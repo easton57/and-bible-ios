@@ -1873,6 +1873,18 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
         bridge.clearSelection()
     }
 
+    /// Open a web search for the currently selected text.
+    func webSearchSelection() {
+        guard !selectedText.isEmpty else { return }
+        guard let encoded = selectedText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://www.google.com/search?q=\(encoded)") else { return }
+        #if os(iOS)
+        UIApplication.shared.open(url)
+        #elseif os(macOS)
+        NSWorkspace.shared.open(url)
+        #endif
+    }
+
     // MARK: - BibleBridgeDelegate — Content Actions
 
     /// Callback for presenting action sheets (set by BibleReaderView)

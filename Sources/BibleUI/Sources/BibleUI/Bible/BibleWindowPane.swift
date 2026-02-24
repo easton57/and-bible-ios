@@ -140,9 +140,9 @@ struct BibleWindowPane: View {
                         window.syncGroup = group
                     } label: {
                         if window.syncGroup == group {
-                            SwiftUI.Label("Group \(group)", systemImage: "checkmark")
+                            SwiftUI.Label(String(localized: "Group \(group)"), systemImage: "checkmark")
                         } else {
-                            Text("Group \(group)")
+                            Text(String(localized: "Group \(group)"))
                         }
                     }
                 }
@@ -311,6 +311,12 @@ struct BibleWindowPane: View {
                 VStack(spacing: 2) {
                     Image(systemName: "speaker.wave.2")
                     Text(String(localized: "speak")).font(.caption2)
+                }
+            }
+            Button { controller?.webSearchSelection() } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "magnifyingglass")
+                    Text(String(localized: "search_web")).font(.caption2)
                 }
             }
         }

@@ -77,6 +77,7 @@
 "bookmark" = "Bookmark";
 "copy" = "Copy";
 "share" = "Share";
+"search_web" = "Web";
 
 /* Strong's Modes */
 "strongs_off" = "Off";
@@ -114,6 +115,8 @@
 "edit_label" = "Edit Label";
 "label_edit_name" = "Name";
 "label_edit_color" = "Color";
+"label_edit_icon" = "Icon";
+"no_icon" = "No Icon";
 "label_edit_options" = "Options";
 "favourite" = "Favourite";
 "underline_style" = "Underline Style";

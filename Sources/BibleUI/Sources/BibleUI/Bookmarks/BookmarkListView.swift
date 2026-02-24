@@ -281,7 +281,7 @@ private struct BookmarkRow: View {
             }
 
             if let icon = bookmark.customIcon, !icon.isEmpty {
-                Text(icon)
+                Image(systemName: icon)
                     .font(.headline)
             }
 

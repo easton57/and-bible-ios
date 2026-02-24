@@ -304,3 +304,15 @@
 "%lld selected" = "%lld selected";
 "%lld window" = "%lld window";
 "%lld windows" = "%lld windows";
+"back_to_previous" = "Back";
+"find_all_occurrences" = "Find all occurrences";
+"no_dictionary_installed" = "No dictionary module installed. Download Strong's Hebrew/Greek from Downloads.";
+"language_system_default" = "System Default";
+"language_restart_required" = "Restart the app for the language change to take effect.";
+"settings_language" = "Language";
+"open_studypad_for_label %@" = "Open \"%@\" StudyPad";
+"No matches found for \"%@\"" = "No matches found for \"%@\"";
+"Enter a search term to find text within \"%@\"." = "Enter a search term to find text within \"%@\".";
+"label_edit_icon" = "Icon";
+"no_icon" = "No Icon";
+"search_web" = "Web";

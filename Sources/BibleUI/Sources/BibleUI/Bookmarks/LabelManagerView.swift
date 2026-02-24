@@ -65,8 +65,9 @@ public struct LabelManagerView: View {
                 } label: {
                     HStack(spacing: 10) {
                         if let icon = label.customIcon, !icon.isEmpty {
-                            Text(icon)
+                            Image(systemName: icon)
                                 .font(.body)
+                                .foregroundStyle(Color(argbInt: label.color))
                         } else {
                             Circle()
                                 .fill(Color(argbInt: label.color))
@@ -157,6 +158,20 @@ private struct LabelEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    // SF Symbol icons matching Android's 27 predefined drawable icons + extras
+    private static let iconSymbols: [String] = [
+        "book.fill", "book.closed.fill", "cross.fill",
+        "building.columns.fill", "starofdavid.fill", "figure.mind.and.body",
+        "info.circle.fill", "questionmark.circle.fill", "exclamationmark.circle.fill",
+        "lightbulb.fill", "bell.fill", "flag.fill",
+        "star.fill", "tag.fill", "envelope.fill",
+        "text.bubble.fill", "square.and.arrow.up", "link",
+        "hands.clap.fill", "clock.fill", "mappin.and.ellipse",
+        "globe", "calendar", "person.fill",
+        "music.note", "mic.fill", "key.fill",
+        "crown.fill", "heart.fill", "heart.slash.fill",
+    ]
+
     // Preset colors matching Android's highlight palette
     private static let presetColors: [(name: String, argb: Int)] = [
         ("Red", Int(Int32(bitPattern: 0xFFFF0000))),
@@ -196,6 +211,40 @@ private struct LabelEditView: View {
                                             .foregroundStyle(.white)
                                     }
                                 }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            Section(String(localized: "label_edit_icon")) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                    // "No Icon" clear button
+                    Button {
+                        label.customIcon = nil
+                        save()
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                            .font(.title2)
+                            .frame(width: 36, height: 36)
+                            .foregroundStyle(label.customIcon == nil ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    ForEach(Self.iconSymbols, id: \.self) { symbol in
+                        Button {
+                            if label.customIcon == symbol {
+                                label.customIcon = nil
+                            } else {
+                                label.customIcon = symbol
+                            }
+                            save()
+                        } label: {
+                            Image(systemName: symbol)
+                                .font(.title2)
+                                .frame(width: 36, height: 36)
+                                .foregroundStyle(label.customIcon == symbol ? Color(argbInt: label.color) : Color.secondary)
                         }
                         .buttonStyle(.plain)
                     }

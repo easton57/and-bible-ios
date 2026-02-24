@@ -2,12 +2,18 @@
 
 import SwiftUI
 import BibleCore
+#if os(iOS)
+import UIKit
+#endif
 
 /// Settings for controlling how Bible text is displayed.
 /// Binds to a TextDisplaySettings struct for persistence.
 public struct TextDisplaySettingsView: View {
     @Binding var settings: TextDisplaySettings
     var onChange: (() -> Void)?
+    #if os(iOS)
+    @State private var showFontPicker = false
+    #endif
 
     public init(settings: Binding<TextDisplaySettings>, onChange: (() -> Void)? = nil) {
         self._settings = settings
@@ -43,6 +49,14 @@ public struct TextDisplaySettingsView: View {
         )
     }
 
+    private var currentFontName: String {
+        let family = settings.fontFamily ?? "sans-serif"
+        if family == "sans-serif" { return "Sans Serif (Default)" }
+        if family == "serif" { return "Serif" }
+        if family == "monospace" { return "Monospace" }
+        return family
+    }
+
     public var body: some View {
         Form {
             Section(String(localized: "settings_font")) {
@@ -52,6 +66,23 @@ public struct TextDisplaySettingsView: View {
                     Text("\(settings.fontSize ?? 18)")
                         .monospacedDigit()
                 }
+                #if os(iOS)
+                Button {
+                    showFontPicker = true
+                } label: {
+                    HStack {
+                        Text(String(localized: "font_family"))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text(currentFontName)
+                            .font(.custom(settings.fontFamily ?? "sans-serif", size: 16))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .sheet(isPresented: $showFontPicker) {
+                    FontPickerView(selectedFamily: fontFamilyBinding)
+                }
+                #else
                 Picker(String(localized: "font_family"), selection: fontFamilyBinding) {
                     ForEach(Self.fontOptions, id: \.value) { option in
                         Text(option.label)
@@ -59,6 +90,7 @@ public struct TextDisplaySettingsView: View {
                             .tag(option.value)
                     }
                 }
+                #endif
             }
 
             Section(String(localized: "settings_layout")) {
@@ -101,13 +133,11 @@ public struct TextDisplaySettingsView: View {
         .navigationTitle(String(localized: "text_display"))
     }
 
-    // MARK: - Font Options
+    // MARK: - Font Options (macOS fallback)
 
     private struct FontOption {
         let label: String
-        /// CSS font-family value sent to Vue.js WebView
         let value: String
-        /// iOS font name for preview rendering
         let previewFont: String
     }
 
@@ -125,3 +155,46 @@ public struct TextDisplaySettingsView: View {
         FontOption(label: "Monospace", value: "monospace", previewFont: "Menlo-Regular"),
     ]
 }
+
+// MARK: - UIFontPickerViewController Wrapper (iOS only)
+
+#if os(iOS)
+private struct FontPickerView: UIViewControllerRepresentable {
+    @Binding var selectedFamily: String
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIFontPickerViewController {
+        let config = UIFontPickerViewController.Configuration()
+        config.includeFaces = false
+        let picker = UIFontPickerViewController(configuration: config)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIFontPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIFontPickerViewControllerDelegate {
+        let parent: FontPickerView
+
+        init(_ parent: FontPickerView) {
+            self.parent = parent
+        }
+
+        func fontPickerViewControllerDidPickFont(_ viewController: UIFontPickerViewController) {
+            guard let descriptor = viewController.selectedFontDescriptor else { return }
+            if let family = descriptor.object(forKey: .family) as? String {
+                parent.selectedFamily = family
+            }
+            parent.dismiss()
+        }
+
+        func fontPickerViewControllerDidCancel(_ viewController: UIFontPickerViewController) {
+            parent.dismiss()
+        }
+    }
+}
+#endif
