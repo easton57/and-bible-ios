@@ -124,8 +124,18 @@ public final class ModuleRepository: @unchecked Sendable {
                         catalogPath: parts[2]
                     ))
                 }
+            } else if trimmed.hasPrefix("FTPSource=") {
+                let value = String(trimmed.dropFirst("FTPSource=".count))
+                let parts = value.components(separatedBy: "|")
+                if parts.count >= 3 {
+                    sources.append(SourceConfig(
+                        name: parts[0],
+                        type: "FTP",
+                        host: parts[1],
+                        catalogPath: parts[2]
+                    ))
+                }
             }
-            // Skip FTP sources — URLSession doesn't support FTP
         }
         return sources
     }
@@ -231,7 +241,10 @@ public final class ModuleRepository: @unchecked Sendable {
     /// Download and parse the module catalog for a source.
     /// - Returns: List of available modules from this source.
     public func refreshCatalog(for source: SourceConfig) async throws -> [RemoteModuleInfo] {
-        guard source.type == "HTTP" else { return [] }
+        guard source.type == "HTTP" else {
+            logger.info("Skipping FTP source '\(source.name)' — FTP is not supported on iOS")
+            return []
+        }
 
         guard let baseURL = source.baseURL else {
             throw ModuleRepositoryError.invalidURL(source.name)

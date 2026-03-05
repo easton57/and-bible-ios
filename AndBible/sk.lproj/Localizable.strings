@@ -371,3 +371,7 @@
 "go_to_reference_invalid" = "Could not find that reference";
 "go" = "Go";
 "browse" = "Browse...";
+
+/* FTP source support */
+"ftp_unsupported" = "Not Supported";
+"ftp_not_supported_hint" = "FTP sources are not supported on iOS. Use an HTTP source instead.";

@@ -2101,6 +2101,33 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
             handleMultiLink(link)
             return
         }
+        // Handle sword:// links (e.g. sword://Bible/John.17.11 from Calvin's commentary)
+        if link.hasPrefix("sword://") {
+            handleSwordLink(link)
+            return
+        }
+        // Handle MyBible cross-reference links: "B:bookInt chapter:verse"
+        if link.hasPrefix("B:") {
+            handleMyBibleLink(link)
+            return
+        }
+        // Handle MyBible Strong's links: "S:G2424" or "S:H1234"
+        if link.hasPrefix("S:") {
+            let strongRef = String(link.dropFirst(2))
+            handleStrongsLink("ab-w://?strong=\(strongRef)")
+            return
+        }
+        // Handle MySword Bible links: "#bBookInt.Chapter.Verse"
+        if link.hasPrefix("#b") {
+            handleMySwordBibleLink(link)
+            return
+        }
+        // Handle MySword Strong's links: "#sG2424" or "#dH1234"
+        if link.hasPrefix("#s") || link.hasPrefix("#d") {
+            let strongRef = String(link.dropFirst(2))
+            handleStrongsLink("ab-w://?strong=\(strongRef)")
+            return
+        }
         guard let url = URL(string: link) else { return }
         #if os(iOS)
         UIApplication.shared.open(url)
@@ -2542,6 +2569,138 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
             onShowCrossReferences?(crossRefs)
         }
     }
+
+    /// Handle sword:// links (e.g. sword://Bible/John.17.11 from Calvin's commentary).
+    /// Format: sword://moduleName/OsisRef or sword://Bible/OsisRef
+    private func handleSwordLink(_ link: String) {
+        logger.info("handleSwordLink: \(link)")
+        // Strip "sword://" prefix
+        var ref = String(link.dropFirst("sword://".count))
+        // Strip leading/trailing slashes
+        while ref.hasPrefix("/") { ref = String(ref.dropFirst()) }
+        while ref.hasSuffix("/") { ref = String(ref.dropLast()) }
+
+        guard !ref.isEmpty else { return }
+
+        if let slashIdx = ref.firstIndex(of: "/") {
+            let modulePart = String(ref[ref.startIndex..<slashIdx]).lowercased()
+            let osisRef = String(ref[ref.index(after: slashIdx)...])
+            // If module is "Bible" (generic), just navigate to the OSIS ref
+            if modulePart == "bible" {
+                _ = navigateToOsisRef(osisRef)
+            } else {
+                // Try to navigate with the OSIS ref regardless of module name
+                // (we don't switch modules for now, just navigate to the reference)
+                _ = navigateToOsisRef(osisRef)
+            }
+        } else {
+            // No slash — treat the whole thing as an OSIS reference
+            _ = navigateToOsisRef(ref)
+        }
+    }
+
+    /// Handle MyBible cross-reference links: "B:bookInt chapter:verse"
+    /// Example: "B:470 1:1" → Matthew 1:1
+    private func handleMyBibleLink(_ link: String) {
+        logger.info("handleMyBibleLink: \(link)")
+        // Format: "B:bookInt chapter:verse" (e.g. "B:470 1:1")
+        let parts = link.split(separator: " ", maxSplits: 1)
+        guard parts.count >= 2 else { return }
+
+        // Extract book number from "B:470"
+        let bookPart = String(parts[0])
+        guard bookPart.hasPrefix("B:"),
+              let bookInt = Int(bookPart.dropFirst(2)) else { return }
+
+        // Look up OSIS ID from MyBible book number
+        guard let osisId = Self.myBibleIntToOsisId[bookInt] else {
+            logger.warning("Unknown MyBible book number: \(bookInt)")
+            return
+        }
+
+        // Parse "chapter:verse"
+        let chapVerse = String(parts[1]).components(separatedBy: ":")
+        guard let chapter = Int(chapVerse[0]) else { return }
+        let verse = chapVerse.count >= 2 ? Int(chapVerse[1]) : nil
+
+        let osisRef = verse != nil ? "\(osisId).\(chapter).\(verse!)" : "\(osisId).\(chapter)"
+        _ = navigateToOsisRef(osisRef)
+    }
+
+    /// Handle MySword Bible links: "#bBookInt.Chapter.Verse"
+    /// Example: "#b40.1.1" → Matthew 1:1 (MySword uses sequential 1-66 numbering)
+    private func handleMySwordBibleLink(_ link: String) {
+        logger.info("handleMySwordBibleLink: \(link)")
+        // Format: "#bBookInt.Chapter.Verse" (e.g. "#b40.1.1")
+        let rest = String(link.dropFirst(2)) // strip "#b"
+        let parts = rest.split(separator: ".").compactMap { Int($0) }
+        guard parts.count >= 2 else { return }
+
+        let bookInt = parts[0]
+        let chapter = parts[1]
+        let verse = parts.count >= 3 ? parts[2] : nil
+
+        // MySword uses sequential 1-66 numbering (1=Gen, 40=Matt, 66=Rev)
+        guard let osisId = Self.mySwordIntToOsisId[bookInt] else {
+            logger.warning("Unknown MySword book number: \(bookInt)")
+            return
+        }
+
+        let osisRef = verse != nil ? "\(osisId).\(chapter).\(verse!)" : "\(osisId).\(chapter)"
+        _ = navigateToOsisRef(osisRef)
+    }
+
+    // MARK: - MySword/MyBible Book Number Mappings
+
+    /// MySword sequential book numbering (1-66, Protestant canon).
+    /// Matches Android's mySwordIntToBibleBook in MySwordBookMap.kt.
+    private static let mySwordIntToOsisId: [Int: String] = [
+        1: "Gen", 2: "Exod", 3: "Lev", 4: "Num", 5: "Deut",
+        6: "Josh", 7: "Judg", 8: "Ruth", 9: "1Sam", 10: "2Sam",
+        11: "1Kgs", 12: "2Kgs", 13: "1Chr", 14: "2Chr",
+        15: "Ezra", 16: "Neh", 17: "Esth", 18: "Job",
+        19: "Ps", 20: "Prov", 21: "Eccl", 22: "Song",
+        23: "Isa", 24: "Jer", 25: "Lam", 26: "Ezek", 27: "Dan",
+        28: "Hos", 29: "Joel", 30: "Amos", 31: "Obad", 32: "Jonah",
+        33: "Mic", 34: "Nah", 35: "Hab", 36: "Zeph",
+        37: "Hag", 38: "Zech", 39: "Mal",
+        40: "Matt", 41: "Mark", 42: "Luke", 43: "John",
+        44: "Acts", 45: "Rom", 46: "1Cor", 47: "2Cor",
+        48: "Gal", 49: "Eph", 50: "Phil", 51: "Col",
+        52: "1Thess", 53: "2Thess", 54: "1Tim", 55: "2Tim",
+        56: "Titus", 57: "Phlm", 58: "Heb",
+        59: "Jas", 60: "1Pet", 61: "2Pet",
+        62: "1John", 63: "2John", 64: "3John",
+        65: "Jude", 66: "Rev",
+    ]
+
+    /// MyBible non-sequential book numbering.
+    /// Matches Android's myBibleIntToBibleBook in MyBibleBookMap.kt.
+    private static let myBibleIntToOsisId: [Int: String] = [
+        10: "Gen", 20: "Exod", 30: "Lev", 40: "Num", 50: "Deut",
+        60: "Josh", 70: "Judg", 80: "Ruth",
+        90: "1Sam", 100: "2Sam", 110: "1Kgs", 120: "2Kgs",
+        130: "1Chr", 140: "2Chr",
+        150: "Ezra", 160: "Neh", 190: "Esth",
+        220: "Job", 230: "Ps", 240: "Prov", 250: "Eccl", 260: "Song",
+        290: "Isa", 300: "Jer", 310: "Lam", 320: "Bar",
+        330: "Ezek", 340: "Dan",
+        350: "Hos", 360: "Joel", 370: "Amos", 380: "Obad",
+        390: "Jonah", 400: "Mic", 410: "Nah", 420: "Hab",
+        430: "Zeph", 440: "Hag", 450: "Zech", 460: "Mal",
+        470: "Matt", 480: "Mark", 490: "Luke", 500: "John",
+        510: "Acts", 520: "Rom", 530: "1Cor", 540: "2Cor",
+        550: "Gal", 560: "Eph", 570: "Phil", 580: "Col",
+        590: "1Thess", 600: "2Thess", 610: "1Tim", 620: "2Tim",
+        630: "Titus", 640: "Phlm", 650: "Heb",
+        660: "Jas", 670: "1Pet", 680: "2Pet",
+        690: "1John", 700: "2John", 710: "3John",
+        720: "Jude", 730: "Rev",
+        // Deuterocanonical / Apocrypha (MyBible includes these)
+        170: "Tob", 180: "Jdt", 270: "Wis", 280: "Sir",
+        462: "1Macc", 464: "2Macc", 466: "3Macc", 467: "4Macc",
+        468: "2Esd",
+    ]
 
     /// Parse an OSIS reference string like "Matt.1.1" or "Gen.1.1-Gen.1.3" into structured refs.
     private func parseOsisReferences(_ osisString: String) -> [OsisRef] {

@@ -275,6 +275,8 @@
 "source_host_placeholder" = "Host (e.g., example.org)";
 "source_path_placeholder" = "Catalog Path (e.g., /sword)";
 "source_catalog_hint" = "The source must serve a SWORD module catalog at the specified host and path (mods.d.tar.gz).";
+"ftp_unsupported" = "FTP — Not Supported";
+"ftp_not_supported_hint" = "FTP sources are not supported on iOS. Please use an HTTP/HTTPS source instead.";
 "add_source" = "Add Source";
 
 /* ========================================

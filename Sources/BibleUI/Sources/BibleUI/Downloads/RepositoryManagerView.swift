@@ -83,7 +83,12 @@ public struct RepositoryManagerView: View {
     }
 
     private var enabledCount: Int {
-        sources.filter { !disabledSources.contains($0.name) }.count
+        sources.filter { !disabledSources.contains($0.name) && $0.type != "FTP" }.count
+    }
+
+    private var isFTPHost: Bool {
+        let host = newSourceHost.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return host.hasPrefix("ftp://") || host.hasPrefix("ftp.")
     }
 
     // MARK: - Source Row
@@ -105,17 +110,28 @@ public struct RepositoryManagerView: View {
 
                 Spacer()
 
-                Text(source.type)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(Capsule())
+                if source.type == "FTP" {
+                    Text(String(localized: "ftp_unsupported"))
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Capsule())
+                } else {
+                    Text(source.type)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Capsule())
+                }
             }
         }
         .contentShape(Rectangle())
         .onTapGesture {
+            guard source.type != "FTP" else { return }
             toggleSource(source)
         }
         .swipeActions(edge: .trailing) {
@@ -147,6 +163,14 @@ public struct RepositoryManagerView: View {
                     #endif
             }
 
+            if isFTPHost {
+                Section {
+                    SwiftUI.Label(String(localized: "ftp_not_supported_hint"), systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
             Section {
                 Text(String(localized: "source_catalog_hint"))
                     .font(.caption)
@@ -169,7 +193,7 @@ public struct RepositoryManagerView: View {
                     addSource()
                     showAddSource = false
                 }
-                .disabled(newSourceName.isEmpty || newSourceHost.isEmpty || newSourcePath.isEmpty)
+                .disabled(newSourceName.isEmpty || newSourceHost.isEmpty || newSourcePath.isEmpty || isFTPHost)
             }
         }
     }

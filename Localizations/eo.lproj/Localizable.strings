@@ -342,3 +342,7 @@
 "help_workspaces_body" = "Save different window arrangements as workspaces. Switch between them from the overflow menu.";
 "help_hidden" = "Hidden Features";
 "help_hidden_body" = "Double-tap the Bible text for fullscreen mode. Enable Tilt to Scroll in the overflow menu. Discrete calculator mode is available in Settings.";
+
+/* FTP source support */
+"ftp_unsupported" = "Not Supported";
+"ftp_not_supported_hint" = "FTP sources are not supported on iOS. Use an HTTP source instead.";
