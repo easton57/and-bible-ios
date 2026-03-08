@@ -1,6 +1,7 @@
 // CalculatorView.swift — Calculator disguise for discrete mode
 
 import SwiftUI
+import BibleCore
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
@@ -27,7 +28,8 @@ public struct CalculatorView: View {
     @State private var currentOperation: Operation?
     @State private var secretTapCount = 0
     @State private var shouldShowBible = false
-    @AppStorage("calculator_pin") private var calculatorPin = "1234"
+    @AppStorage(AppPreferenceKey.calculatorPin.rawValue)
+    private var calculatorPin = AppPreferenceRegistry.stringDefault(for: .calculatorPin) ?? "1234"
 
     private let secretTapThreshold = 7 // Taps on "=" to unlock Bible
 

@@ -266,6 +266,7 @@ extension BibleWebView {
         // Ensure taps pass through to web content without delay
         webView.scrollView.delaysContentTouches = false
         webView.scrollView.canCancelContentTouches = true
+        webView.scrollView.delegate = coordinator
         #endif
 
         bridge.webView = webView

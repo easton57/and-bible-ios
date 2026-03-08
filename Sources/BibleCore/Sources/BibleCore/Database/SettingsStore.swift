@@ -96,3 +96,142 @@ public final class SettingsStore {
         try? modelContext.save()
     }
 }
+
+// MARK: - AppPreferenceKey Accessors
+
+public extension SettingsStore {
+    func getString(_ key: AppPreferenceKey) -> String {
+        if let stored = readStoredValue(for: key) {
+            return stored
+        }
+        return AppPreferenceRegistry.stringDefault(for: key) ?? ""
+    }
+
+    func setString(_ key: AppPreferenceKey, value: String) {
+        let definition = AppPreferenceRegistry.definition(for: key)
+        switch definition.storage {
+        case .swiftData:
+            setString(key.rawValue, value: value)
+        case .userDefaults:
+            UserDefaults.standard.set(value, forKey: key.rawValue)
+        case .action:
+            break
+        }
+    }
+
+    func getBool(_ key: AppPreferenceKey) -> Bool {
+        let fallback = AppPreferenceRegistry.boolDefault(for: key) ?? false
+        let definition = AppPreferenceRegistry.definition(for: key)
+
+        switch definition.storage {
+        case .swiftData:
+            guard let raw = getString(key.rawValue) else { return fallback }
+            return raw == "true"
+        case .userDefaults:
+            if let boolValue = UserDefaults.standard.object(forKey: key.rawValue) as? Bool {
+                return boolValue
+            }
+            if let raw = UserDefaults.standard.string(forKey: key.rawValue) {
+                return raw == "true"
+            }
+            return fallback
+        case .action:
+            return fallback
+        }
+    }
+
+    func setBool(_ key: AppPreferenceKey, value: Bool) {
+        let definition = AppPreferenceRegistry.definition(for: key)
+        switch definition.storage {
+        case .swiftData:
+            setString(key.rawValue, value: value ? "true" : "false")
+        case .userDefaults:
+            UserDefaults.standard.set(value, forKey: key.rawValue)
+        case .action:
+            break
+        }
+    }
+
+    func getInt(_ key: AppPreferenceKey) -> Int {
+        let fallback = AppPreferenceRegistry.intDefault(for: key) ?? 0
+        let definition = AppPreferenceRegistry.definition(for: key)
+
+        switch definition.storage {
+        case .swiftData:
+            guard let raw = getString(key.rawValue) else { return fallback }
+            return Int(raw) ?? fallback
+        case .userDefaults:
+            let object = UserDefaults.standard.object(forKey: key.rawValue)
+            if let intValue = object as? Int {
+                return intValue
+            }
+            if let stringValue = object as? String {
+                return Int(stringValue) ?? fallback
+            }
+            return fallback
+        case .action:
+            return fallback
+        }
+    }
+
+    func setInt(_ key: AppPreferenceKey, value: Int) {
+        let definition = AppPreferenceRegistry.definition(for: key)
+        switch definition.storage {
+        case .swiftData:
+            setString(key.rawValue, value: String(value))
+        case .userDefaults:
+            UserDefaults.standard.set(value, forKey: key.rawValue)
+        case .action:
+            break
+        }
+    }
+
+    func getStringSet(_ key: AppPreferenceKey) -> [String] {
+        let definition = AppPreferenceRegistry.definition(for: key)
+        switch definition.storage {
+        case .swiftData:
+            let raw = getString(key.rawValue)
+            return AppPreferenceRegistry.decodeCSVSet(raw)
+        case .userDefaults:
+            if let values = UserDefaults.standard.array(forKey: key.rawValue) as? [String] {
+                return values
+            }
+            let raw = UserDefaults.standard.string(forKey: key.rawValue)
+            return AppPreferenceRegistry.decodeCSVSet(raw)
+        case .action:
+            return []
+        }
+    }
+
+    func setStringSet(_ key: AppPreferenceKey, values: [String]) {
+        let encoded = AppPreferenceRegistry.encodeCSVSet(values)
+        let definition = AppPreferenceRegistry.definition(for: key)
+        switch definition.storage {
+        case .swiftData:
+            setString(key.rawValue, value: encoded)
+        case .userDefaults:
+            UserDefaults.standard.set(values.sorted(), forKey: key.rawValue)
+        case .action:
+            break
+        }
+    }
+
+    private func readStoredValue(for key: AppPreferenceKey) -> String? {
+        let definition = AppPreferenceRegistry.definition(for: key)
+        switch definition.storage {
+        case .swiftData:
+            return getString(key.rawValue)
+        case .userDefaults:
+            let object = UserDefaults.standard.object(forKey: key.rawValue)
+            if let boolValue = object as? Bool {
+                return boolValue ? "true" : "false"
+            }
+            if let intValue = object as? Int {
+                return String(intValue)
+            }
+            return object as? String
+        case .action:
+            return nil
+        }
+    }
+}

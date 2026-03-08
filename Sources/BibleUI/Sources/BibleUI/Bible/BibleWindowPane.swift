@@ -48,6 +48,7 @@ struct BibleWindowPane: View {
     var onSearchForStrongs: ((String) -> Void)?
     var onShowStrongsSheet: ((String, String) -> Void)?
     var onRefChooserDialog: ((@escaping (String?) -> Void) -> Void)?
+    var onUserScrollDeltaY: ((Double) -> Void)?
 
     /// The active background color as an ARGB integer.
     private var activeBackgroundColorInt: Int {
@@ -324,12 +325,21 @@ struct BibleWindowPane: View {
         }
         ctrl.onInteraction = focusHandler
         bridge.onAnyMessage = focusHandler
+        bridge.onNativeScrollDeltaY = { deltaY in
+            onUserScrollDeltaY?(deltaY)
+        }
 
         // Wire WindowManager reference for synchronized scrolling
         ctrl.windowManagerRef = windowManager
 
         // Links window support: single OSIS references open in a links window
         ctrl.onOpenInLinksWindow = { [weak windowManager] book, chapter in
+            let useLinksWindow = store.getBool(.openLinksInSpecialWindowPref)
+            guard useLinksWindow else {
+                ctrl.navigateTo(book: book, chapter: chapter)
+                return
+            }
+
             guard let wm = windowManager else { return }
             // Find or create a links window for this source window
             let linksWindow: Window
@@ -412,6 +422,14 @@ struct BibleWindowPane: View {
                 VStack(spacing: 2) {
                     Image(systemName: "magnifyingglass")
                     Text(String(localized: "search_web")).font(.caption2)
+                }
+            }
+            if controller?.hasWordLookupDictionaries == true {
+                Button { controller?.lookupSelectionInDictionaries() } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: "book.closed")
+                        Text(String(localized: "dictionary")).font(.caption2)
+                    }
                 }
             }
         }

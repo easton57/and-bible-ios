@@ -3,6 +3,9 @@
 import Foundation
 import WebKit
 import os.log
+#if os(iOS)
+import UIKit
+#endif
 
 private let logger = Logger(subsystem: "org.andbible", category: "WebViewCoordinator")
 
@@ -10,6 +13,9 @@ private let logger = Logger(subsystem: "org.andbible", category: "WebViewCoordin
 public class WebViewCoordinator: NSObject, WKNavigationDelegate {
     let bridge: BibleBridge
     weak var webView: WKWebView?
+    #if os(iOS)
+    private var lastUserScrollOffsetY: CGFloat?
+    #endif
 
     init(bridge: BibleBridge) {
         self.bridge = bridge
@@ -20,6 +26,9 @@ public class WebViewCoordinator: NSObject, WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         logger.info("BibleView page loaded successfully")
+        #if os(iOS)
+        lastUserScrollOffsetY = webView.scrollView.contentOffset.y
+        #endif
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -66,3 +75,33 @@ public class WebViewCoordinator: NSObject, WKNavigationDelegate {
         logger.error("BibleView provisional navigation failed: \(error.localizedDescription)")
     }
 }
+
+#if os(iOS)
+extension WebViewCoordinator: UIScrollViewDelegate {
+    public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        lastUserScrollOffsetY = scrollView.contentOffset.y
+    }
+
+    public func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let offsetY = scrollView.contentOffset.y
+        guard scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating else {
+            lastUserScrollOffsetY = offsetY
+            return
+        }
+        guard let previous = lastUserScrollOffsetY else {
+            lastUserScrollOffsetY = offsetY
+            return
+        }
+
+        let delta = offsetY - previous
+        if delta != 0 {
+            bridge.onNativeScrollDeltaY?(Double(delta))
+        }
+        lastUserScrollOffsetY = offsetY
+    }
+
+    public func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        lastUserScrollOffsetY = scrollView.contentOffset.y
+    }
+}
+#endif

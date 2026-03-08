@@ -26,9 +26,9 @@ struct AndBibleApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     /// Discrete mode persists across launches — controls icon switching.
-    @AppStorage("discrete_mode") private var isDiscreteMode = false
+    @AppStorage(AppPreferenceKey.discreteMode.rawValue) private var isDiscreteMode = false
     /// When enabled, calculator gate appears on every app launch/resume.
-    @AppStorage("show_calculator") private var showCalculator = false
+    @AppStorage(AppPreferenceKey.showCalculator.rawValue) private var showCalculator = false
     /// Temporary unlock for the current session — does NOT change the persisted setting.
     @State private var isUnlocked = false
 

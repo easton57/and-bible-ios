@@ -70,6 +70,11 @@ public struct BibleReaderView: View {
     @State private var toastMessage: String?
     @State private var toastWorkItem: DispatchWorkItem?
     @State private var isFullScreen = false
+    @State private var navigateToVersePref = AppPreferenceRegistry.boolDefault(for: .navigateToVersePref) ?? false
+    @State private var autoFullscreenPref = AppPreferenceRegistry.boolDefault(for: .autoFullscreenPref) ?? false
+    @State private var lastFullScreenByDoubleTap = false
+    @State private var autoFullscreenDirectionDown: Bool?
+    @State private var autoFullscreenDistance: Double = 0
     @State private var showDictionaryBrowser = false
     @State private var showGeneralBookBrowser = false
     @State private var showMapBrowser = false
@@ -85,6 +90,8 @@ public struct BibleReaderView: View {
     #if os(iOS)
     @State private var tiltScrollService = TiltScrollService()
     #endif
+
+    private let autoFullscreenScrollThreshold: Double = 56.0
 
     /// The focused window's controller — reads from WindowManager's single source of truth.
     /// References `controllerVersion` to guarantee SwiftUI re-evaluates when controllers
@@ -162,6 +169,11 @@ public struct BibleReaderView: View {
             // Load persisted settings
             let store = SettingsStore(modelContext: modelContext)
             nightMode = store.getBool("night_mode")
+            navigateToVersePref = store.getBool(.navigateToVersePref)
+            autoFullscreenPref = store.getBool(.autoFullscreenPref)
+            #if os(iOS)
+            UIApplication.shared.isIdleTimerDisabled = store.getBool(.screenKeepOnPref)
+            #endif
 
             // Wire TTS settings persistence and restore saved speed
             speakService.settingsStore = store
@@ -244,9 +256,12 @@ public struct BibleReaderView: View {
         .preferredColorScheme(nightMode ? .dark : nil)
         .sheet(isPresented: $showBookChooser) {
             NavigationStack {
-                BookChooserView(books: focusedController?.bookList ?? BibleReaderController.defaultBooks) { book, chapter in
+                BookChooserView(
+                    books: focusedController?.bookList ?? BibleReaderController.defaultBooks,
+                    navigateToVerse: navigateToVersePref
+                ) { book, chapter, verse in
                     showBookChooser = false
-                    focusedController?.navigateTo(book: book, chapter: chapter)
+                    focusedController?.navigateTo(book: book, chapter: chapter, verse: verse)
                 }
             }
         }
@@ -299,6 +314,9 @@ public struct BibleReaderView: View {
                                 ctrl.updateDisplaySettings(displaySettings, nightMode: nightMode)
                             }
                         }
+                        let store = SettingsStore(modelContext: modelContext)
+                        navigateToVersePref = store.getBool(.navigateToVersePref)
+                        autoFullscreenPref = store.getBool(.autoFullscreenPref)
                     }
                 )
                 .toolbar {
@@ -306,6 +324,16 @@ public struct BibleReaderView: View {
                         Button(String(localized: "done")) { showSettings = false }
                     }
                 }
+            }
+        }
+        .onChange(of: showSettings) { _, isPresented in
+            if !isPresented {
+                reloadBehaviorPreferences()
+            }
+        }
+        .onChange(of: isFullScreen) { _, fullScreen in
+            if !fullScreen {
+                lastFullScreenByDoubleTap = false
             }
         }
         .sheet(isPresented: $showCompare) {
@@ -489,7 +517,7 @@ public struct BibleReaderView: View {
         }
         .sheet(isPresented: $showRefChooser) {
             NavigationStack {
-                BookChooserView(books: focusedController?.bookList ?? BibleReaderController.defaultBooks) { book, chapter in
+                BookChooserView(books: focusedController?.bookList ?? BibleReaderController.defaultBooks) { book, chapter, _ in
                     showRefChooser = false
                     let osisId = focusedController?.osisBookId(for: book) ?? BibleReaderController.osisBookId(for: book)
                     refChooserCompletion?("\(osisId).\(chapter)")
@@ -611,7 +639,14 @@ public struct BibleReaderView: View {
             },
             onShowWorkspaces: { showWorkspaces = true },
             onToggleFullScreen: {
-                withAnimation { isFullScreen.toggle() }
+                if isFullScreen {
+                    withAnimation(.easeInOut(duration: 0.2)) { isFullScreen = false }
+                    lastFullScreenByDoubleTap = false
+                } else {
+                    withAnimation(.easeInOut(duration: 0.2)) { isFullScreen = true }
+                    lastFullScreenByDoubleTap = true
+                }
+                resetAutoFullscreenTracking()
             },
             onSearchForStrongs: { strongsNum in
                 searchInitialQuery = strongsNum
@@ -641,6 +676,9 @@ public struct BibleReaderView: View {
                 // Present book chooser and return OSIS ref
                 refChooserCompletion = completion
                 showRefChooser = true
+            },
+            onUserScrollDeltaY: { deltaY in
+                handleAutoFullscreenScroll(from: window, deltaY: deltaY)
             }
         )
     }
@@ -1034,6 +1072,8 @@ public struct BibleReaderView: View {
                                 get: { isFullScreen },
                                 set: { newValue in
                                     withAnimation(.easeInOut(duration: 0.2)) { isFullScreen = newValue }
+                                    lastFullScreenByDoubleTap = false
+                                    resetAutoFullscreenTracking()
                                 }
                             )) {
                                 SwiftUI.Label(String(localized: "fullscreen"), systemImage: "arrow.up.left.and.arrow.down.right")
@@ -1318,6 +1358,46 @@ public struct BibleReaderView: View {
             if let ctrl = windowManager.controllers[window.id] as? BibleReaderController {
                 ctrl.updateDisplaySettings(displaySettings, nightMode: nightMode)
             }
+        }
+    }
+
+    private func reloadBehaviorPreferences() {
+        let store = SettingsStore(modelContext: modelContext)
+        navigateToVersePref = store.getBool(.navigateToVersePref)
+        autoFullscreenPref = store.getBool(.autoFullscreenPref)
+    }
+
+    private func resetAutoFullscreenTracking() {
+        autoFullscreenDirectionDown = nil
+        autoFullscreenDistance = 0
+    }
+
+    private func handleAutoFullscreenScroll(from window: Window, deltaY: Double) {
+        guard windowManager.activeWindow?.id == window.id else { return }
+        guard autoFullscreenPref else {
+            resetAutoFullscreenTracking()
+            return
+        }
+        guard deltaY != 0 else { return }
+
+        let isDirectionDown = deltaY > 0
+        if autoFullscreenDirectionDown != isDirectionDown {
+            autoFullscreenDirectionDown = isDirectionDown
+            autoFullscreenDistance = 0
+        }
+
+        autoFullscreenDistance += abs(deltaY)
+        guard autoFullscreenDistance >= autoFullscreenScrollThreshold else { return }
+        autoFullscreenDistance = 0
+
+        // Match Android: when fullscreen was entered by double-tap, scrolling
+        // should not auto-toggle fullscreen until fullscreen has been exited.
+        guard !lastFullScreenByDoubleTap else { return }
+
+        if !isFullScreen && isDirectionDown {
+            withAnimation(.easeInOut(duration: 0.2)) { isFullScreen = true }
+        } else if isFullScreen && !isDirectionDown {
+            withAnimation(.easeInOut(duration: 0.2)) { isFullScreen = false }
         }
     }
 

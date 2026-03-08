@@ -9,16 +9,24 @@ import SwordKit
 /// Modules with apocrypha/deuterocanonical books will show additional sections.
 public struct BookChooserView: View {
     let books: [BookInfo]
-    let onSelect: (String, Int) -> Void
+    let navigateToVerse: Bool
+    let onSelect: (String, Int, Int?) -> Void
     @State private var selectedBook: BookInfo?
+    @State private var selectedChapter: Int?
     @Environment(\.dismiss) private var dismiss
 
     /// Create a book chooser with a specific book list.
     /// - Parameters:
     ///   - books: The book list from the active module's versification.
-    ///   - onSelect: Callback with (bookName, chapter) when a chapter is selected.
-    public init(books: [BookInfo], onSelect: @escaping (String, Int) -> Void) {
+    ///   - navigateToVerse: Whether selecting a passage should include a verse step.
+    ///   - onSelect: Callback with (bookName, chapter, verse?) when selection is complete.
+    public init(
+        books: [BookInfo],
+        navigateToVerse: Bool = false,
+        onSelect: @escaping (String, Int, Int?) -> Void
+    ) {
         self.books = books
+        self.navigateToVerse = navigateToVerse
         self.onSelect = onSelect
     }
 
@@ -35,14 +43,28 @@ public struct BookChooserView: View {
     public var body: some View {
         Group {
             if let book = selectedBook {
-                ChapterChooserView(bookName: book.name, chapterCount: book.chapterCount) { chapter in
-                    onSelect(book.name, chapter)
+                if navigateToVerse, let chapter = selectedChapter {
+                    VerseChooserView(
+                        bookName: book.name,
+                        chapter: chapter,
+                        verseCount: BibleReaderController.verseCount(for: book.name, chapter: chapter)
+                    ) { verse in
+                        onSelect(book.name, chapter, verse)
+                    }
+                } else {
+                    ChapterChooserView(bookName: book.name, chapterCount: book.chapterCount) { chapter in
+                        if navigateToVerse {
+                            selectedChapter = chapter
+                        } else {
+                            onSelect(book.name, chapter, nil)
+                        }
+                    }
                 }
             } else {
                 bookGrid
             }
         }
-        .navigationTitle(selectedBook?.name ?? String(localized: "choose_book"))
+        .navigationTitle(navigationTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -50,12 +72,28 @@ public struct BookChooserView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button(String(localized: "cancel")) { dismiss() }
             }
-            if selectedBook != nil {
+            if selectedChapter != nil {
                 ToolbarItem(placement: .navigation) {
-                    Button(String(localized: "books")) { selectedBook = nil }
+                    Button(String(localized: "choose_chapter", defaultValue: "Choose Chapter")) {
+                        selectedChapter = nil
+                    }
+                }
+            } else if selectedBook != nil {
+                ToolbarItem(placement: .navigation) {
+                    Button(String(localized: "books")) {
+                        selectedBook = nil
+                        selectedChapter = nil
+                    }
                 }
             }
         }
+    }
+
+    private var navigationTitle: String {
+        if let book = selectedBook, let chapter = selectedChapter {
+            return "\(book.name) \(chapter)"
+        }
+        return selectedBook?.name ?? String(localized: "choose_book")
     }
 
     private var bookGrid: some View {
@@ -80,7 +118,10 @@ public struct BookChooserView: View {
         let columns = [GridItem(.adaptive(minimum: 100), spacing: 8)]
         return LazyVGrid(columns: columns, spacing: 8) {
             ForEach(books) { book in
-                Button(action: { selectedBook = book }) {
+                Button(action: {
+                    selectedBook = book
+                    selectedChapter = nil
+                }) {
                     Text(book.abbreviation)
                         .font(.subheadline)
                         .frame(maxWidth: .infinity)

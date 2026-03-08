@@ -107,6 +107,9 @@ public final class BibleBridge: NSObject, WKScriptMessageHandler {
     /// Fires on every bridge message — used to detect user interaction for active window tracking.
     public var onAnyMessage: (() -> Void)?
 
+    /// Fires for native user-driven webview scroll deltas (positive = down).
+    public var onNativeScrollDeltaY: ((Double) -> Void)?
+
     public override init() {
         super.init()
     }
