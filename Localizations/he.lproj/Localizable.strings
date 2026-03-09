@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "התנהגות היישום";
 "prefs_display_customization_cat" = "מראה והתנהגות";
 "prefs_advanced_settings_cat" = "הגדרות מתקדמות";
+
+"prefs_toolbar_button_action_title" = "פעולת כפתורי סרגל הכלים";
+"prefs_toolbar_button_action_summary" = "פעולה שתתבצע בלחיצה רגילה או ארוכה על כפתורי תנ\\\"ך או פרשנות בסרגל הכלים";
+"prefs_toolbar_button_action_default" = "לחיצה לפתיחת תפריט, לחיצה ארוכה למסך מסמכים (ברירת המחדל)";
+"prefs_toolbar_button_action_swap_menu" = "לחיצה למעבר למסמך הבא, לחיצה ארוכה לפתיחת תפריט";
+"prefs_toolbar_button_action_swap_activity" = "לחיצה למעבר למסמך הבא, לחיצה ארוכה למסך מסמכים";

@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Nastavení aplikace";
 "prefs_display_customization_cat" = "Vzhled aplikace";
 "prefs_advanced_settings_cat" = "Rozšířená nastavení";
+
+"prefs_toolbar_button_action_title" = "Nastavení tlačítek nástrojů";
+"prefs_toolbar_button_action_summary" = "Nastavit akci při kliknutí / dlouhém stisku tlačítek nástrojů";
+"prefs_toolbar_button_action_default" = "Klik - otevřít menu, podržet - zobrazit okno dokumentů (výchozí)";
+"prefs_toolbar_button_action_swap_menu" = "Klik - otevřít následující dokument, podržet - otevřít menu";
+"prefs_toolbar_button_action_swap_activity" = "Klik - otevřít následující dokument, podržet - otevřít okno dokumentů";

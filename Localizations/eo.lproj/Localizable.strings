@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Sinteno";
 "prefs_display_customization_cat" = "Aspekto";
 "prefs_advanced_settings_cat" = "Spertulaj agordoj";
+
+"prefs_toolbar_button_action_title" = "Agoj de butono sur ilarstrio";
+"prefs_toolbar_button_action_summary" = "Agoj okazontaj post frapet(ad)i la butonon montrantan titolon de libro sur la ilarstrio";
+"prefs_toolbar_button_action_default" = "Frapeti por malfermi menuon, frapetadi por montri ekranon de dokumentoj (implicite)";
+"prefs_toolbar_button_action_swap_menu" = "Frapeti por malfermi sekvan dokumenton, frapetadi por malfermi menuon";
+"prefs_toolbar_button_action_swap_activity" = "Frapeti por malfermi sekvan dokumenton, frapetadi por montri ekranon de dokumentoj";

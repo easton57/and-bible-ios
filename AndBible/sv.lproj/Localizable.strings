@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Appbeteende";
 "prefs_display_customization_cat" = "Utseende & känsla";
 "prefs_advanced_settings_cat" = "Avancerade inställningar";
+
+"prefs_toolbar_button_action_title" = "Åtgärd för knapptryck i verktygsfältet";
+"prefs_toolbar_button_action_summary" = "Åtgärd vid tryck/långtryck på Bibel- eller Kommentarknapparna i verktygsfältet";
+"prefs_toolbar_button_action_default" = "Tryck för att öppna menyn, långtryck för dokumentskärmen (standard)";
+"prefs_toolbar_button_action_swap_menu" = "Tryck för att öppna nästa dokument, långtryck för att öppna menyn";
+"prefs_toolbar_button_action_swap_activity" = "Tryck för att öppna nästa dokument, långtryck för dokumentskärmen";

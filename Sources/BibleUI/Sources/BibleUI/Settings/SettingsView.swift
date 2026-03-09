@@ -51,6 +51,8 @@ public struct SettingsView: View {
     @State private var doubleTapToFullscreen =
         AppPreferenceRegistry.boolDefault(for: .doubleTapToFullscreen) ?? true
     @State private var autoFullscreen = AppPreferenceRegistry.boolDefault(for: .autoFullscreenPref) ?? false
+    @State private var toolbarButtonActionsMode =
+        AppPreferenceRegistry.stringDefault(for: .toolbarButtonActions) ?? "default"
     @State private var bibleViewSwipeMode =
         AppPreferenceRegistry.stringDefault(for: .bibleViewSwipeMode) ?? "CHAPTER"
     @State private var selectedLanguage: String = AppPreferenceRegistry.stringDefault(for: .localePref) ?? ""
@@ -319,6 +321,33 @@ public struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 Picker(
                     String(
+                        localized: "prefs_toolbar_button_action_title",
+                        defaultValue: "Bible/commentary toolbar button action"
+                    ),
+                    selection: Binding(
+                        get: { Self.normalizedToolbarButtonActionsMode(toolbarButtonActionsMode) },
+                        set: { newValue in
+                            toolbarButtonActionsMode = Self.normalizedToolbarButtonActionsMode(newValue)
+                            let store = SettingsStore(modelContext: modelContext)
+                            store.setString(.toolbarButtonActions, value: toolbarButtonActionsMode)
+                        }
+                    )
+                ) {
+                    Text(String(localized: "prefs_toolbar_button_action_default", defaultValue: "Default"))
+                        .tag("default")
+                    Text(String(localized: "prefs_toolbar_button_action_swap_menu", defaultValue: "Swap menu"))
+                        .tag("swap-menu")
+                    Text(String(localized: "prefs_toolbar_button_action_swap_activity", defaultValue: "Swap activity"))
+                        .tag("swap-activity")
+                }
+                Text(String(
+                    localized: "prefs_toolbar_button_action_summary",
+                    defaultValue: "Choose if one-tap of Bible/commentary toolbar buttons shows menu or activity directly."
+                ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker(
+                    String(
                         localized: "prefs_bible_view_swipe_mode_title",
                         defaultValue: "Action for swipe left / right gesture"
                     ),
@@ -557,6 +586,9 @@ public struct SettingsView: View {
             screenKeepOn = store.getBool(.screenKeepOnPref)
             doubleTapToFullscreen = store.getBool(.doubleTapToFullscreen)
             autoFullscreen = store.getBool(.autoFullscreenPref)
+            toolbarButtonActionsMode = Self.normalizedToolbarButtonActionsMode(
+                store.getString(.toolbarButtonActions)
+            )
             bibleViewSwipeMode = Self.normalizedBibleViewSwipeMode(store.getString(.bibleViewSwipeMode))
             nightModeMode = store.getString(.nightModePref3)
             let manualNightMode = store.getBool("night_mode")
@@ -948,6 +980,15 @@ public struct SettingsView: View {
             return rawValue
         default:
             return "CHAPTER"
+        }
+    }
+
+    private static func normalizedToolbarButtonActionsMode(_ rawValue: String) -> String {
+        switch rawValue {
+        case "default", "swap-menu", "swap-activity":
+            return rawValue
+        default:
+            return "default"
         }
     }
 

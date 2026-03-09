@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Поведінка програми";
 "prefs_display_customization_cat" = "Оформлення та зручність використання";
 "prefs_advanced_settings_cat" = "Розширені налаштування";
+
+"prefs_toolbar_button_action_title" = "Дії для кнопки панель інструментів";
+"prefs_toolbar_button_action_summary" = "Дія, яку потрібно вжити при натисканні / тривалому натисканні кнопок в панелі інструментів Біблії чи Коментарів";
+"prefs_toolbar_button_action_default" = "Натисніть, щоб відкрити меню, тривале натискання для екрана документів (за замовчуванням)";
+"prefs_toolbar_button_action_swap_menu" = "Натисніть, щоб відкрити наступний ресурс, тривале натискання, щоб відкрити меню";
+"prefs_toolbar_button_action_swap_activity" = "Натисніть, щоб відкрити наступний ресурс, тривале натискання для екрану ресурсів";

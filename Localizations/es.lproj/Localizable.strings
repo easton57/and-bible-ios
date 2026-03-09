@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Comportamiento de la aplicación";
 "prefs_display_customization_cat" = "Mira & siente";
 "prefs_advanced_settings_cat" = "Ajustes avanzados";
+
+"prefs_toolbar_button_action_title" = "Acción  al presionar botón de la barra";
+"prefs_toolbar_button_action_summary" = "Acción a tomar al pulsar o pulsación larga los botones de la barra de Biblia o Comentario";
+"prefs_toolbar_button_action_default" = "Pulsar para abrir menú, pulsación larga para pantalla de documentos (predeterminado)";
+"prefs_toolbar_button_action_swap_menu" = "Pulsar para abrir el siguiente documento, pulsación larga para abrir menú";
+"prefs_toolbar_button_action_swap_activity" = "Pulsar para abrir el siguiente documento, pulsación larga para pantalla de documentos";

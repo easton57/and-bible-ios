@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Zachowanie";
 "prefs_display_customization_cat" = "Wygląd";
 "prefs_advanced_settings_cat" = "Ustawienia zaawansowane";
+
+"prefs_toolbar_button_action_title" = "Akcje przycisku paska narzędzi";
+"prefs_toolbar_button_action_summary" = "Akcje wywoływane po naciśnięciu/przytrzymaniu przycisku wyświetlającego tytuł księgi na pasku narzędzi";
+"prefs_toolbar_button_action_default" = "Naciśnij, aby otworzyć menu; przytrzymaj, aby otworzyć wybór dokumentu (domyślne)";
+"prefs_toolbar_button_action_swap_menu" = "Naciśnij, aby otworzyć następny dokument; przytrzymaj, aby otworzyć menu";
+"prefs_toolbar_button_action_swap_activity" = "Naciśnij, aby otworzyć następny dokument; przytrzymaj, aby otworzyć wybór dokumentu";

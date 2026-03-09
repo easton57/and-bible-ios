@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Sovelluksen käyttäytyminen";
 "prefs_display_customization_cat" = "Ulkonäkö";
 "prefs_advanced_settings_cat" = "Lisäasetukset";
+
+"prefs_toolbar_button_action_title" = "Toiminteet työkaluvalikon painikkeen painamiselle";
+"prefs_toolbar_button_action_summary" = "Mikä toiminne toteutetaan kun painetaan / painetaan pitkä painallus työkalupalkin Raamattu tai Kommentaari -painikkeista?";
+"prefs_toolbar_button_action_default" = "Painallus avaa valikon, pitkä painallus vie dokumentit -näkymään (oletus)";
+"prefs_toolbar_button_action_swap_menu" = "Painalluksella seuraavaan dokumenttiin, pitkä painallus avaa valikon";
+"prefs_toolbar_button_action_swap_activity" = "Painalluksella seuraavaan dokumenttiin, pitkällä painalluksella dokumentit -näkymään";

@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Comportamento da aplicação";
 "prefs_display_customization_cat" = "Aparência";
 "prefs_advanced_settings_cat" = "Opções avançadas";
+
+"prefs_toolbar_button_action_title" = "Ação para pressionar o botão da barra de ferramentas";
+"prefs_toolbar_button_action_summary" = "Ação a ser executada ao pressionar / pressionar longamente os botões da barra de ferramentas Bíblia ou Comentário";
+"prefs_toolbar_button_action_default" = "Pressione para abrir o menu, pressione e mantenha para o ecran de documentos (padrão)";
+"prefs_toolbar_button_action_swap_menu" = "Pressione para abrir o próximo documento, pressione e mantenha para abrir o menu";
+"prefs_toolbar_button_action_swap_activity" = "Pressione para abrir o próximo documento, pressione e mantenha para abrir o ecran de documentos";

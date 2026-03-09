@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Nastavenie aplikácie";
 "prefs_display_customization_cat" = "Vzhľad aplikácie";
 "prefs_advanced_settings_cat" = "Pokročilé nastavenia";
+
+"prefs_toolbar_button_action_title" = "Akcia pre stlačenie tlačidla na panely nástrojov";
+"prefs_toolbar_button_action_summary" = "Akcia, ktorá sa vykoná pri ťuknutí/dlhom stlačení tlačidiel Biblia alebo Komentára na panely nástrojov";
+"prefs_toolbar_button_action_default" = "Ťuknutím sa otvorí ponuka, dlhým stlačením sa zobrazí obrazovka dokumentov (predvolené) ";
+"prefs_toolbar_button_action_swap_menu" = "Ťuknutím sa otvorí nasledujúci dokument, dlhým stlačením sa otvorí ponuka";
+"prefs_toolbar_button_action_swap_activity" = "Ťuknutím sa otvorí nasledujúci dokument, dlhým stlačením obrazovka dokumentov";

@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Понашање апликације";
 "prefs_display_customization_cat" = "Изглед и осећај";
 "prefs_advanced_settings_cat" = "Напредна подешавања";
+
+"prefs_toolbar_button_action_title" = "Радња за дугме трака са алатима";
+"prefs_toolbar_button_action_summary" = "Радња за извршити када су притиснута/дуго притиснута дугмад на траци са алатима Библија и Коментар";
+"prefs_toolbar_button_action_default" = "Притиснути за отварање менија, дуго притиснути за екран са документима (подразумевано)";
+"prefs_toolbar_button_action_swap_menu" = "Притиснути за отварање следећег документа, дуго притиснути за отварање менија";
+"prefs_toolbar_button_action_swap_activity" = "Притиснути за отварање следећег документа, дуго притиснути за екран са документима";

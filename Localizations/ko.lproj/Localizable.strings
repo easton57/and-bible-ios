@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "어플리케이션 행동";
 "prefs_display_customization_cat" = "룩앤필";
 "prefs_advanced_settings_cat" = "고급 설정";
+
+"prefs_toolbar_button_action_title" = "툴바 버튼 눌렀을 때 동작";
+"prefs_toolbar_button_action_summary" = "성경 또는 주석 툴바의 버튼을 누르거나 길게 눌렀을 때의 동작";
+"prefs_toolbar_button_action_default" = "누르면 메뉴가 열리고, 길게 누르면 문서 화면으로 (기본)";
+"prefs_toolbar_button_action_swap_menu" = "누르면 다음 문서가 열리고, 길게 누르면 메뉴가 열림";
+"prefs_toolbar_button_action_swap_activity" = "누르면 다음 문서가 열리고, 길게 누르면 문서 화면으로";

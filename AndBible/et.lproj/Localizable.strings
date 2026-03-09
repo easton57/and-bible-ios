@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Rakenduse käitumine";
 "prefs_display_customization_cat" = "Vaade ja välimus";
 "prefs_advanced_settings_cat" = "Lisaseaded";
+
+"prefs_toolbar_button_action_title" = "Action for toolbar button press";
+"prefs_toolbar_button_action_summary" = "Action to take when pressing/long-pressing Bible or Commentary toolbar buttons";
+"prefs_toolbar_button_action_default" = "Vajuta menüü avamiseks, hoia all dokumentide ekraani jaoks (vaikimisi)";
+"prefs_toolbar_button_action_swap_menu" = "Vajuta järgmise dokumendi avamiseks, hoia all menüü avamiseks";
+"prefs_toolbar_button_action_swap_activity" = "Vajuta järgmise dokumendi avamiseks, hoia all dokumentide menüü avamiseks";

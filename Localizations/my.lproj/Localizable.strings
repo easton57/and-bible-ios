@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "အက်ပ်ပလီကေးရှင်း အပြုအမူ";
 "prefs_display_customization_cat" = "& ကြည့်ပါ; ခံစားကြည့်ပါ";
 "prefs_advanced_settings_cat" = "အဆင့်မြင့် ဆက်တင်များ";
+
+"prefs_toolbar_button_action_title" = "အသုံးပြုရန် ကိရိယာခလုတ်ကို နှိပ်ပါ";
+"prefs_toolbar_button_action_summary" = "အသုံးပြုရန် အနက်ဖွင့်ကျမ်း ကိရိယာခလုတ် သို့မဟုတ် ကျမ်းစာကို ဖိထားရန်/ကြာကြာဖိထားရန်";
+"prefs_toolbar_button_action_default" = "မီနူးကိုဖွင့်ရန် ဖိထားပါ၊ မှတ်တမ်း မျက်နှာပြင်(ပုံသေ) အတွက် ကြာကြာဖိထားပါ";
+"prefs_toolbar_button_action_swap_menu" = "မှတ်တမ်းအသစ်ကိုဖွင့်ရန် ဖိထားပါ၊ မီနူးကိုဖွင့်ရန် ကြာကြာဖိထားပါ";
+"prefs_toolbar_button_action_swap_activity" = "မှတ်တမ်းအသစ်ကိုဖွင့်ရန် ဖိထားပါ၊ မှတ်တမ်းမျက်နှာပြင်ကိုဖွင့်ရန် ကြာကြာဖိထားပါ";

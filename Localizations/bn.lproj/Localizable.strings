@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "প্রয়োগ আচরণ";
 "prefs_display_customization_cat" = "দেখা & অনুভব করা";
 "prefs_advanced_settings_cat" = "এ্যডভান্স সেটিংস";
+
+"prefs_toolbar_button_action_title" = "কাজের জন্য টুলবার বোতাম টিপুন ";
+"prefs_toolbar_button_action_summary" = "বাইবেল বা কমেন্টারি টুলবার বোতাম টিপে/দীর্ঘ-টিপে দেওয়ার সময় নেওয়া পদক্ষেপ";
+"prefs_toolbar_button_action_default" = "মেনু খুলতে টিপুন, ডকুমেন্ট স্ক্রীনের জন্য দীর্ঘক্ষণ টিপুন (ডিফল্ট)";
+"prefs_toolbar_button_action_swap_menu" = "পরবর্তী নথি খুলতে টিপুন, মেনু খুলতে দীর্ঘক্ষণ টিপুন";
+"prefs_toolbar_button_action_swap_activity" = "পরবর্তী নথি খুলতে টিপুন, নথির পর্দার জন্য দীর্ঘক্ষণ টিপুন৷";

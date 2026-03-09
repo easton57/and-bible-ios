@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Programėlės elgsena";
 "prefs_display_customization_cat" = "Išvaizda ir turinys";
 "prefs_advanced_settings_cat" = "Išplėstiniai nustatymai";
+
+"prefs_toolbar_button_action_title" = "Veiksmas paspaudus ant įrankių juostos mygtuko";
+"prefs_toolbar_button_action_summary" = "Veiksmas, kuris bus atliekamas paspaudus/paspaudus ir palaikius ant Biblijos arba Komentarų mygtuko įrankių juostoje";
+"prefs_toolbar_button_action_default" = "Paspaudus atverti meniu, paspaudus ir palaikius - dokumentų langą (numatytoji)";
+"prefs_toolbar_button_action_swap_menu" = "Paspaudus atverti kitą dokumentą, paspaudus ir palaikius atverti meniu";
+"prefs_toolbar_button_action_swap_activity" = "Paspaudus atverti kitą dokumentą, paspaudus ir palaikius atverti dokumentų langą";

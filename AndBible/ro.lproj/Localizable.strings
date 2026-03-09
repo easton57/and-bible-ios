@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Comportamentul aplicației";
 "prefs_display_customization_cat" = "Aspectul aplicației";
 "prefs_advanced_settings_cat" = "Reglări avansate";
+
+"prefs_toolbar_button_action_title" = "Acțiune la apăsarea butonului";
+"prefs_toolbar_button_action_summary" = "Ce se va face la apăsarea sau apăsarea prelungită pe simbolurile din banda de sus";
+"prefs_toolbar_button_action_default" = "Apasă pentru Opțiuni, ține apăsat pentru Documente (prestabilit)";
+"prefs_toolbar_button_action_swap_menu" = "Apasă pentru a deschide următorul document, ține apăsat pentru a deschide opțiunile";
+"prefs_toolbar_button_action_swap_activity" = "Apasă pentru a deschide următorul document, ține apăsat pentru a vedea documentele";

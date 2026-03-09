@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Applikasjonsoppførsel";
 "prefs_display_customization_cat" = "Utseende og utforming";
 "prefs_advanced_settings_cat" = "Avanserte innstillinger";
+
+"prefs_toolbar_button_action_title" = "Action for toolbar button press";
+"prefs_toolbar_button_action_summary" = "Handling ved trykk/langt trykk på Bibel eller bibelkommentar-knapp på verktøylinjen";
+"prefs_toolbar_button_action_default" = "Trykk for å åpne meny, langt trykk for dokumentskjerm (standard)";
+"prefs_toolbar_button_action_swap_menu" = "Trykk for å åpne neste modul, lang-trykk for å åpne meny";
+"prefs_toolbar_button_action_swap_activity" = "Trykk for å åpne neste modul, lang-trykk for modulvindu";

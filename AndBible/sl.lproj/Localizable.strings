@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Vedenje aplikacije";
 "prefs_display_customization_cat" = "Poglej in začuti";
 "prefs_advanced_settings_cat" = "Napredne nastavitve";
+
+"prefs_toolbar_button_action_title" = "Pritisk gumba v orodni vrstici...";
+"prefs_toolbar_button_action_summary" = "Dejanje, ki se zgodi s pritiskom / dolgim pritiskom biblije ali komentarja v orodni vrstici.";
+"prefs_toolbar_button_action_default" = "Pritisnite, da odprete meni, dolgo pritisnite za zaslon dokumentov (privzeto) ";
+"prefs_toolbar_button_action_swap_menu" = "Pritisnite, da odprete naslednji dokument, dolgo pritisnite, da odprete meni";
+"prefs_toolbar_button_action_swap_activity" = "Pritisnite, da odprete naslednji dokument, dolgo pritisnite za zaslon dokumentov";

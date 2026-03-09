@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Συμπεριφορά εφαρμογής";
 "prefs_display_customization_cat" = "Εμφάνιση & αίσθηση";
 "prefs_advanced_settings_cat" = "Προχωρημένες ρυθμίσεις";
+
+"prefs_toolbar_button_action_title" = "Ενέργειες κουμπιού εργαλειοθήκης";
+"prefs_toolbar_button_action_summary" = "Ενέργεια πατήματος/παρατεταμένου πατήματος κουμπιού εργαλειοθηκών Βίβλου ή σχολίων";
+"prefs_toolbar_button_action_default" = "Πατήστε για άνοιγμα μενού, παρατεταμένο πάτημα για οθόνη εγγράφων (προεπιλογή)";
+"prefs_toolbar_button_action_swap_menu" = "Πατήστε για άνοιγμα επόμενου εγγράφου, παρατεταμένο πάτημα για άνοιγμα μενού";
+"prefs_toolbar_button_action_swap_activity" = "Πατήστε για άνοιγμα επόμενου εγγράφου, παρατεταμένο πάτημα για άνοιγμα οθόνης εγγράφων";

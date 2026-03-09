@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "程式行為";
 "prefs_display_customization_cat" = "外觀與感覺";
 "prefs_advanced_settings_cat" = "進階設定";
+
+"prefs_toolbar_button_action_title" = "工具列按鍵的動作";
+"prefs_toolbar_button_action_summary" = "點選或長按聖經及註釋時工具列按鍵的動作";
+"prefs_toolbar_button_action_default" = "點選以開啟選單；長按則打開文件表列";
+"prefs_toolbar_button_action_swap_menu" = "點選以開啟下一份文件；長按則開啟選單";
+"prefs_toolbar_button_action_swap_activity" = "點選以開啟下一份文件；長按則打開文件表列";

@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Uygulama davranışı";
 "prefs_display_customization_cat" = "Görünüm ve his";
 "prefs_advanced_settings_cat" = "Gelişmiş ayarlar";
+
+"prefs_toolbar_button_action_title" = "Araç çubuğu düğmesine basma eylemi";
+"prefs_toolbar_button_action_summary" = "İncil ya da Yorum Kitabı araç çubuğu düğmelerine basıldığında/uzun-basıldığında yapılacak eylem";
+"prefs_toolbar_button_action_default" = "Menüyü açmak için basın, belgeler ekranı için uzun basın (varsayılan)";
+"prefs_toolbar_button_action_swap_menu" = "Bir sonraki belgeyi açmak için basın, menüyü açmak için uzun basın";
+"prefs_toolbar_button_action_swap_activity" = "Bir sonraki belgeyi açmak için basın, belgeler ekranı için uzun basın";

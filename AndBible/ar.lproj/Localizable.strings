@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "سلوك التطبيق";
 "prefs_display_customization_cat" = "المظهر و الاحساس";
 "prefs_advanced_settings_cat" = "اعدادات متقدمة";
+
+"prefs_toolbar_button_action_title" = "الإجراء الخاص بالضغط على زر شريط الأدوات";
+"prefs_toolbar_button_action_summary" = "الإجراء الذي يجب اتخاذه عند الضغط / الضغط المطول على أزرار شريط أدوات الكتاب المقدس أو التعليق";
+"prefs_toolbar_button_action_default" = "اضغط لفتح القائمة، ضغطة مطولة لشاشة المستندات (افتراضي)";
+"prefs_toolbar_button_action_swap_menu" = "اضغط لفتح المستند التالي، ضغطة مطولة لفتح القائمة";
+"prefs_toolbar_button_action_swap_activity" = "اضغط لفتح المستند التالي، اضغط مطولاً على شاشة المستندات";

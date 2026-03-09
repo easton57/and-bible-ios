@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Поведение приложения";
 "prefs_display_customization_cat" = "Оформление и удобство";
 "prefs_advanced_settings_cat" = "Расширенные настройки";
+
+"prefs_toolbar_button_action_title" = "Действие при нажатии кнопки панели инструментов";
+"prefs_toolbar_button_action_summary" = "Действия, выполняемые при нажатии / долгом нажатии кнопок панели инструментов Библии или комментариев";
+"prefs_toolbar_button_action_default" = "Нажмите, чтобы открыть меню, нажмите и удерживайте, чтобы открыть экран ресурсов (по умолчанию)";
+"prefs_toolbar_button_action_swap_menu" = "Нажмите, чтобы открыть следующий ресурс, нажмите и удерживайте, чтобы открыть меню";
+"prefs_toolbar_button_action_swap_activity" = "Нажмите, чтобы открыть следующий ресурс, нажмите и удерживайте, чтобы открыть экран ресурсов";

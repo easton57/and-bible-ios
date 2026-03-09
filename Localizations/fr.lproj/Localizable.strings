@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Comportement de l’application";
 "prefs_display_customization_cat" = "Apparence";
 "prefs_advanced_settings_cat" = "Paramètres avancés";
+
+"prefs_toolbar_button_action_title" = "Action en cas de pression sur un bouton de la barre d’outils";
+"prefs_toolbar_button_action_summary" = "Action à entreprendre lorsque vous appuyez ou appuyez longuement sur les boutons de la barre d’outils Bible ou Commentaire.";
+"prefs_toolbar_button_action_default" = "Appuyez pour ouvrir le menu, appuyez longuement pour l’affichage des documents (par défaut).";
+"prefs_toolbar_button_action_swap_menu" = "Appuyer pour ouvrir le document suivant, appui long pour ouvrir le menu";
+"prefs_toolbar_button_action_swap_activity" = "Appuyer pour ouvrir le document suivant, appui long pour l’affichage des documents";

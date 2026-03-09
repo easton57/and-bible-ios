@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Қолданбаның тәртібі";
 "prefs_display_customization_cat" = "Қара және; сез";
 "prefs_advanced_settings_cat" = "Озық параметрлері";
+
+"prefs_toolbar_button_action_title" = "Құралдар тақтасындағы батырманы басу әрекеті";
+"prefs_toolbar_button_action_summary" = "Киелі кітаптың немесе пікірлердің құралдар тақтасындағы батырмаларды басу / ұзақ басу арқылы орындалатын әрекет";
+"prefs_toolbar_button_action_default" = "Мәзірді ашу үшін басыңыз, ал бейне құжаттар үшін (әдептегідей) ұзақ басыңыз";
+"prefs_toolbar_button_action_swap_menu" = "Келесі құжатты ашу үшін - басу, мәзірді ашу үшін - ұзақ басу";
+"prefs_toolbar_button_action_swap_activity" = "Келесі құжатты ашу үшін басыңыз, ал бейне құжаттар үшін ұзақ басыңыз";

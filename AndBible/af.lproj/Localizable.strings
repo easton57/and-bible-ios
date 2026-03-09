@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Toepassings gedrag";
 "prefs_display_customization_cat" = "Aanskou & voel";
 "prefs_advanced_settings_cat" = "Gevorderde instellings";
+
+"prefs_toolbar_button_action_title" = "Aksie vir nutsbalk knoppie druk";
+"prefs_toolbar_button_action_summary" = "Aksie om te neem wanneer jy Bybel- of Kommentaar nutsbalk knoppies druk";
+"prefs_toolbar_button_action_default" = "Druk om kieslys oop te maak, lang druk vir dokumente skerm (standaard)";
+"prefs_toolbar_button_action_swap_menu" = "Druk om volgende dokument oop te maak, lang druk om kieslys oop te maak";
+"prefs_toolbar_button_action_swap_activity" = "Druk om volgende dokument oop te maak, lang druk vir dokumente skerm";

@@ -74,6 +74,8 @@ public struct BibleReaderView: View {
     @State private var isFullScreen = false
     @State private var navigateToVersePref = AppPreferenceRegistry.boolDefault(for: .navigateToVersePref) ?? false
     @State private var autoFullscreenPref = AppPreferenceRegistry.boolDefault(for: .autoFullscreenPref) ?? false
+    @State private var toolbarButtonActionsMode =
+        AppPreferenceRegistry.stringDefault(for: .toolbarButtonActions) ?? "default"
     @State private var bibleViewSwipeMode =
         AppPreferenceRegistry.stringDefault(for: .bibleViewSwipeMode) ?? "CHAPTER"
     @State private var fullScreenHideButtonsPref =
@@ -82,6 +84,8 @@ public struct BibleReaderView: View {
         AppPreferenceRegistry.boolDefault(for: .hideWindowButtons) ?? false
     @State private var hideBibleReferenceOverlayPref =
         AppPreferenceRegistry.boolDefault(for: .hideBibleReferenceOverlay) ?? false
+    @State private var suppressBibleTapAfterLongPress = false
+    @State private var suppressCommentaryTapAfterLongPress = false
     @State private var lastFullScreenByDoubleTap = false
     @State private var autoFullscreenDirectionDown: Bool?
     @State private var autoFullscreenDistance: Double = 0
@@ -234,6 +238,7 @@ public struct BibleReaderView: View {
             )
             navigateToVersePref = store.getBool(.navigateToVersePref)
             autoFullscreenPref = store.getBool(.autoFullscreenPref)
+            toolbarButtonActionsMode = store.getString(.toolbarButtonActions)
             bibleViewSwipeMode = store.getString(.bibleViewSwipeMode)
             fullScreenHideButtonsPref = store.getBool(.fullScreenHideButtonsPref)
             hideWindowButtonsPref = store.getBool(.hideWindowButtons)
@@ -1112,37 +1117,38 @@ public struct BibleReaderView: View {
                         }
 
                         // Bible
-                        Button {
-                            if controller?.currentCategory == .bible {
-                                pickerCategory = .bible
-                                showModulePicker = true
-                            } else {
-                                controller?.switchCategory(to: .bible)
+                        Image(systemName: "book.fill")
+                            .font(.body)
+                            .opacity(controller?.currentCategory == .bible ? 1.0 : 0.4)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if suppressBibleTapAfterLongPress {
+                                    suppressBibleTapAfterLongPress = false
+                                    return
+                                }
+                                handleBibleToolbarTap(controller)
                             }
-                        } label: {
-                            Image(systemName: "book.fill")
-                                .font(.body)
-                                .opacity(controller?.currentCategory == .bible ? 1.0 : 0.4)
-                        }
+                            .onLongPressGesture {
+                                suppressBibleTapAfterLongPress = true
+                                handleBibleToolbarLongPress(controller)
+                            }
 
                         // Commentary
-                        Button {
-                            if controller?.currentCategory == .commentary {
-                                pickerCategory = .commentary
-                                showModulePicker = true
-                            } else {
-                                if controller?.activeCommentaryModuleName == nil {
-                                    pickerCategory = .commentary
-                                    showModulePicker = true
-                                } else {
-                                    controller?.switchCategory(to: .commentary)
+                        Image(systemName: "text.book.closed.fill")
+                            .font(.body)
+                            .opacity(controller?.currentCategory == .commentary ? 1.0 : 0.4)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if suppressCommentaryTapAfterLongPress {
+                                    suppressCommentaryTapAfterLongPress = false
+                                    return
                                 }
+                                handleCommentaryToolbarTap(controller)
                             }
-                        } label: {
-                            Image(systemName: "text.book.closed.fill")
-                                .font(.body)
-                                .opacity(controller?.currentCategory == .commentary ? 1.0 : 0.4)
-                        }
+                            .onLongPressGesture {
+                                suppressCommentaryTapAfterLongPress = true
+                                handleCommentaryToolbarLongPress(controller)
+                            }
 
                         // Ellipsis menu
                         Menu {
@@ -1446,10 +1452,112 @@ public struct BibleReaderView: View {
         }
     }
 
+    private var toolbarActionsMode: ToolbarButtonActionsMode {
+        ToolbarButtonActionsMode(rawValue: toolbarButtonActionsMode) ?? .defaultMode
+    }
+
+    private func handleBibleToolbarTap(_ controller: BibleReaderController?) {
+        switch toolbarActionsMode {
+        case .defaultMode:
+            performBibleMenuAction()
+        case .swapMenu, .swapActivity:
+            performBibleActivityAction(controller)
+        }
+    }
+
+    private func handleBibleToolbarLongPress(_ controller: BibleReaderController?) {
+        switch toolbarActionsMode {
+        case .swapMenu:
+            performBibleMenuAction()
+        case .defaultMode, .swapActivity:
+            performBibleActivityAction(controller)
+        }
+    }
+
+    private func handleCommentaryToolbarTap(_ controller: BibleReaderController?) {
+        switch toolbarActionsMode {
+        case .defaultMode:
+            performCommentaryMenuAction()
+        case .swapMenu, .swapActivity:
+            performCommentaryActivityAction(controller)
+        }
+    }
+
+    private func handleCommentaryToolbarLongPress(_ controller: BibleReaderController?) {
+        switch toolbarActionsMode {
+        case .swapMenu:
+            performCommentaryMenuAction()
+        case .defaultMode, .swapActivity:
+            performCommentaryActivityAction(controller)
+        }
+    }
+
+    private func performBibleMenuAction() {
+        pickerCategory = .bible
+        showModulePicker = true
+    }
+
+    private func performBibleActivityAction(_ controller: BibleReaderController?) {
+        guard let controller else { return }
+        if controller.currentCategory != .bible {
+            controller.switchCategory(to: .bible)
+            return
+        }
+        cycleToNextModule(
+            modules: controller.installedBibleModules,
+            activeName: controller.activeModuleName
+        ) { nextName in
+            controller.switchModule(to: nextName)
+            controller.switchCategory(to: .bible)
+        }
+    }
+
+    private func performCommentaryMenuAction() {
+        pickerCategory = .commentary
+        showModulePicker = true
+    }
+
+    private func performCommentaryActivityAction(_ controller: BibleReaderController?) {
+        guard let controller else { return }
+        if controller.currentCategory != .commentary {
+            if controller.activeCommentaryModuleName == nil {
+                performCommentaryMenuAction()
+            } else {
+                controller.switchCategory(to: .commentary)
+            }
+            return
+        }
+        cycleToNextModule(
+            modules: controller.installedCommentaryModules,
+            activeName: controller.activeCommentaryModuleName
+        ) { nextName in
+            controller.switchCommentaryModule(to: nextName)
+            controller.switchCategory(to: .commentary)
+        }
+    }
+
+    private func cycleToNextModule(
+        modules: [ModuleInfo],
+        activeName: String?,
+        apply: (String) -> Void
+    ) {
+        guard !modules.isEmpty else { return }
+        guard modules.count > 1 else { return }
+
+        if let activeName,
+           let index = modules.firstIndex(where: { $0.name == activeName }) {
+            let next = modules[(index + 1) % modules.count]
+            apply(next.name)
+        } else if let first = modules.first {
+            apply(first.name)
+        }
+    }
+
     private func reloadBehaviorPreferences() {
         let store = SettingsStore(modelContext: modelContext)
         navigateToVersePref = store.getBool(.navigateToVersePref)
         autoFullscreenPref = store.getBool(.autoFullscreenPref)
+        toolbarButtonActionsMode = store.getString(.toolbarButtonActions)
         bibleViewSwipeMode = store.getString(.bibleViewSwipeMode)
         fullScreenHideButtonsPref = store.getBool(.fullScreenHideButtonsPref)
         hideWindowButtonsPref = store.getBool(.hideWindowButtons)
@@ -1558,4 +1666,10 @@ private enum BibleSwipeMode: String {
     case chapter = "CHAPTER"
     case page = "PAGE"
     case none = "NONE"
+}
+
+private enum ToolbarButtonActionsMode: String {
+    case defaultMode = "default"
+    case swapMenu = "swap-menu"
+    case swapActivity = "swap-activity"
 }

@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "程序行为";
 "prefs_display_customization_cat" = "外观与感觉";
 "prefs_advanced_settings_cat" = "高级设置";
+
+"prefs_toolbar_button_action_title" = "工具栏按钮行为";
+"prefs_toolbar_button_action_summary" = "点按或长按圣经及注释时工具栏按钮的行为";
+"prefs_toolbar_button_action_default" = "点击以打开菜单；长按以打开文档界面（默认）";
+"prefs_toolbar_button_action_swap_menu" = "点击以打开下一文档；长按以打开菜单";
+"prefs_toolbar_button_action_swap_activity" = "点击以开启下一文档；长按以打开文档界面";

@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "Ponašanje aplikacije";
 "prefs_display_customization_cat" = "Izgled i osećaj";
 "prefs_advanced_settings_cat" = "Napredna podešavanja";
+
+"prefs_toolbar_button_action_title" = "Radnja za dugme trake sa alatima";
+"prefs_toolbar_button_action_summary" = "Radnja za izvršiti kada su pritisnuta/dugo pritisnuta dugmad na traci sa alatima Biblija i Komentar";
+"prefs_toolbar_button_action_default" = "Pritisnuti za otvaranje menija, dugo pritisnuti za ekran sa dokumentima (podrazumevano)";
+"prefs_toolbar_button_action_swap_menu" = "Pritisnuti za otvaranje sledećeg dokumenta, dugo pritisnuti za otvaranje menija";
+"prefs_toolbar_button_action_swap_activity" = "Pritisnuti za otvaranje sledećeg dokumenta, dugo pritisnuti za ekran sa dokumentima";

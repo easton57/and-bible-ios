@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = " एप्लिकेशन व्यवहार";
 "prefs_display_customization_cat" = "देखने & लगने में";
 "prefs_advanced_settings_cat" = "एडवांस सेटिंग";
+
+"prefs_toolbar_button_action_title" = "टूलबार बटन प्रेस के लिए कार्य";
+"prefs_toolbar_button_action_summary" = "बाइबिल या कमेंट्री टूलबार बटनों को दबाने/लंबे समय तक दबाने पर की जाने वाली कार्य";
+"prefs_toolbar_button_action_default" = "मेनू खोलने के लिए दबाएं, दस्तावेज़ स्क्रीन के लिए देर तक दबाएं (डिफ़ॉल्ट)";
+"prefs_toolbar_button_action_swap_menu" = "अगला दस्तावेज़ खोलने के लिए दबाएं, मेनू खोलने के लिए देर तक दबाएं";
+"prefs_toolbar_button_action_swap_activity" = "अगला दस्तावेज़ खोलने के लिए दबाएं, दस्तावेज़ स्क्रीन के लिए देर तक दबाएं";

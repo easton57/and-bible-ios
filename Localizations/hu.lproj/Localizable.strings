@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Működési mód";
 "prefs_display_customization_cat" = "Kinézet";
 "prefs_advanced_settings_cat" = "Haladó beállítások";
+
+"prefs_toolbar_button_action_title" = "Eszköztár gomb funkciója";
+"prefs_toolbar_button_action_summary" = "Mi történjen a Biblia vagy Kommentár eszköztár gomb lenyomása vagy hosszan-lenyomásakor.";
+"prefs_toolbar_button_action_default" = "Menü megnyitása lenyomásra, dokumentumok képernyő megnyitása hosszan-lenyomásra (alapértelmezett)";
+"prefs_toolbar_button_action_swap_menu" = "Következő dokumentum megnyitása lenyomásra, menü megnyitása hosszan-lenyomásra.";
+"prefs_toolbar_button_action_swap_activity" = "Következő dokumentum megnyitása lenyomásra, dokumentumok képernyő megnyitása hosszan-lenyomásra.";

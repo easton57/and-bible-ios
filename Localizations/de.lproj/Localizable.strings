@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Verhalten der Anwendung";
 "prefs_display_customization_cat" = "Look & feel";
 "prefs_advanced_settings_cat" = "Erweiterte Einstellungen";
+
+"prefs_toolbar_button_action_title" = "Aktion bei Antippen des Toolbar-Knopfes";
+"prefs_toolbar_button_action_summary" = "Die Aktion, die bei Drücken bzw. Drücken und Halten des Toolbar-Knopfes in Bibel- oder Kommentardokumenten vorgenommen werden soll";
+"prefs_toolbar_button_action_default" = "Antippen, um das Menü zu öffnen, Tippen und Halten für Dokumentauswahl (Standardaktion)";
+"prefs_toolbar_button_action_swap_menu" = "Antippen um das nächste Dokument zu öffnen, gedrückt halten um das Menü zu öffnen";
+"prefs_toolbar_button_action_swap_activity" = "Antippen um das nächste Dokument zu öffnen, gedrückt halten um die Dokumentauswahl zu öffnen";

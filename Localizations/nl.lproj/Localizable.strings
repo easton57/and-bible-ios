@@ -401,3 +401,9 @@
 "prefs_behavior_customization_cat" = "Applicatie gedrag";
 "prefs_display_customization_cat" = "Uiterlijk";
 "prefs_advanced_settings_cat" = "Geavanceerde instellingen";
+
+"prefs_toolbar_button_action_title" = "Actie voor knoppen op taakbalk";
+"prefs_toolbar_button_action_summary" = "Actie bij (lang) drukken op taakbalk van Bijbel of Commentaar";
+"prefs_toolbar_button_action_default" = "Indrukken om het menu te openen, lang indrukken voor het documentscherm (standaard)";
+"prefs_toolbar_button_action_swap_menu" = "Indrukken om het volgende document te openen, lang indrukken om het menu te openen.";
+"prefs_toolbar_button_action_swap_activity" = "Druk om volgend document te openen, lang drukken voor Documenten scherm";

@@ -430,3 +430,9 @@
 "prefs_behavior_customization_cat" = "செயலியின்  நடத்தை";
 "prefs_display_customization_cat" = "தோற்ற அமைப்பு";
 "prefs_advanced_settings_cat" = "மேலதிக அமைப்புகள்";
+
+"prefs_toolbar_button_action_title" = "கருவிப்பட்டி பொத்தானை அழுத்தினால் என்ன ஆகும்";
+"prefs_toolbar_button_action_summary" = "விவிலியம் அல்லது விளக்க உரை கருவிப்பட்டை பொத்தான்களை அழுத்தினாலோ நீண்ட நேரம் அழுத்தினாலோ செய்ய வேண்டியது";
+"prefs_toolbar_button_action_default" = "மெனுவை திறக்க இங்கே அழுத்தவும். நீண்ட நேரம் அழுத்தினால் கோப்புகள் திரை திறக்கும். (default)";
+"prefs_toolbar_button_action_swap_menu" = "அடுத்த கோப்பை திறக்க அழுத்தவும், நீண்ட நேரம் அழுத்தினால் மெனு திறக்கும்";
+"prefs_toolbar_button_action_swap_activity" = "அடுத்த கோப்பை திறக்க அழுத்தவும், நீண்ட நேரம் அழுத்தினால் கோப்புகள் திரை திறக்கும்";
