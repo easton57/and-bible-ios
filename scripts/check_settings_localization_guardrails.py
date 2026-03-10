@@ -1,0 +1,347 @@
+#!/usr/bin/env python3
+"""
+SETPAR-603 localization guardrails for settings parity keys.
+
+Checks:
+1. AndBible and Localizations trees must match for tracked settings keys.
+2. No iOS locale can remain English for a key when Android has a non-English translation.
+3. Per-key English-placeholder count may not exceed committed baseline (plus optional allowance).
+
+Usage:
+  python3 scripts/check_settings_localization_guardrails.py
+  python3 scripts/check_settings_localization_guardrails.py --write-baseline
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+import re
+import xml.etree.ElementTree as ET
+
+
+PARITY_KEYS = [
+    "choose_strongs_greek_dictionary_title",
+    "choose_strongs_greek_dictionary_summary",
+    "choose_strongs_hebrew_dictionary_title",
+    "choose_strongs_hebrew_dictionary_summary",
+    "choose_strongs_greek_morphology_title",
+    "choose_strongs_greek_morphology_summary",
+    "choose_word_lookup_dictionary_title",
+    "choose_word_lookup_dictionary_summary",
+    "prefs_behavior_customization_cat",
+    "prefs_display_customization_cat",
+    "prefs_advanced_settings_cat",
+    "prefs_navigate_to_verse_title",
+    "prefs_navigate_to_verse_summary",
+    "prefs_open_links_in_special_window_title",
+    "prefs_open_links_in_special_window_summary",
+    "prefs_screen_keep_on_title",
+    "prefs_screen_keep_on_summary",
+    "prefs_double_tap_to_fullscreen_title",
+    "prefs_double_tap_to_fullscreen_summary",
+    "auto_fullscreen",
+    "auto_fullscreen_summary",
+    "prefs_toolbar_button_action_title",
+    "prefs_toolbar_button_action_summary",
+    "prefs_disable_two_step_bookmarking_title",
+    "prefs_disable_two_step_bookmarking_summary",
+    "prefs_bible_view_swipe_mode_title",
+    "prefs_bible_view_swipe_mode_summary",
+    "prefs_volume_keys_scroll_title",
+    "prefs_volume_keys_scroll_summary",
+    "prefs_night_mode_title",
+    "prefs_night_mode_summary",
+    "prefs_interface_locale_title",
+    "prefs_interface_locale_summary",
+    "prefs_e_ink_mode_title",
+    "prefs_eink_mode_summary",
+    "prefs_disable_animations_title",
+    "prefs_disable_animations_summary",
+    "prefs_disable_click_to_edit_title",
+    "prefs_disable_click_to_edit_summary",
+    "pref_font_size_multiplier_title",
+    "full_screen_hide_buttons_pref_title",
+    "full_screen_hide_buttons_pref_summary",
+    "hide_window_buttons_title",
+    "hide_window_buttons_summary",
+    "hide_bible_reference_overlay_title",
+    "hide_bible_reference_overlay_summary",
+    "active_window_indicator_title",
+    "active_window_indicator_summary",
+    "prefs_experimental_features_title",
+    "prefs_experimental_features_summary",
+    "prefs_enable_bluetooth_title",
+    "prefs_enable_bluetooth_summary",
+    "prefs_show_error_box_title",
+    "prefs_show_error_box_summary",
+    "open_bible_links_title",
+    "open_bible_links_summary",
+    "crash_app",
+    "crash_app_summary",
+]
+
+
+LOCALE_TO_ANDROID_VALUES = {
+    "af": "values-af",
+    "ar": "values-ar",
+    "az": "values-az",
+    "bg": "values-bg",
+    "bn": "values-bn",
+    "cs": "values-cs",
+    "de": "values-de",
+    "el": "values-el",
+    "en": "values",
+    "eo": "values-eo",
+    "es": "values-es",
+    "et": "values-et",
+    "fi": "values-fi",
+    "fr": "values-fr",
+    "he": "values-iw",
+    "hi": "values-hi",
+    "hr": "values-hr",
+    "hu": "values-hu",
+    "id": "values-id",
+    "it": "values-it",
+    "kk": "values-kk",
+    "ko": "values-ko",
+    "lt": "values-lt",
+    "ml": "values-ml",
+    "my": "values-my",
+    "nb": "values-nb",
+    "nl": "values-nl",
+    "pl": "values-pl",
+    "pt": "values-pt",
+    "pt-BR": "values-pt-rBR",
+    "ro": "values-ro",
+    "ru": "values-ru",
+    "sk": "values-sk",
+    "sl": "values-sl",
+    "sr": "values-b+sr+RS",
+    "sr-Latn": "values-b+sr+Latn",
+    "sv": "values-sv",
+    "ta": "values-ta",
+    "te": "values-te",
+    "tr": "values-tr",
+    "uk": "values-uk",
+    "uz": "values-uz",
+    "yue": "values-yue",
+    "zh-Hans": "values-zh-rCN",
+    "zh-Hant": "values-zh-rTW",
+}
+
+
+LINE_RE = re.compile(r'^"(?P<key>[^"]+)"\s*=\s*"(?P<val>(?:[^"\\]|\\.)*)";\s*$')
+
+
+def parse_ios_strings(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = LINE_RE.match(line.strip())
+        if match:
+            values[match.group("key")] = match.group("val")
+    return values
+
+
+def unescape_ios(value: str) -> str:
+    return value.replace(r"\\", "\\").replace(r"\"", '"').replace(r"\n", "\n")
+
+
+def parse_android_strings(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    root = ET.parse(path).getroot()
+    values: dict[str, str] = {}
+    for node in root.findall("string"):
+        name = node.get("name")
+        if name:
+            values[name] = "".join(node.itertext())
+    return values
+
+
+@dataclass
+class Audit:
+    locales: list[str]
+    english_placeholder_by_key: dict[str, list[str]]
+    ios_gap_by_key: dict[str, list[str]]
+    tree_mismatches: list[str]
+
+
+def run_audit(repo_root: Path, android_root: Path) -> Audit:
+    ios_a_root = repo_root / "AndBible"
+    ios_b_root = repo_root / "Localizations"
+
+    en_a = parse_ios_strings(ios_a_root / "en.lproj" / "Localizable.strings")
+    en_b = parse_ios_strings(ios_b_root / "en.lproj" / "Localizable.strings")
+    english = {k: unescape_ios(en_a[k]) for k in PARITY_KEYS}
+
+    tree_mismatches: list[str] = []
+    for key in PARITY_KEYS:
+        if key not in en_a or key not in en_b:
+            tree_mismatches.append(f"missing_en_key:{key}")
+        elif en_a[key] != en_b[key]:
+            tree_mismatches.append(f"en_tree_mismatch:{key}")
+
+    android_base = parse_android_strings(android_root / "values" / "strings.xml")
+    android_base.update(parse_android_strings(android_root / "values" / "untranslated_strings.xml"))
+    android_by_locale = {
+        loc: parse_android_strings(android_root / qualifier / "strings.xml")
+        for loc, qualifier in LOCALE_TO_ANDROID_VALUES.items()
+    }
+
+    locales = sorted(
+        p.name.replace(".lproj", "")
+        for p in ios_a_root.glob("*.lproj")
+        if p.name.endswith(".lproj") and p.name != "en.lproj"
+    )
+
+    english_placeholder_by_key = {k: [] for k in PARITY_KEYS}
+    ios_gap_by_key = {k: [] for k in PARITY_KEYS}
+
+    for locale in locales:
+        ios_a = parse_ios_strings(ios_a_root / f"{locale}.lproj" / "Localizable.strings")
+        ios_b = parse_ios_strings(ios_b_root / f"{locale}.lproj" / "Localizable.strings")
+        android_loc = android_by_locale.get(locale, {})
+
+        for key in PARITY_KEYS:
+            if key not in ios_a or key not in ios_b:
+                tree_mismatches.append(f"missing_locale_key:{locale}:{key}")
+                continue
+
+            va = unescape_ios(ios_a[key])
+            vb = unescape_ios(ios_b[key])
+            if va != vb:
+                tree_mismatches.append(f"locale_tree_mismatch:{locale}:{key}")
+
+            ios_is_english = va == english[key]
+            if ios_is_english:
+                english_placeholder_by_key[key].append(locale)
+
+            a_has = key in android_loc
+            if a_has:
+                a_val = android_loc[key]
+                a_base = android_base.get(key, "")
+                if ios_is_english and a_val != a_base:
+                    ios_gap_by_key[key].append(locale)
+
+    for key in PARITY_KEYS:
+        english_placeholder_by_key[key].sort()
+        ios_gap_by_key[key].sort()
+
+    return Audit(
+        locales=locales,
+        english_placeholder_by_key=english_placeholder_by_key,
+        ios_gap_by_key=ios_gap_by_key,
+        tree_mismatches=tree_mismatches,
+    )
+
+
+def write_baseline(path: Path, audit: Audit) -> None:
+    payload = {
+        "generated_on": date.today().isoformat(),
+        "parity_keys": PARITY_KEYS,
+        "locales": audit.locales,
+        "english_placeholder_by_key": audit.english_placeholder_by_key,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Settings localization parity guardrails (SETPAR-603)")
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=Path(__file__).resolve().parents[1],
+        help="Path to and-bible-ios repository root",
+    )
+    parser.add_argument(
+        "--android-root",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / "and-bible" / "app" / "src" / "main" / "res",
+        help="Path to Android app res directory",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "docs" / "settings-localization-guardrail-baseline.json",
+        help="Baseline JSON path",
+    )
+    parser.add_argument(
+        "--allow-count-increase",
+        type=int,
+        default=0,
+        help="Allowed increase in English-placeholder count per key vs baseline",
+    )
+    parser.add_argument(
+        "--write-baseline",
+        action="store_true",
+        help="Write baseline file from current state and exit 0",
+    )
+    args = parser.parse_args()
+
+    audit = run_audit(args.repo_root, args.android_root)
+
+    if args.write_baseline:
+        write_baseline(args.baseline, audit)
+        print(f"Wrote baseline: {args.baseline}")
+        return 0
+
+    if not args.baseline.exists():
+        print(f"Baseline not found: {args.baseline}", file=sys.stderr)
+        print("Run with --write-baseline first.", file=sys.stderr)
+        return 2
+
+    baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
+    base_counts = {
+        key: len(locales)
+        for key, locales in baseline.get("english_placeholder_by_key", {}).items()
+    }
+
+    failures: list[str] = []
+
+    if audit.tree_mismatches:
+        failures.append("Tree consistency failures:")
+        failures.extend(f"  - {item}" for item in sorted(audit.tree_mismatches))
+
+    ios_gap_count = sum(len(v) for v in audit.ios_gap_by_key.values())
+    if ios_gap_count > 0:
+        failures.append("iOS-vs-Android translation gaps (must be zero):")
+        for key in PARITY_KEYS:
+            bad = audit.ios_gap_by_key.get(key, [])
+            if bad:
+                failures.append(f"  - {key}: {', '.join(bad)}")
+
+    for key in PARITY_KEYS:
+        current = len(audit.english_placeholder_by_key.get(key, []))
+        baseline_count = int(base_counts.get(key, 0))
+        if current > baseline_count + args.allow_count_increase:
+            failures.append(
+                f"English-placeholder count regression for {key}: "
+                f"baseline={baseline_count}, current={current}, "
+                f"allowed_increase={args.allow_count_increase}"
+            )
+
+    print("SETPAR-603 guardrail summary")
+    print(f"- tree mismatches: {len(audit.tree_mismatches)}")
+    print(f"- ios_gap count: {ios_gap_count}")
+    print(f"- keys checked: {len(PARITY_KEYS)}")
+    print(f"- locales checked: {len(audit.locales)}")
+
+    if failures:
+        print("\nFAILURES:")
+        for line in failures:
+            print(line)
+        return 1
+
+    print("Guardrails passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
