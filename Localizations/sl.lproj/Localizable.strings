@@ -461,3 +461,7 @@
 "prefs_swipe_mode_chapter" = "Poglavje";
 "prefs_swipe_mode_none" = "Onemogočeno";
 "prefs_swipe_mode_page" = "Stran";
+
+"prefs_volume_keys_scroll_title" = "Volume buttons scroll";
+"prefs_volume_keys_scroll_summary" = "Use volume up/down to scroll Bible text";
+"prefs_volume_keys_scroll_ios_note" = "iOS does not expose volume-button presses to apps. This setting is kept for Android parity and cross-device sync.";

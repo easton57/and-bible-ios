@@ -57,6 +57,8 @@ public struct SettingsView: View {
         AppPreferenceRegistry.stringDefault(for: .toolbarButtonActions) ?? "default"
     @State private var bibleViewSwipeMode =
         AppPreferenceRegistry.stringDefault(for: .bibleViewSwipeMode) ?? "CHAPTER"
+    @State private var volumeKeysScroll =
+        AppPreferenceRegistry.boolDefault(for: .volumeKeysScroll) ?? true
     @State private var selectedLanguage: String = AppPreferenceRegistry.stringDefault(for: .localePref) ?? ""
     @State private var showRestartAlert = false
     @State private var showDiscreteHelp = false
@@ -395,6 +397,32 @@ public struct SettingsView: View {
                 ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Toggle(
+                    String(
+                        localized: "prefs_volume_keys_scroll_title",
+                        defaultValue: "Volume buttons scroll"
+                    ),
+                    isOn: Binding(
+                        get: { volumeKeysScroll },
+                        set: { newValue in
+                            volumeKeysScroll = newValue
+                            let store = SettingsStore(modelContext: modelContext)
+                            store.setBool(.volumeKeysScroll, value: newValue)
+                        }
+                    )
+                )
+                Text(String(
+                    localized: "prefs_volume_keys_scroll_summary",
+                    defaultValue: "Use volume up/down to scroll Bible text"
+                ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "prefs_volume_keys_scroll_ios_note",
+                    defaultValue: "iOS does not expose volume-button presses to apps. This setting is kept for Android parity and cross-device sync."
+                ))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                 Toggle(String(localized: "verse_selection"), isOn: Binding(
                     get: { displaySettings.enableVerseSelection ?? true },
                     set: {
@@ -613,6 +641,7 @@ public struct SettingsView: View {
                 store.getString(.toolbarButtonActions)
             )
             bibleViewSwipeMode = Self.normalizedBibleViewSwipeMode(store.getString(.bibleViewSwipeMode))
+            volumeKeysScroll = store.getBool(.volumeKeysScroll)
             nightModeMode = store.getString(.nightModePref3)
             let manualNightMode = store.getBool("night_mode")
             nightMode = NightModeSettingsResolver.isNightMode(
