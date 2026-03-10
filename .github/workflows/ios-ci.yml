@@ -30,9 +30,23 @@ jobs:
     name: Build And Test (Simulator)
     runs-on: macos-15
     timeout-minutes: 90
+    env:
+      DERIVED_DATA_PATH: .derivedData
+      XCRESULT_BUNDLE_PATH: .artifacts/AndBibleTests.xcresult
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Restore SwiftPM and build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .derivedData/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-xcode-spm-${{ hashFiles('Package.swift', 'AndBible.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-spm-
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -132,10 +146,22 @@ jobs:
 
       - name: Build and run unit tests
         run: >-
+          mkdir -p .artifacts &&
           xcodebuild
           -project AndBible.xcodeproj
           -scheme AndBible
           -configuration Debug
           -destination "${{ steps.simulator.outputs.destination }}"
+          -derivedDataPath "${DERIVED_DATA_PATH}"
+          -resultBundlePath "${XCRESULT_BUNDLE_PATH}"
           CODE_SIGNING_ALLOWED=NO
           test
+
+      - name: Upload xcodebuild test result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: andbible-xcresult-${{ github.run_id }}
+          path: ${{ env.XCRESULT_BUNDLE_PATH }}
+          if-no-files-found: warn
+          retention-days: 14
