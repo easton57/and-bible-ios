@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Indrukken om het menu te openen, lang indrukken voor het documentscherm (standaard)";
 "prefs_toolbar_button_action_swap_menu" = "Indrukken om het volgende document te openen, lang indrukken om het menu te openen.";
 "prefs_toolbar_button_action_swap_activity" = "Druk om volgend document te openen, lang drukken voor Documenten scherm";
+
+
+"add_bookmark3" = "Selectie";
+"add_bookmark_whole_verse1" = "Verzen";
+"prefs_disable_two_step_bookmarking_title" = "Snel bladwijzers toevoegen";
+"prefs_disable_two_step_bookmarking_summary" = "De knoppen \"Selectie\" en \"Verzen\" direct tonen in het selectiemenu in de Bijbelweergave.";

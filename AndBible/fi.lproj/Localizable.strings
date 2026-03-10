@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Painallus avaa valikon, pitkä painallus vie dokumentit -näkymään (oletus)";
 "prefs_toolbar_button_action_swap_menu" = "Painalluksella seuraavaan dokumenttiin, pitkä painallus avaa valikon";
 "prefs_toolbar_button_action_swap_activity" = "Painalluksella seuraavaan dokumenttiin, pitkällä painalluksella dokumentit -näkymään";
+
+
+"add_bookmark3" = "Valinta";
+"add_bookmark_whole_verse1" = "Jakeet";
+"prefs_disable_two_step_bookmarking_title" = "Yksivaiheinen kirjanmerkin lisääminen";
+"prefs_disable_two_step_bookmarking_summary" = "Näytä \"Valinta\" ja \"Jakeet\" suoraan raamattunäkymän valintavalikossa.";

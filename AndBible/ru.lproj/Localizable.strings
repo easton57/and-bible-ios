@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Нажмите, чтобы открыть меню, нажмите и удерживайте, чтобы открыть экран ресурсов (по умолчанию)";
 "prefs_toolbar_button_action_swap_menu" = "Нажмите, чтобы открыть следующий ресурс, нажмите и удерживайте, чтобы открыть меню";
 "prefs_toolbar_button_action_swap_activity" = "Нажмите, чтобы открыть следующий ресурс, нажмите и удерживайте, чтобы открыть экран ресурсов";
+
+
+"add_bookmark3" = "Выделение";
+"add_bookmark_whole_verse1" = "Стихи";
+"prefs_disable_two_step_bookmarking_title" = "Одношаговое создание закладок";
+"prefs_disable_two_step_bookmarking_summary" = "Показывать элементы «Выделение» и «Стихи» непосредственно в меню Выделение в режиме просмотра Библии";

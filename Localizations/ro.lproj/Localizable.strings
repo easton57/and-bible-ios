@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Apasă pentru Opțiuni, ține apăsat pentru Documente (prestabilit)";
 "prefs_toolbar_button_action_swap_menu" = "Apasă pentru a deschide următorul document, ține apăsat pentru a deschide opțiunile";
 "prefs_toolbar_button_action_swap_activity" = "Apasă pentru a deschide următorul document, ține apăsat pentru a vedea documentele";
+
+
+"add_bookmark3" = "Text ales";
+"add_bookmark_whole_verse1" = "Versete";
+"prefs_disable_two_step_bookmarking_title" = "Semn de carte rapid";
+"prefs_disable_two_step_bookmarking_summary" = "Arată opțiunile „Text ales” și „Versete” cînd pui semn de carte la un text ales";

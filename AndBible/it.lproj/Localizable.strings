@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Premi per aprire il menù, premi a lungo per i documenti (predefinito)";
 "prefs_toolbar_button_action_swap_menu" = "Premi per aprire il documento successivo, premi a lungo per aprire il menù";
 "prefs_toolbar_button_action_swap_activity" = "Premi per il documento successivo, premi a lungo per la schermata documenti";
+
+
+"add_bookmark3" = "Selezione";
+"add_bookmark_whole_verse1" = "Versetti";
+"prefs_disable_two_step_bookmarking_title" = "Segnalibro rapido";
+"prefs_disable_two_step_bookmarking_summary" = "Mostra gli elementi \"Selezione\" e \"Versetti\" direttamente nella vista Bibbia del menù Selezione";

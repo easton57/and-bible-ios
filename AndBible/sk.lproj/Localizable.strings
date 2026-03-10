@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Ťuknutím sa otvorí ponuka, dlhým stlačením sa zobrazí obrazovka dokumentov (predvolené) ";
 "prefs_toolbar_button_action_swap_menu" = "Ťuknutím sa otvorí nasledujúci dokument, dlhým stlačením sa otvorí ponuka";
 "prefs_toolbar_button_action_swap_activity" = "Ťuknutím sa otvorí nasledujúci dokument, dlhým stlačením obrazovka dokumentov";
+
+
+"add_bookmark3" = "Výber";
+"add_bookmark_whole_verse1" = "Verše";
+"prefs_disable_two_step_bookmarking_title" = "Rýchle záložky";
+"prefs_disable_two_step_bookmarking_summary" = "Zobraziť položky „Výber“ a „Verše“ priamo v ponuke Výberu okna Biblie";

@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Menüyü açmak için basın, belgeler ekranı için uzun basın (varsayılan)";
 "prefs_toolbar_button_action_swap_menu" = "Bir sonraki belgeyi açmak için basın, menüyü açmak için uzun basın";
 "prefs_toolbar_button_action_swap_activity" = "Bir sonraki belgeyi açmak için basın, belgeler ekranı için uzun basın";
+
+
+"add_bookmark3" = "Seçim";
+"add_bookmark_whole_verse1" = "Ayetler";
+"prefs_disable_two_step_bookmarking_title" = "Tek adımda yer imi";
+"prefs_disable_two_step_bookmarking_summary" = "Doğrudan Kutsal Kitap görünümü Seçim menüsünde \"Seçim\" ve \"Ayetler\" öğelerini gösterin";

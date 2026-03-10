@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Pulsar para abrir menú, pulsación larga para pantalla de documentos (predeterminado)";
 "prefs_toolbar_button_action_swap_menu" = "Pulsar para abrir el siguiente documento, pulsación larga para abrir menú";
 "prefs_toolbar_button_action_swap_activity" = "Pulsar para abrir el siguiente documento, pulsación larga para pantalla de documentos";
+
+
+"add_bookmark3" = "Selección";
+"add_bookmark_whole_verse1" = "Versos";
+"prefs_disable_two_step_bookmarking_title" = "Marcador de un paso";
+"prefs_disable_two_step_bookmarking_summary" = "Mostrar elementos de \"Selección\" y \"Versos\" directamente en el menú de selección de la vista de la Biblia";

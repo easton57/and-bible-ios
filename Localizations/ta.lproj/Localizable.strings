@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "மெனுவை திறக்க இங்கே அழுத்தவும். நீண்ட நேரம் அழுத்தினால் கோப்புகள் திரை திறக்கும். (default)";
 "prefs_toolbar_button_action_swap_menu" = "அடுத்த கோப்பை திறக்க அழுத்தவும், நீண்ட நேரம் அழுத்தினால் மெனு திறக்கும்";
 "prefs_toolbar_button_action_swap_activity" = "அடுத்த கோப்பை திறக்க அழுத்தவும், நீண்ட நேரம் அழுத்தினால் கோப்புகள் திரை திறக்கும்";
+
+
+"add_bookmark3" = "தேர்வு";
+"add_bookmark_whole_verse1" = "வசனங்கள்";
+"prefs_disable_two_step_bookmarking_title" = "ஒரு நிலை புக்மார்க்குகள் ";
+"prefs_disable_two_step_bookmarking_summary" = "Show \"Selection\" and \"Verses\" items directly in Bible view Selection menu";

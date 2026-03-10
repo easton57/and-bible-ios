@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Мәзірді ашу үшін басыңыз, ал бейне құжаттар үшін (әдептегідей) ұзақ басыңыз";
 "prefs_toolbar_button_action_swap_menu" = "Келесі құжатты ашу үшін - басу, мәзірді ашу үшін - ұзақ басу";
 "prefs_toolbar_button_action_swap_activity" = "Келесі құжатты ашу үшін басыңыз, ал бейне құжаттар үшін ұзақ басыңыз";
+
+
+"add_bookmark3" = "Таңдау";
+"add_bookmark_whole_verse1" = "Аяттар";
+"prefs_disable_two_step_bookmarking_title" = "Бір қадамды бетбелгілер";
+"prefs_disable_two_step_bookmarking_summary" = "«Таңдау» мен «Аяттар» тармақтарын тікелей Киелі Кітап көрінісіндегі Таңдау мәзірінде көрсетіңіз";

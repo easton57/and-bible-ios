@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "اضغط لفتح القائمة، ضغطة مطولة لشاشة المستندات (افتراضي)";
 "prefs_toolbar_button_action_swap_menu" = "اضغط لفتح المستند التالي، ضغطة مطولة لفتح القائمة";
 "prefs_toolbar_button_action_swap_activity" = "اضغط لفتح المستند التالي، اضغط مطولاً على شاشة المستندات";
+
+
+"add_bookmark3" = "تحديد";
+"add_bookmark_whole_verse1" = "آيات";
+"prefs_disable_two_step_bookmarking_title" = "One-step bookmarking";
+"prefs_disable_two_step_bookmarking_summary" = "Show \"Selection\" and \"Verses\" items directly in Bible view Selection menu";

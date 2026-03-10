@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Press to open menu, long press for documents screen (default)";
 "prefs_toolbar_button_action_swap_menu" = "Press to open next document, long press to open menu";
 "prefs_toolbar_button_action_swap_activity" = "Press to open next document, long press for documents screen";
+
+
+"add_bookmark3" = "Selection";
+"add_bookmark_whole_verse1" = "Verses";
+"prefs_disable_two_step_bookmarking_title" = "One-step bookmarking";
+"prefs_disable_two_step_bookmarking_summary" = "Show \"Selection\" and \"Verses\" items directly in Bible view Selection menu";

@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Naciśnij, aby otworzyć menu; przytrzymaj, aby otworzyć wybór dokumentu (domyślne)";
 "prefs_toolbar_button_action_swap_menu" = "Naciśnij, aby otworzyć następny dokument; przytrzymaj, aby otworzyć menu";
 "prefs_toolbar_button_action_swap_activity" = "Naciśnij, aby otworzyć następny dokument; przytrzymaj, aby otworzyć wybór dokumentu";
+
+
+"add_bookmark3" = "Fragment";
+"add_bookmark_whole_verse1" = "Wersety";
+"prefs_disable_two_step_bookmarking_title" = "Dodawanie zakładek pojedynczym stuknięciem";
+"prefs_disable_two_step_bookmarking_summary" = "Wyświetl elementy „fragment” i „wersety” zamiast rozwijanego menu „zakładka”.";

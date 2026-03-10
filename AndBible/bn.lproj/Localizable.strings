@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "মেনু খুলতে টিপুন, ডকুমেন্ট স্ক্রীনের জন্য দীর্ঘক্ষণ টিপুন (ডিফল্ট)";
 "prefs_toolbar_button_action_swap_menu" = "পরবর্তী নথি খুলতে টিপুন, মেনু খুলতে দীর্ঘক্ষণ টিপুন";
 "prefs_toolbar_button_action_swap_activity" = "পরবর্তী নথি খুলতে টিপুন, নথির পর্দার জন্য দীর্ঘক্ষণ টিপুন৷";
+
+
+"add_bookmark3" = "নির্বাচন";
+"add_bookmark_whole_verse1" = "পদ্গুলি";
+"prefs_disable_two_step_bookmarking_title" = "এক-ধাপে বুকমার্কিং";
+"prefs_disable_two_step_bookmarking_summary" = "বাইবেল ভিউ সিলেকশন মেনুতে সরাসরি \"নির্বাচন\" এবং \"পদ\" আইটেমগুলি দেখান";

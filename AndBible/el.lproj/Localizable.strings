@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Πατήστε για άνοιγμα μενού, παρατεταμένο πάτημα για οθόνη εγγράφων (προεπιλογή)";
 "prefs_toolbar_button_action_swap_menu" = "Πατήστε για άνοιγμα επόμενου εγγράφου, παρατεταμένο πάτημα για άνοιγμα μενού";
 "prefs_toolbar_button_action_swap_activity" = "Πατήστε για άνοιγμα επόμενου εγγράφου, παρατεταμένο πάτημα για άνοιγμα οθόνης εγγράφων";
+
+
+"add_bookmark3" = "Επιλογή";
+"add_bookmark_whole_verse1" = "Στίχοι";
+"prefs_disable_two_step_bookmarking_title" = "Σελιδοδείκτης σε ένα βήμα";
+"prefs_disable_two_step_bookmarking_summary" = "Εμφανίστε τα στοιχεία \"Επιλογή\" και \"Στίχοι\" απευθείας στο μενού επιλογής της προβολής Βίβλου";

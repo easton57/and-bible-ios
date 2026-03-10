@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "누르면 메뉴가 열리고, 길게 누르면 문서 화면으로 (기본)";
 "prefs_toolbar_button_action_swap_menu" = "누르면 다음 문서가 열리고, 길게 누르면 메뉴가 열림";
 "prefs_toolbar_button_action_swap_activity" = "누르면 다음 문서가 열리고, 길게 누르면 문서 화면으로";
+
+
+"add_bookmark3" = "선택";
+"add_bookmark_whole_verse1" = "구절";
+"prefs_disable_two_step_bookmarking_title" = "One-step bookmarking";
+"prefs_disable_two_step_bookmarking_summary" = "Show \"Selection\" and \"Verses\" items directly in Bible view Selection menu";

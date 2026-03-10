@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Dodirnite za otvaranje izbornika, dugo pritisnuti za zaslon sa dokumentima (zadano)";
 "prefs_toolbar_button_action_swap_menu" = "Dodirnuti za otvaranje sljedećeg dokumenta, dugo pritisnuti za otvaranje izbornika";
 "prefs_toolbar_button_action_swap_activity" = "Dodirnuti za otvaranje sljedećeg dokumenta, dugo pritisnuti za zaslon sa dokumentima";
+
+
+"add_bookmark3" = "Odabir";
+"add_bookmark_whole_verse1" = "Redci";
+"prefs_disable_two_step_bookmarking_title" = "Straničnikanje u jednom koraku";
+"prefs_disable_two_step_bookmarking_summary" = "Prikaži stavke iz Odabir i Redci direktno u selekcijski izbornik biblijskog prozora";

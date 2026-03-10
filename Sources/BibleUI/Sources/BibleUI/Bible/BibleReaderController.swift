@@ -1521,7 +1521,16 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
 
     // MARK: - BibleBridgeDelegate — Bookmarks
 
-    public func bridge(_ bridge: BibleBridge, addBookmark bookInitials: String, startOrdinal: Int, endOrdinal: Int, addNote: Bool) {
+    /// Shared bookmark creation/update path used by JS bridge and native selection actions.
+    private func addOrUpdateBibleBookmark(
+        bookInitials: String,
+        startOrdinal: Int,
+        endOrdinal: Int,
+        addNote: Bool,
+        wholeVerse: Bool,
+        startOffset: Int? = nil,
+        endOffset: Int? = nil
+    ) {
         guard let service = bookmarkService else {
             logger.warning("addBookmark: bookmarkService is nil")
             return
@@ -1540,6 +1549,9 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
                 bookInitials: bookInitials,
                 startOrdinal: startOrdinal,
                 endOrdinal: endOrdinal,
+                wholeVerse: wholeVerse,
+                startOffset: startOffset,
+                endOffset: endOffset,
                 addNote: addNote
             )
             bookmark.book = currentBook
@@ -1576,6 +1588,18 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
         } else if isNew {
             bridge.emit(event: "bookmark_clicked", data: "\"\(bmId)\", {\"openLabels\":true}")
         }
+    }
+
+    public func bridge(_ bridge: BibleBridge, addBookmark bookInitials: String, startOrdinal: Int, endOrdinal: Int, addNote: Bool) {
+        addOrUpdateBibleBookmark(
+            bookInitials: bookInitials,
+            startOrdinal: startOrdinal,
+            endOrdinal: endOrdinal,
+            addNote: addNote,
+            wholeVerse: true,
+            startOffset: nil,
+            endOffset: nil
+        )
     }
 
     public func bridge(_ bridge: BibleBridge, addGenericBookmark bookInitials: String, osisRef: String, startOrdinal: Int, endOrdinal: Int, addNote: Bool) {
@@ -1919,13 +1943,83 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
 
     // MARK: - Selection Actions
 
-    /// Bookmark the current selection. Queries JS for ordinal range.
-    func bookmarkSelection() {
+    /// Query detailed selection info from Vue.js (`bibleView.querySelection()`), with
+    /// fallback to the bridge's DOM-based query when unavailable.
+    @MainActor
+    private func querySelectionDetails() async -> (
+        text: String,
+        startOrdinal: Int?,
+        endOrdinal: Int?,
+        startOffset: Int?,
+        endOffset: Int?
+    )? {
+        if let webView = bridge.webView {
+            let js = """
+            (function() {
+                try {
+                    if (typeof bibleView === 'undefined' || !bibleView.querySelection) return null;
+                    var sel = bibleView.querySelection();
+                    if (sel == null) return null;
+                    return (typeof sel === 'string') ? sel : JSON.stringify(sel);
+                } catch (e) {
+                    return null;
+                }
+            })()
+            """
+
+            do {
+                let result = try await webView.evaluateJavaScript(js)
+                if let jsonStr = result as? String,
+                   let data = jsonStr.data(using: .utf8),
+                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    func asInt(_ value: Any?) -> Int? {
+                        if value is NSNull { return nil }
+                        if let intValue = value as? Int { return intValue }
+                        if let number = value as? NSNumber { return number.intValue }
+                        return nil
+                    }
+
+                    let text = dict["text"] as? String ?? ""
+                    let startOrdinal = asInt(dict["startOrdinal"])
+                    let endOrdinal = asInt(dict["endOrdinal"])
+                    let startOffset = asInt(dict["startOffset"])
+                    let endOffset = asInt(dict["endOffset"])
+
+                    if !text.isEmpty || startOrdinal != nil || endOrdinal != nil {
+                        return (text, startOrdinal, endOrdinal, startOffset, endOffset)
+                    }
+                }
+            } catch {
+                logger.debug("querySelectionDetails JS error: \(error.localizedDescription)")
+            }
+        }
+
+        if let fallback = await bridge.querySelection() {
+            return (fallback.text, fallback.startOrdinal, fallback.endOrdinal, nil, nil)
+        }
+        return nil
+    }
+
+    /// Bookmark the current selection.
+    /// `wholeVerse=false` matches Android "Selection", `wholeVerse=true` matches "Verses".
+    func bookmarkSelection(wholeVerse: Bool = false) {
         Task { @MainActor in
-            guard let sel = await bridge.querySelection() else { return }
+            guard let sel = await querySelectionDetails() else { return }
             let startOrd = sel.startOrdinal ?? ((currentChapter - 1) * 40 + 1)
             let endOrd = sel.endOrdinal ?? startOrd
-            bridge(bridge, addBookmark: activeModuleName, startOrdinal: startOrd, endOrdinal: endOrd, addNote: false)
+
+            let selectionStartOffset = wholeVerse ? nil : sel.startOffset
+            let selectionEndOffset = wholeVerse ? nil : sel.endOffset
+
+            addOrUpdateBibleBookmark(
+                bookInitials: activeModuleName,
+                startOrdinal: startOrd,
+                endOrdinal: endOrd,
+                addNote: false,
+                wholeVerse: wholeVerse,
+                startOffset: selectionStartOffset,
+                endOffset: selectionEndOffset
+            )
             bridge.clearSelection()
         }
     }

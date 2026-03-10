@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Antippen, um das Menü zu öffnen, Tippen und Halten für Dokumentauswahl (Standardaktion)";
 "prefs_toolbar_button_action_swap_menu" = "Antippen um das nächste Dokument zu öffnen, gedrückt halten um das Menü zu öffnen";
 "prefs_toolbar_button_action_swap_activity" = "Antippen um das nächste Dokument zu öffnen, gedrückt halten um die Dokumentauswahl zu öffnen";
+
+
+"add_bookmark3" = "Auswahl";
+"add_bookmark_whole_verse1" = "Verse";
+"prefs_disable_two_step_bookmarking_title" = "direktes Hinzufügen zu Lesezeichen";
+"prefs_disable_two_step_bookmarking_summary" = "\"Auswahl\" und \"Verse\" direkt im Auswahlmenü der Bibelansicht anzeigen";

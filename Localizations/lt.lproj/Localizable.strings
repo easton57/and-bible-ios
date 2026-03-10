@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Paspaudus atverti meniu, paspaudus ir palaikius - dokumentų langą (numatytoji)";
 "prefs_toolbar_button_action_swap_menu" = "Paspaudus atverti kitą dokumentą, paspaudus ir palaikius atverti meniu";
 "prefs_toolbar_button_action_swap_activity" = "Paspaudus atverti kitą dokumentą, paspaudus ir palaikius atverti dokumentų langą";
+
+
+"add_bookmark3" = "Pridėti žymę";
+"add_bookmark_whole_verse1" = "Eilutės";
+"prefs_disable_two_step_bookmarking_title" = "Vieno žingsnio žymėjimas";
+"prefs_disable_two_step_bookmarking_summary" = "Rodyti „Žymėjimas“ ir „Eilutės“ elementus tiesiogiai Biblijos rodinio žymėjimo meniu";

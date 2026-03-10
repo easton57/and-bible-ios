@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Klik - otevřít menu, podržet - zobrazit okno dokumentů (výchozí)";
 "prefs_toolbar_button_action_swap_menu" = "Klik - otevřít následující dokument, podržet - otevřít menu";
 "prefs_toolbar_button_action_swap_activity" = "Klik - otevřít následující dokument, podržet - otevřít okno dokumentů";
+
+
+"add_bookmark3" = "Výběr";
+"add_bookmark_whole_verse1" = "Verš";
+"prefs_disable_two_step_bookmarking_title" = "Rychlé záložky";
+"prefs_disable_two_step_bookmarking_summary" = "Zobrazit \"výběr\" a \"verš\" položky v případě manipulace s výběrem textu";

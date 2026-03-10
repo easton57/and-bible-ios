@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "मेनू खोलने के लिए दबाएं, दस्तावेज़ स्क्रीन के लिए देर तक दबाएं (डिफ़ॉल्ट)";
 "prefs_toolbar_button_action_swap_menu" = "अगला दस्तावेज़ खोलने के लिए दबाएं, मेनू खोलने के लिए देर तक दबाएं";
 "prefs_toolbar_button_action_swap_activity" = "अगला दस्तावेज़ खोलने के लिए दबाएं, दस्तावेज़ स्क्रीन के लिए देर तक दबाएं";
+
+
+"add_bookmark3" = "चयन";
+"add_bookmark_whole_verse1" = "छंद";
+"prefs_disable_two_step_bookmarking_title" = "वन-स्टेप बुकमार्किंग";
+"prefs_disable_two_step_bookmarking_summary" = "सीधे बाइबिल दृश्य चयन मेनू में \"चयन\" और \"छंद\" आइटम दिखाएं";

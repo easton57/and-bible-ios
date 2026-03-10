@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Tryck för att öppna menyn, långtryck för dokumentskärmen (standard)";
 "prefs_toolbar_button_action_swap_menu" = "Tryck för att öppna nästa dokument, långtryck för att öppna menyn";
 "prefs_toolbar_button_action_swap_activity" = "Tryck för att öppna nästa dokument, långtryck för dokumentskärmen";
+
+
+"add_bookmark3" = "Markering";
+"add_bookmark_whole_verse1" = "Verser";
+"prefs_disable_two_step_bookmarking_title" = "Bokmärkning i ett steg";
+"prefs_disable_two_step_bookmarking_summary" = "Visa menyvalen \"Markering\" och \"Verser\" direkt i bibelvyns markeringsmeny";

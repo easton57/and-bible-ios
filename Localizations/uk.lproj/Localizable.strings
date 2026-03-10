@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Натисніть, щоб відкрити меню, тривале натискання для екрана документів (за замовчуванням)";
 "prefs_toolbar_button_action_swap_menu" = "Натисніть, щоб відкрити наступний ресурс, тривале натискання, щоб відкрити меню";
 "prefs_toolbar_button_action_swap_activity" = "Натисніть, щоб відкрити наступний ресурс, тривале натискання для екрану ресурсів";
+
+
+"add_bookmark3" = "Виділення";
+"add_bookmark_whole_verse1" = "Вірші";
+"prefs_disable_two_step_bookmarking_title" = "Однокрокове створення закладки";
+"prefs_disable_two_step_bookmarking_summary" = "Показати \"Виділення\" та \"Вірші\" безпосередньо в меню перегляду Біблії";

@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Appuyez pour ouvrir le menu, appuyez longuement pour l’affichage des documents (par défaut).";
 "prefs_toolbar_button_action_swap_menu" = "Appuyer pour ouvrir le document suivant, appui long pour ouvrir le menu";
 "prefs_toolbar_button_action_swap_activity" = "Appuyer pour ouvrir le document suivant, appui long pour l’affichage des documents";
+
+
+"add_bookmark3" = "Sélection";
+"add_bookmark_whole_verse1" = "Versets";
+"prefs_disable_two_step_bookmarking_title" = "Signet en une seule étape";
+"prefs_disable_two_step_bookmarking_summary" = "Afficher les éléments « Sélection » et « Versets » directement dans le menu « Sélection » de l’affichage de la Bible";

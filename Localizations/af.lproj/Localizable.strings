@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Druk om kieslys oop te maak, lang druk vir dokumente skerm (standaard)";
 "prefs_toolbar_button_action_swap_menu" = "Druk om volgende dokument oop te maak, lang druk om kieslys oop te maak";
 "prefs_toolbar_button_action_swap_activity" = "Druk om volgende dokument oop te maak, lang druk vir dokumente skerm";
+
+
+"add_bookmark3" = "Seleksie";
+"add_bookmark_whole_verse1" = "Verse";
+"prefs_disable_two_step_bookmarking_title" = "Een-stap boekmerk";
+"prefs_disable_two_step_bookmarking_summary" = "Wys 'Seleksie' en 'Verse' items direk in Bybel beskouings keurings kieslys";

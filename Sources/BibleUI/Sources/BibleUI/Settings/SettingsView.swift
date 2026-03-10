@@ -51,6 +51,8 @@ public struct SettingsView: View {
     @State private var doubleTapToFullscreen =
         AppPreferenceRegistry.boolDefault(for: .doubleTapToFullscreen) ?? true
     @State private var autoFullscreen = AppPreferenceRegistry.boolDefault(for: .autoFullscreenPref) ?? false
+    @State private var disableTwoStepBookmarking =
+        AppPreferenceRegistry.boolDefault(for: .disableTwoStepBookmarking) ?? false
     @State private var toolbarButtonActionsMode =
         AppPreferenceRegistry.stringDefault(for: .toolbarButtonActions) ?? "default"
     @State private var bibleViewSwipeMode =
@@ -346,6 +348,26 @@ public struct SettingsView: View {
                 ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Toggle(
+                    String(
+                        localized: "prefs_disable_two_step_bookmarking_title",
+                        defaultValue: "One-step bookmarking"
+                    ),
+                    isOn: Binding(
+                        get: { disableTwoStepBookmarking },
+                        set: { newValue in
+                            disableTwoStepBookmarking = newValue
+                            let store = SettingsStore(modelContext: modelContext)
+                            store.setBool(.disableTwoStepBookmarking, value: newValue)
+                        }
+                    )
+                )
+                Text(String(
+                    localized: "prefs_disable_two_step_bookmarking_summary",
+                    defaultValue: "Show \"Selection\" and \"Verses\" items directly in Bible view Selection menu"
+                ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Picker(
                     String(
                         localized: "prefs_bible_view_swipe_mode_title",
@@ -586,6 +608,7 @@ public struct SettingsView: View {
             screenKeepOn = store.getBool(.screenKeepOnPref)
             doubleTapToFullscreen = store.getBool(.doubleTapToFullscreen)
             autoFullscreen = store.getBool(.autoFullscreenPref)
+            disableTwoStepBookmarking = store.getBool(.disableTwoStepBookmarking)
             toolbarButtonActionsMode = Self.normalizedToolbarButtonActionsMode(
                 store.getString(.toolbarButtonActions)
             )

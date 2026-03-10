@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Frapeti por malfermi menuon, frapetadi por montri ekranon de dokumentoj (implicite)";
 "prefs_toolbar_button_action_swap_menu" = "Frapeti por malfermi sekvan dokumenton, frapetadi por malfermi menuon";
 "prefs_toolbar_button_action_swap_activity" = "Frapeti por malfermi sekvan dokumenton, frapetadi por montri ekranon de dokumentoj";
+
+
+"add_bookmark3" = "Fragmento";
+"add_bookmark_whole_verse1" = "Versoj";
+"prefs_disable_two_step_bookmarking_title" = "Aldoni legosignon per unu frapeto";
+"prefs_disable_two_step_bookmarking_summary" = "Montri la agojn “fragmento” kaj “versoj” anstataŭ la etendita menuo “legosigno”";

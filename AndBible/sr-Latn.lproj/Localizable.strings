@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Pritisnuti za otvaranje menija, dugo pritisnuti za ekran sa dokumentima (podrazumevano)";
 "prefs_toolbar_button_action_swap_menu" = "Pritisnuti za otvaranje sledećeg dokumenta, dugo pritisnuti za otvaranje menija";
 "prefs_toolbar_button_action_swap_activity" = "Pritisnuti za otvaranje sledećeg dokumenta, dugo pritisnuti za ekran sa dokumentima";
+
+
+"add_bookmark3" = "Odabir";
+"add_bookmark_whole_verse1" = "Stihovi";
+"prefs_disable_two_step_bookmarking_title" = "Obeležavanje u jednom koraku";
+"prefs_disable_two_step_bookmarking_summary" = "Prikaži stavke iz \"Odabir\" i \"Stihovi\" diretkno u selekcioni meni biblijskog prozora";

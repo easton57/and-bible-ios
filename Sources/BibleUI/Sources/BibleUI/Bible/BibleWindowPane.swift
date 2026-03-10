@@ -19,6 +19,7 @@ struct BibleWindowPane: View {
     let isFocused: Bool
     let displaySettings: TextDisplaySettings
     let nightMode: Bool
+    let disableTwoStepBookmarking: Bool
     let hideWindowButtons: Bool
     let speakService: SpeakService
 
@@ -393,10 +394,55 @@ struct BibleWindowPane: View {
 
     private var selectionActionBar: some View {
         HStack(spacing: 20) {
-            Button { controller?.bookmarkSelection() } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "bookmark")
-                    Text(String(localized: "bookmark")).font(.caption2)
+            if controller?.currentCategory == .bible {
+                if disableTwoStepBookmarking {
+                    Button { controller?.bookmarkSelection(wholeVerse: false) } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "bookmark")
+                            Text(String(
+                                localized: "add_bookmark3",
+                                defaultValue: "Selection"
+                            ))
+                            .font(.caption2)
+                        }
+                    }
+                    Button { controller?.bookmarkSelection(wholeVerse: true) } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "bookmark.fill")
+                            Text(String(
+                                localized: "add_bookmark_whole_verse1",
+                                defaultValue: "Verses"
+                            ))
+                            .font(.caption2)
+                        }
+                    }
+                } else {
+                    Menu {
+                        Button(String(
+                            localized: "add_bookmark3",
+                            defaultValue: "Selection"
+                        )) {
+                            controller?.bookmarkSelection(wholeVerse: false)
+                        }
+                        Button(String(
+                            localized: "add_bookmark_whole_verse1",
+                            defaultValue: "Verses"
+                        )) {
+                            controller?.bookmarkSelection(wholeVerse: true)
+                        }
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "bookmark")
+                            Text(String(localized: "bookmark")).font(.caption2)
+                        }
+                    }
+                }
+            } else {
+                Button { controller?.bookmarkSelection(wholeVerse: true) } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: "bookmark")
+                        Text(String(localized: "bookmark")).font(.caption2)
+                    }
                 }
             }
             Button { controller?.copySelection() } label: {

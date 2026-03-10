@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "點選以開啟選單；長按則打開文件表列";
 "prefs_toolbar_button_action_swap_menu" = "點選以開啟下一份文件；長按則開啟選單";
 "prefs_toolbar_button_action_swap_activity" = "點選以開啟下一份文件；長按則打開文件表列";
+
+
+"add_bookmark3" = "選取";
+"add_bookmark_whole_verse1" = "經文";
+"prefs_disable_two_step_bookmarking_title" = "一鍵標籤書籤";
+"prefs_disable_two_step_bookmarking_summary" = "直接在聖經檢視選取選單顯示 \"選取\" 及 \"節\"";

@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "မီနူးကိုဖွင့်ရန် ဖိထားပါ၊ မှတ်တမ်း မျက်နှာပြင်(ပုံသေ) အတွက် ကြာကြာဖိထားပါ";
 "prefs_toolbar_button_action_swap_menu" = "မှတ်တမ်းအသစ်ကိုဖွင့်ရန် ဖိထားပါ၊ မီနူးကိုဖွင့်ရန် ကြာကြာဖိထားပါ";
 "prefs_toolbar_button_action_swap_activity" = "မှတ်တမ်းအသစ်ကိုဖွင့်ရန် ဖိထားပါ၊ မှတ်တမ်းမျက်နှာပြင်ကိုဖွင့်ရန် ကြာကြာဖိထားပါ";
+
+
+"add_bookmark3" = "ရွေးချယ်မှု";
+"add_bookmark_whole_verse1" = "အခန်းငယ်များ";
+"prefs_disable_two_step_bookmarking_title" = "တိုက်ရိုက် စာညှပ်ခြင်း";
+"prefs_disable_two_step_bookmarking_summary" = "ကျမ်းစာမြင်ကွင်း ရွေးချယ်မှု မီနူးတွင် \"ရွေးချယ်မှု\" နှင့် \"အခန်းငယ်များ\" အကြောင်းကို တိုက်ရိုက်ပြပါ။";

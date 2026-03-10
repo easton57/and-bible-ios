@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Trykk for å åpne meny, langt trykk for dokumentskjerm (standard)";
 "prefs_toolbar_button_action_swap_menu" = "Trykk for å åpne neste modul, lang-trykk for å åpne meny";
 "prefs_toolbar_button_action_swap_activity" = "Trykk for å åpne neste modul, lang-trykk for modulvindu";
+
+
+"add_bookmark3" = "Selection";
+"add_bookmark_whole_verse1" = "Verses";
+"prefs_disable_two_step_bookmarking_title" = "One-step bookmarking";
+"prefs_disable_two_step_bookmarking_summary" = "Show \"Selection\" and \"Verses\" items directly in Bible view Selection menu";

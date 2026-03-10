@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "לחיצה לפתיחת תפריט, לחיצה ארוכה למסך מסמכים (ברירת המחדל)";
 "prefs_toolbar_button_action_swap_menu" = "לחיצה למעבר למסמך הבא, לחיצה ארוכה לפתיחת תפריט";
 "prefs_toolbar_button_action_swap_activity" = "לחיצה למעבר למסמך הבא, לחיצה ארוכה למסך מסמכים";
+
+
+"add_bookmark3" = "בחירה";
+"add_bookmark_whole_verse1" = "פסוקים";
+"prefs_disable_two_step_bookmarking_title" = "סימניה מהירה";
+"prefs_disable_two_step_bookmarking_summary" = "הצגת אפשרויות \"בחירה\" ו\"פסוקים\" בתפריט הנפתח ע\"י לחיצה ארוכה על הטקסט. אפשרויות אלה יוצרות במהירות סימניות - הראשונה עבור החלק הנבחר, השניה עבור פסוקים שלמים.";

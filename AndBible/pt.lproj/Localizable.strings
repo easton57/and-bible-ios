@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Pressione para abrir o menu, pressione e mantenha para o ecran de documentos (padrão)";
 "prefs_toolbar_button_action_swap_menu" = "Pressione para abrir o próximo documento, pressione e mantenha para abrir o menu";
 "prefs_toolbar_button_action_swap_activity" = "Pressione para abrir o próximo documento, pressione e mantenha para abrir o ecran de documentos";
+
+
+"add_bookmark3" = "Selecção";
+"add_bookmark_whole_verse1" = "Versículos";
+"prefs_disable_two_step_bookmarking_title" = "Marcação de marcadores numa etapa";
+"prefs_disable_two_step_bookmarking_summary" = "Mostrar os itens \"Seleção\" e \"Versículos\" diretamente no menu de seleção da visualização da Bíblia";

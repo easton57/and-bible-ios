@@ -436,3 +436,9 @@
 "prefs_toolbar_button_action_default" = "Pritisnite, da odprete meni, dolgo pritisnite za zaslon dokumentov (privzeto) ";
 "prefs_toolbar_button_action_swap_menu" = "Pritisnite, da odprete naslednji dokument, dolgo pritisnite, da odprete meni";
 "prefs_toolbar_button_action_swap_activity" = "Pritisnite, da odprete naslednji dokument, dolgo pritisnite za zaslon dokumentov";
+
+
+"add_bookmark3" = "Izbira";
+"add_bookmark_whole_verse1" = "Vrstice";
+"prefs_disable_two_step_bookmarking_title" = "Zaznamek v enem koraku";
+"prefs_disable_two_step_bookmarking_summary" = "\"Izbor\" in \"Vrstice\" prikaži neposredno v meniju za izbiro Biblije";

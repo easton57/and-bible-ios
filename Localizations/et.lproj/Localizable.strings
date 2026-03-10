@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Vajuta menüü avamiseks, hoia all dokumentide ekraani jaoks (vaikimisi)";
 "prefs_toolbar_button_action_swap_menu" = "Vajuta järgmise dokumendi avamiseks, hoia all menüü avamiseks";
 "prefs_toolbar_button_action_swap_activity" = "Vajuta järgmise dokumendi avamiseks, hoia all dokumentide menüü avamiseks";
+
+
+"add_bookmark3" = "Valitu";
+"add_bookmark_whole_verse1" = "Salmid";
+"prefs_disable_two_step_bookmarking_title" = "Ühe liigutusega järjehoidja lisamine";
+"prefs_disable_two_step_bookmarking_summary" = "Show \"Selection\" and \"Verses\" items directly in Bible view Selection menu";

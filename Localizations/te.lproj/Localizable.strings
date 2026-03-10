@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "మెనుని తెరవడానికి నొక్కండి, పత్రాల స్క్రీన్ కోసం ఎక్కువసేపు నొక్కండి (డిఫాల్ట్)";
 "prefs_toolbar_button_action_swap_menu" = "తదుపరి పత్రాన్ని తెరవడానికి నొక్కండి, మెనుని తెరవడానికి ఎక్కువసేపు నొక్కండి";
 "prefs_toolbar_button_action_swap_activity" = "తదుపరి పత్రాన్ని తెరవడానికి నొక్కండి, పత్రాల స్క్రీన్ కోసం ఎక్కువసేపు నొక్కండి";
+
+
+"add_bookmark3" = "ఎంపిక";
+"add_bookmark_whole_verse1" = "వచనాలు";
+"prefs_disable_two_step_bookmarking_title" = "ఒక-దశ బుక్‌మార్కింగ్";
+"prefs_disable_two_step_bookmarking_summary" = "\"ఎంపిక\" మరియు \"వచనాలు \" అంశాలను నేరుగా బైబిల్ వీక్షణ ఎంపిక మెనులో చూపండి";

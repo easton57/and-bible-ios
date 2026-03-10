@@ -74,6 +74,8 @@ public struct BibleReaderView: View {
     @State private var isFullScreen = false
     @State private var navigateToVersePref = AppPreferenceRegistry.boolDefault(for: .navigateToVersePref) ?? false
     @State private var autoFullscreenPref = AppPreferenceRegistry.boolDefault(for: .autoFullscreenPref) ?? false
+    @State private var disableTwoStepBookmarkingPref =
+        AppPreferenceRegistry.boolDefault(for: .disableTwoStepBookmarking) ?? false
     @State private var toolbarButtonActionsMode =
         AppPreferenceRegistry.stringDefault(for: .toolbarButtonActions) ?? "default"
     @State private var bibleViewSwipeMode =
@@ -238,6 +240,7 @@ public struct BibleReaderView: View {
             )
             navigateToVersePref = store.getBool(.navigateToVersePref)
             autoFullscreenPref = store.getBool(.autoFullscreenPref)
+            disableTwoStepBookmarkingPref = store.getBool(.disableTwoStepBookmarking)
             toolbarButtonActionsMode = store.getString(.toolbarButtonActions)
             bibleViewSwipeMode = store.getString(.bibleViewSwipeMode)
             fullScreenHideButtonsPref = store.getBool(.fullScreenHideButtonsPref)
@@ -692,6 +695,7 @@ public struct BibleReaderView: View {
             isFocused: window.id == windowManager.activeWindow?.id,
             displaySettings: displaySettings,
             nightMode: nightMode,
+            disableTwoStepBookmarking: disableTwoStepBookmarkingPref,
             hideWindowButtons: hideWindowButtonsPref,
             speakService: speakService,
             onShowBookChooser: { showBookChooser = true },
@@ -1599,6 +1603,7 @@ public struct BibleReaderView: View {
         let store = SettingsStore(modelContext: modelContext)
         navigateToVersePref = store.getBool(.navigateToVersePref)
         autoFullscreenPref = store.getBool(.autoFullscreenPref)
+        disableTwoStepBookmarkingPref = store.getBool(.disableTwoStepBookmarking)
         toolbarButtonActionsMode = store.getString(.toolbarButtonActions)
         bibleViewSwipeMode = store.getString(.bibleViewSwipeMode)
         fullScreenHideButtonsPref = store.getBool(.fullScreenHideButtonsPref)

@@ -407,3 +407,9 @@
 "prefs_toolbar_button_action_default" = "Menü megnyitása lenyomásra, dokumentumok képernyő megnyitása hosszan-lenyomásra (alapértelmezett)";
 "prefs_toolbar_button_action_swap_menu" = "Következő dokumentum megnyitása lenyomásra, menü megnyitása hosszan-lenyomásra.";
 "prefs_toolbar_button_action_swap_activity" = "Következő dokumentum megnyitása lenyomásra, dokumentumok képernyő megnyitása hosszan-lenyomásra.";
+
+
+"add_bookmark3" = "Kiválasztás";
+"add_bookmark_whole_verse1" = "Versek";
+"prefs_disable_two_step_bookmarking_title" = "Könyvjelzők mentése egy lépésben";
+"prefs_disable_two_step_bookmarking_summary" = "Mutassa a \"Kiválasztás\" és \"Versek\" elemeket közvetlenül a Biblia nézet Kiválasztás menüjében";
