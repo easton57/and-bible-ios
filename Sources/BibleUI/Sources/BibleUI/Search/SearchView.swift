@@ -562,7 +562,7 @@ public struct SearchView: View {
         let currentSelectedModules = selectedModules
         let bookName = currentBook
         let osisBookId = currentOsisBookId
-        let strongsQueries = Self.normalizedStrongsEntryAttributeQueries(for: currentQuery)
+        let strongsQueryOptions = Self.normalizedStrongsQueryOptions(for: currentQuery)
 
         Task.detached(priority: .userInitiated) {
             let (scopeBookName, scopeTestament) = Self.resolveScopeParams(
@@ -570,59 +570,18 @@ public struct SearchView: View {
             )
             let swordScope = Self.swordScope(for: currentScope, osisBookId: osisBookId)
 
-            // Strong's find-all queries must use SWORD entry-attribute search; the FTS index
-            // intentionally strips Strong's markup from indexed plain text.
-            if !strongsQueries.isEmpty {
-                let targetModuleNames: [String] = {
-                    if currentSelectedModules.isEmpty {
-                        if let primary = swordModule?.info.name {
-                            return [primary]
-                        }
-                        return []
-                    }
-                    return Array(currentSelectedModules).sorted()
-                }()
-
-                var modules: [(name: String, module: SwordModule)] = []
-                for moduleName in targetModuleNames {
-                    if let module = swordManager?.module(named: moduleName) {
-                        modules.append((name: moduleName, module: module))
-                    } else if let primary = swordModule, primary.info.name == moduleName {
-                        modules.append((name: moduleName, module: primary))
-                    }
-                }
-                if modules.isEmpty, let primary = swordModule {
-                    modules = [(name: primary.info.name, module: primary)]
-                }
-
-                if modules.count > 1 {
-                    var allHits: [SearchHit] = []
-                    var perModule: [(name: String, count: Int)] = []
-                    for (moduleName, module) in modules {
-                        let hits = Self.searchStrongsInModule(
-                            module,
-                            strongsQueries: strongsQueries,
-                            moduleName: moduleName,
-                            scope: swordScope
-                        )
-                        perModule.append((name: moduleName, count: hits.count))
-                        allHits.append(contentsOf: hits)
-                    }
-                    let totalCount = perModule.reduce(0) { $0 + $1.count }
-                    await MainActor.run {
-                        results = allHits
-                        multiResults = MultiResultGroup(perModule: perModule, totalCount: totalCount)
-                        resultSummary = String(localized: "\(totalCount) verses in \(perModule.count) translations")
-                        isSearching = false
-                    }
-                    return
-                }
-
-                if let module = modules.first {
+            // Android parity: find-all occurrences uses "strong:<key>" query syntax and
+            // a Strong's-capable Bible module, not plain-text FTS.
+            if let strongsQueryOptions {
+                let strongsModule = Self.resolveStrongsSearchModule(
+                    currentModule: swordModule,
+                    installedModules: installedBibleModules,
+                    swordManager: swordManager
+                )
+                if let strongsModule {
                     let hits = Self.searchStrongsInModule(
-                        module.module,
-                        strongsQueries: strongsQueries,
-                        moduleName: nil,
+                        strongsModule,
+                        queryOptions: strongsQueryOptions,
                         scope: swordScope
                     )
                     await MainActor.run {
@@ -771,9 +730,14 @@ public struct SearchView: View {
         return (bookPart, chapter, verse)
     }
 
-    private static func normalizedStrongsEntryAttributeQueries(for query: String) -> [String] {
+    private struct StrongsQueryOptions {
+        let androidStyleQueries: [String]
+        let entryAttributeQueries: [String]
+    }
+
+    private static func normalizedStrongsQueryOptions(for query: String) -> StrongsQueryOptions? {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return [] }
+        guard !trimmed.isEmpty else { return nil }
 
         var candidate = trimmed.uppercased()
         if candidate.hasPrefix("LEMMA:STRONG:") {
@@ -784,31 +748,80 @@ public struct SearchView: View {
             candidate = String(candidate.dropFirst("LEMMA:".count))
         }
 
-        guard let prefix = candidate.first, prefix == "H" || prefix == "G" else { return [] }
+        guard let prefix = candidate.first, prefix == "H" || prefix == "G" else { return nil }
         let digitsRaw = String(candidate.dropFirst())
-        guard !digitsRaw.isEmpty, digitsRaw.allSatisfy(\.isNumber) else { return [] }
+        guard !digitsRaw.isEmpty, digitsRaw.allSatisfy(\.isNumber) else { return nil }
 
         let stripped = String(digitsRaw.drop(while: { $0 == "0" }))
         let normalizedDigits = stripped.isEmpty ? "0" : stripped
 
-        var normalizedKeys: [String] = []
-        normalizedKeys.append("lemma:strong:\(prefix)\(digitsRaw)")
+        let prefixLower = String(prefix).lowercased()
+
+        var androidStyleQueries: [String] = []
+        androidStyleQueries.append("strong:\(prefixLower)\(digitsRaw)")
+        androidStyleQueries.append("strong:\(prefixLower)0*\(normalizedDigits)")
         if normalizedDigits != digitsRaw {
-            normalizedKeys.append("lemma:strong:\(prefix)\(normalizedDigits)")
+            androidStyleQueries.append("strong:\(prefixLower)\(normalizedDigits)")
         }
-        return normalizedKeys
+
+        var entryAttributeQueries: [String] = []
+        entryAttributeQueries.append("lemma:strong:\(prefix)\(digitsRaw)")
+        if normalizedDigits != digitsRaw {
+            entryAttributeQueries.append("lemma:strong:\(prefix)\(normalizedDigits)")
+        }
+        return StrongsQueryOptions(
+            androidStyleQueries: Self.orderedUnique(androidStyleQueries),
+            entryAttributeQueries: Self.orderedUnique(entryAttributeQueries)
+        )
+    }
+
+    private static func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for value in values where seen.insert(value).inserted {
+            result.append(value)
+        }
+        return result
+    }
+
+    private static func resolveStrongsSearchModule(
+        currentModule: SwordModule?,
+        installedModules: [ModuleInfo],
+        swordManager: SwordManager?
+    ) -> SwordModule? {
+        guard let swordManager else { return currentModule }
+
+        if let currentModule, currentModule.info.features.contains(.strongsNumbers) {
+            return currentModule
+        }
+
+        let strongsBibleNames = installedModules
+            .filter { $0.features.contains(.strongsNumbers) }
+            .map(\.name)
+            .sorted()
+
+        for moduleName in strongsBibleNames {
+            if let module = swordManager.module(named: moduleName) {
+                return module
+            }
+        }
+        return currentModule
     }
 
     private static func searchStrongsInModule(
         _ module: SwordModule,
-        strongsQueries: [String],
-        moduleName: String?,
+        queryOptions: StrongsQueryOptions,
         scope: String?
     ) -> [SearchHit] {
-        for strongsQuery in strongsQueries {
+        let searchAttempts: [(query: String, type: SearchType)] =
+            queryOptions.androidStyleQueries.map { ($0, .lucene) } +
+            queryOptions.androidStyleQueries.map { ($0, .multiWord) } +
+            queryOptions.entryAttributeQueries.map { ($0, .entryAttribute) }
+
+        for attempt in searchAttempts {
             let options = SearchOptions(
-                query: strongsQuery,
-                searchType: .entryAttribute,
+                query: attempt.query,
+                searchType: attempt.type,
                 scope: scope
             )
             let swordResults = module.search(options)
@@ -819,7 +832,7 @@ public struct SearchView: View {
                     chapter: parsed.chapter,
                     verse: parsed.verse,
                     text: result.previewText,
-                    moduleName: moduleName
+                    moduleName: nil
                 )
             }
             if !hits.isEmpty {
