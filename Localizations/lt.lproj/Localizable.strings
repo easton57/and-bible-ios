@@ -465,15 +465,15 @@
 "prefs_volume_keys_scroll_title" = "Volume buttons scroll";
 "prefs_volume_keys_scroll_summary" = "Use volume up/down to scroll Bible text";
 "prefs_volume_keys_scroll_ios_note" = "iOS does not expose volume-button presses to apps. This setting is kept for Android parity and cross-device sync.";
-"prefs_experimental_features_title" = "Experimental features";
-"prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
+"prefs_experimental_features_title" = "Eksperimentinės ypatybės";
+"prefs_experimental_features_summary" = "Pažymėkite, kurias eksperimentines ypatybes norite įjungti. Šios ypatybės yra vis dar plėtojamos ir gali būti pakeistos ar pašalintos";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "Įjungti Bluetooth medijos mygtukus";
+"prefs_enable_bluetooth_summary" = "Apdoroti Bluetooth medijos mygtukus siekiant pradėti/stabdyti kalbėjimą.";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "Atverti Biblijos nuorodas AndBible programėlėje";
+"open_bible_links_summary" = "Spustelėjus ant nuorodų, kurios nurodo į AndBible palaikomus Biblijos URL adresus, atverti juos AndBible programėlėje";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";

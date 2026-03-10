@@ -441,7 +441,7 @@
 "add_bookmark3" = "Seleksie";
 "add_bookmark_whole_verse1" = "Verse";
 "prefs_disable_two_step_bookmarking_title" = "Een-stap boekmerk";
-"prefs_disable_two_step_bookmarking_summary" = "Wys 'Seleksie' en 'Verse' items direk in Bybel beskouings keurings kieslys";
+"prefs_disable_two_step_bookmarking_summary" = "Wys \'Seleksie\' en \'Verse\' items direk in Bybel beskouings keurings kieslys";
 
 "active_window_indicator_summary" = "Merk vensterhoeke om te help herken watter venster aktief is";
 "active_window_indicator_title" = "Wys aktiewe venste raanwyser";
@@ -472,9 +472,9 @@
 "prefs_double_tap_to_fullscreen_title" = "Dubbel-tik op Volskerm";
 "prefs_e_ink_mode_title" = "Swart & wit modus";
 "prefs_eink_mode_summary" = "Gebruik die toep in monochroom-modus (geen kleure nie), wat dit meer geskik maak vir E-ink-toestelle.";
-"prefs_interface_locale_summary" = "Kies 'n persoonlike gebruikers taal";
+"prefs_interface_locale_summary" = "Kies \'n persoonlike gebruikers taal";
 "prefs_interface_locale_title" = "Applikasie taal";
-"prefs_navigate_to_verse_summary" = "Kies vers (en hoofstuk) wanneer 'n teks gekies word";
+"prefs_navigate_to_verse_summary" = "Kies vers (en hoofstuk) wanneer \'n teks gekies word";
 "prefs_navigate_to_verse_title" = "Gaan na vers";
 "prefs_night_mode_automatic" = "Outomaties";
 "prefs_night_mode_manual" = "handleiding";
@@ -498,11 +498,11 @@
 "prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "Aktiveer Bluetooth-media knoppies";
+"prefs_enable_bluetooth_summary" = "Hanteer Bluetooth-mediak noppies om te begin /stop praat.";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "Maak Bybel skakels oop in AndBible";
+"open_bible_links_summary" = "As jy op skakels klik wat verwys na AndBible ondersteunde Bybel URL, maak dit oop in AndBible";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";

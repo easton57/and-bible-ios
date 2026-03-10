@@ -447,12 +447,12 @@
 "active_window_indicator_title" = "顯示現時視窗標示";
 "auto_fullscreen" = "捲動以切換至全螢幕";
 "auto_fullscreen_summary" = "捲動文字時，自動切換為全螢幕。提示：你可以隨時以雙點切換至全螢幕";
-"choose_strongs_greek_dictionary_summary" = "選擇偏好的Strong's希臘文字典";
-"choose_strongs_greek_dictionary_title" = "Strong's希臘文字典";
+"choose_strongs_greek_dictionary_summary" = "選擇偏好的Strong\'s希臘文字典";
+"choose_strongs_greek_dictionary_title" = "Strong\'s希臘文字典";
 "choose_strongs_greek_morphology_summary" = "選擇 Robinson 希臘文詞形工具以查找定義";
 "choose_strongs_greek_morphology_title" = "Robinson 希臘文詞形工具";
-"choose_strongs_hebrew_dictionary_summary" = "選擇偏好的Strong's希伯來文字典";
-"choose_strongs_hebrew_dictionary_title" = "Strong's希伯來文字典";
+"choose_strongs_hebrew_dictionary_summary" = "選擇偏好的Strong\'s希伯來文字典";
+"choose_strongs_hebrew_dictionary_title" = "Strong\'s希伯來文字典";
 "choose_word_lookup_dictionary_summary" = "Choose dictionaries for looking up words";
 "choose_word_lookup_dictionary_title" = "Word lookup dictionaries";
 "full_screen_hide_buttons_pref_summary" = "當切換至全螢幕模式時，自動隱藏底部的導覽列";
@@ -481,7 +481,7 @@
 "prefs_night_mode_summary" = "選擇以自動、手動或系統設定切換夜間模式。手動切換可以在主螢幕中的3點選單進行";
 "prefs_night_mode_system" = "系統";
 "prefs_night_mode_title" = "夜間模式切換";
-"prefs_open_links_in_special_window_summary" = "在特殊視窗開啟連結，以便快速查看交叉對照及Strong's編號";
+"prefs_open_links_in_special_window_summary" = "在特殊視窗開啟連結，以便快速查看交叉對照及Strong\'s編號";
 "prefs_open_links_in_special_window_title" = "連結視窗";
 "prefs_screen_keep_on_summary" = "使用此應用程式時，防止螢幕睡眠";
 "prefs_screen_keep_on_title" = "保持螢幕開啟";
@@ -498,11 +498,11 @@
 "prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "啟用藍牙按鍵功能";
+"prefs_enable_bluetooth_summary" = "使用藍牙按鍵開始/停止語音";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "在And Bible中開啟聖經連結";
+"open_bible_links_summary" = "點擊AndBible支援的聖經URL時，在AndBible中開啟";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";

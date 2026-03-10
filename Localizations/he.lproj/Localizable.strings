@@ -403,7 +403,7 @@
 "prefs_advanced_settings_cat" = "הגדרות מתקדמות";
 
 "prefs_toolbar_button_action_title" = "פעולת כפתורי סרגל הכלים";
-"prefs_toolbar_button_action_summary" = "פעולה שתתבצע בלחיצה רגילה או ארוכה על כפתורי תנ\\\"ך או פרשנות בסרגל הכלים";
+"prefs_toolbar_button_action_summary" = "פעולה שתתבצע בלחיצה רגילה או ארוכה על כפתורי תנ\"ך או פרשנות בסרגל הכלים";
 "prefs_toolbar_button_action_default" = "לחיצה לפתיחת תפריט, לחיצה ארוכה למסך מסמכים (ברירת המחדל)";
 "prefs_toolbar_button_action_swap_menu" = "לחיצה למעבר למסמך הבא, לחיצה ארוכה לפתיחת תפריט";
 "prefs_toolbar_button_action_swap_activity" = "לחיצה למעבר למסמך הבא, לחיצה ארוכה למסך מסמכים";
@@ -456,8 +456,8 @@
 "prefs_open_links_in_special_window_title" = "חלון קישורים";
 "prefs_screen_keep_on_summary" = "המנע מכיבוי המסך כשתוכנה פועלת";
 "prefs_screen_keep_on_title" = "השאר את המסך דולק";
-"prefs_show_error_box_summary" = "שימושי למפתחים לפענוח שגיאות ג'אווהסקריפט. גורם ליישום לפעול יותר לאט.";
-"prefs_show_error_box_title" = "הצג תיבת שגיאות ג'אווהסקריפט";
+"prefs_show_error_box_summary" = "שימושי למפתחים לפענוח שגיאות ג\'אווהסקריפט. גורם ליישום לפעול יותר לאט.";
+"prefs_show_error_box_title" = "הצג תיבת שגיאות ג\'אווהסקריפט";
 "prefs_swipe_mode_chapter" = "פרק";
 "prefs_swipe_mode_none" = "לא זמין";
 "prefs_swipe_mode_page" = "עמוד";
@@ -469,10 +469,10 @@
 "prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "אפשר כפתורי מדיה בבלוטות\'";
+"prefs_enable_bluetooth_summary" = "אפשר להשתמש בכפתורי מדיה בלוטות\' כדי להתחיל או להפסיק הקראה.";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
+"open_bible_links_title" = "פתח קישורים לכתובים באמצעות AndBible";
 "open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
 
 "crash_app" = "Crash app!";

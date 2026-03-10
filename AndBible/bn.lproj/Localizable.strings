@@ -498,11 +498,11 @@
 "prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "ব্লুটুথ মিডিয়া বোতামগুলি সক্ষম করুন৷";
+"prefs_enable_bluetooth_summary" = "কথা বলা শুরু/বন্ধ করতে ব্লুটুথ মিডিয়া বোতামগুলি পরিচালনা করুন।";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "AndBible এ বাইবেলের লিঙ্ক খুলুন";
+"open_bible_links_summary" = "AndBible সমর্থিত বাইবেল URL-এর উল্লেখ করা লিঙ্কগুলিতে ক্লিক করার সময়, সেগুলি AndBible-এ খুলুন";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";

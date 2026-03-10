@@ -498,11 +498,11 @@
 "prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "Увімкнути мультимедійні кнопки Bluetooth";
+"prefs_enable_bluetooth_summary" = "Використовуйте мультимедійні кнопки Bluetooth, щоб розпочати/припинити говорити.";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "Відкрити біблійні посилання в AndBible";
+"open_bible_links_summary" = "Натискаючи посилання, які посилаються на біблійну URL-адресу, яка підтримується AndBible, відкривайте їх в AndBible";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";

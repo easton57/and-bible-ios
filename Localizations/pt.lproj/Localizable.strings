@@ -465,15 +465,15 @@
 "prefs_volume_keys_scroll_title" = "Volume buttons scroll";
 "prefs_volume_keys_scroll_summary" = "Use volume up/down to scroll Bible text";
 "prefs_volume_keys_scroll_ios_note" = "iOS does not expose volume-button presses to apps. This setting is kept for Android parity and cross-device sync.";
-"prefs_experimental_features_title" = "Experimental features";
-"prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
+"prefs_experimental_features_title" = "Recursos experimentais";
+"prefs_experimental_features_summary" = "Selecione quais funcionalidades experimentais deseja ativar. Estas funcionalidades ainda estão em desenvolvimento e podem ser alteradas ou removidas";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "Ativar botões de mídia via Bluetooth";
+"prefs_enable_bluetooth_summary" = "Manipule botões de mídia Bluetooth para iniciar/parar de falar";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "Abrir ligações da Bíblia no AndBible";
+"open_bible_links_summary" = "Quando clicar em atalhos suportados pelo URL bíblico e AndBible, abrí-los no AndBible";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";

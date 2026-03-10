@@ -481,7 +481,7 @@
 "prefs_night_mode_summary" = "Kies om automatisch naar nacht-modus te wisselen (als het apparaat dit ondersteunt), handmatig of via apparaatinstellingen (Android 10+).  Handmatig wisselen kan vanuit het 3-stippenmenu in het hoofdscherm.";
 "prefs_night_mode_system" = "Systeem";
 "prefs_night_mode_title" = "Nachtweergave wisselen";
-"prefs_open_links_in_special_window_summary" = "Open koppelingen in speciaal venster voor snellere weergave van kruisverwijzingen en Strong's";
+"prefs_open_links_in_special_window_summary" = "Open koppelingen in speciaal venster voor snellere weergave van kruisverwijzingen en Strong\'s";
 "prefs_open_links_in_special_window_title" = "Koppelingenscherm";
 "prefs_screen_keep_on_summary" = "Voorkomen dat het scherm uitgaat tijdens het gebruiken van de app";
 "prefs_screen_keep_on_title" = "Scherm ingeschakeld houden";
@@ -498,11 +498,11 @@
 "prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "Schakel Bluetooth-mediaknoppen in";
+"prefs_enable_bluetooth_summary" = "Gebruik Bluetooth-mediaknoppen om spreken te starten/stoppen.";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "Open Bijbel links in AndBible";
+"open_bible_links_summary" = "Open Bijbel URLs in AndBible (alleen mogelijk als Bijbel URL wordt ondersteund door AndBible)";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";

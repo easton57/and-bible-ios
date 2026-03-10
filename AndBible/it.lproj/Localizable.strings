@@ -427,8 +427,8 @@
 "discrete_help_par3" = "The 'Hide religious symbols' setting changes the app icon to a calculator icon in the launcher.";
 "discrete_help_ios_note" = "Note: On iOS, the app icon changes to a calculator when 'Hide religious symbols' is enabled, but the app display name cannot be changed at runtime due to platform limitations.";
 
-"prefs_behavior_customization_cat" = "Comportamento dell\\'applicazione";
-"prefs_display_customization_cat" = "Aspetto dell\\'interfaccia";
+"prefs_behavior_customization_cat" = "Comportamento dell\'applicazione";
+"prefs_display_customization_cat" = "Aspetto dell\'interfaccia";
 "prefs_advanced_settings_cat" = "Impostazioni avanzate";
 
 "prefs_toolbar_button_action_title" = "Azioni dei pulsanti della barra strumenti";
@@ -457,7 +457,7 @@
 "choose_word_lookup_dictionary_title" = "Word lookup dictionaries";
 "full_screen_hide_buttons_pref_summary" = "Quando si passa alla modalità a schermo intero, nasconde automaticamente la barra dei pulsanti della finestra che si trova nella parte inferiore dello schermo";
 "full_screen_hide_buttons_pref_title" = "Nascondi pulsanti a schermo intero";
-"hide_bible_reference_overlay_summary" = "Non mostrare i riferimenti biblici semi-trasparenti in sovraimpressione quando l'app è a schermo intero";
+"hide_bible_reference_overlay_summary" = "Non mostrare i riferimenti biblici semi-trasparenti in sovraimpressione quando l\'app è a schermo intero";
 "hide_bible_reference_overlay_title" = "Nascondi i riferimenti biblici sovrapposti";
 "hide_window_buttons_summary" = "I pulsanti della finestra visualizzati sul lato destro delle viste della Bibbia sono nascosti. La barra di navigazione della finestra in basso resta visualizzata e puoi aprire il menù a comparsa della finestra premendo a lungo.";
 "hide_window_buttons_title" = "Nascondi i pulsanti della finestra";
@@ -471,9 +471,9 @@
 "prefs_double_tap_to_fullscreen_summary" = "Usa la modalità schermo intero toccando due volte la finestra";
 "prefs_double_tap_to_fullscreen_title" = "Tocca due volte per lo schermo intero";
 "prefs_e_ink_mode_title" = "Modalità bianco e nero";
-"prefs_eink_mode_summary" = "Usa l'app in modalità monocromatica (senza colori), più adatta ai dispositivi E-ink.";
-"prefs_interface_locale_summary" = "Scegli una lingua personalizzata per l'interfaccia";
-"prefs_interface_locale_title" = "Lingua dell'applicazione";
+"prefs_eink_mode_summary" = "Usa l\'app in modalità monocromatica (senza colori), più adatta ai dispositivi E-ink.";
+"prefs_interface_locale_summary" = "Scegli una lingua personalizzata per l\'interfaccia";
+"prefs_interface_locale_title" = "Lingua dell\'applicazione";
 "prefs_navigate_to_verse_summary" = "Scegli il versetto (e il capitolo) quando selezioni un passaggio";
 "prefs_navigate_to_verse_title" = "Naviga al versetto";
 "prefs_night_mode_automatic" = "Automatico";
@@ -483,9 +483,9 @@
 "prefs_night_mode_title" = "Passaggio alla modalità notturna";
 "prefs_open_links_in_special_window_summary" = "Apre i collegamenti in finestre speciali, per mostrare più rapidamente i riferimenti incrociati e gli Strong";
 "prefs_open_links_in_special_window_title" = "Finestra collegamenti";
-"prefs_screen_keep_on_summary" = "Impedisci la sospensione dello schermo durante l'utilizzo di questa app";
+"prefs_screen_keep_on_summary" = "Impedisci la sospensione dello schermo durante l\'utilizzo di questa app";
 "prefs_screen_keep_on_title" = "Tieni lo schermo acceso";
-"prefs_show_error_box_summary" = "Utile agli sviluppatori per trovare gli errori javascript in BibleView. Questo rallenterà l'app.";
+"prefs_show_error_box_summary" = "Utile agli sviluppatori per trovare gli errori javascript in BibleView. Questo rallenterà l\'app.";
 "prefs_show_error_box_title" = "Mostra finestra errori Javascript";
 "prefs_swipe_mode_chapter" = "Capitolo";
 "prefs_swipe_mode_none" = "Disabilitato";
@@ -494,15 +494,15 @@
 "prefs_volume_keys_scroll_title" = "Volume buttons scroll";
 "prefs_volume_keys_scroll_summary" = "Use volume up/down to scroll Bible text";
 "prefs_volume_keys_scroll_ios_note" = "iOS does not expose volume-button presses to apps. This setting is kept for Android parity and cross-device sync.";
-"prefs_experimental_features_title" = "Experimental features";
-"prefs_experimental_features_summary" = "Select which experimental features to enable. These features are still in development and may change or be removed";
+"prefs_experimental_features_title" = "Funzionalità sperimentali";
+"prefs_experimental_features_summary" = "Scegli quali funzionalità sperimentali abilitare. Queste funzionalità sono ancora in fase di sviluppo e potrebbero subire modifiche o essere rimosse";
 "experimental_feature_bookmark_edit_actions" = "Bookmark edit actions";
 "experimental_feature_add_paragraph_break" = "Add paragraph break bookmark";
-"prefs_enable_bluetooth_title" = "Enable Bluetooth media buttons";
-"prefs_enable_bluetooth_summary" = "Handle Bluetooth media buttons to start/stop speaking.";
+"prefs_enable_bluetooth_title" = "Abilita i tasti multimediali Bluetooth";
+"prefs_enable_bluetooth_summary" = "Gestisce i tasti multimediali Bluetooth per avviare/fermare la dizione.";
 
-"open_bible_links_title" = "Open Bible links in AndBible";
-"open_bible_links_summary" = "When clicking links that refer to AndBible supported Bible URL, open them in AndBible";
+"open_bible_links_title" = "Apri collegamenti Bibbia in AndBible";
+"open_bible_links_summary" = "Quando clicchi su collegamenti che fanno riferimento al formato URL supportato da AndBible per i versi biblici, verranno mostrati in AndBible";
 
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";
