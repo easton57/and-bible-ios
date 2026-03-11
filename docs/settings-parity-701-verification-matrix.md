@@ -1,12 +1,12 @@
 # SETPAR-701 Verification Matrix (Android Application Preferences -> iOS)
 
-Date: 2026-03-10
+Date: 2026-03-11
 
 ## Scope and Method
 
 - Contract baseline: `docs/settings-parity-contract.md`.
 - Key inventory: `Sources/BibleCore/Sources/BibleCore/Database/AppPreferenceRegistry.swift` (`AppPreferenceKey.allCases` = 35).
-- Verification method: direct code inspection of iOS UI persistence points and runtime consumers.
+- Verification method: direct code inspection of iOS UI persistence points and runtime consumers, backed by simulator regression evidence in `docs/settings-parity-702-regression-report.md`.
 
 ## Status Legend
 
@@ -65,3 +65,5 @@ Date: 2026-03-10
 ## Open Gaps Identified by This Matrix
 
 No functional gaps remain for the 35-key Android application-preferences contract. Remaining entries are documented platform divergences (`volume_keys_scroll`, `request_sdcard_permission_pref`).
+
+Regression hardening note: Strong's "Find all occurrences" now has a module-backed simulator test to prevent recurrence of the `H02022` no-results failure.

@@ -610,22 +610,30 @@ public struct SearchView: View {
         let currentSelectedModules = selectedModules
         let bookName = currentBook
         let osisBookId = currentOsisBookId
+        let currentSwordModule = swordModule
+        let currentSwordManager = swordManager
+        let currentSearchIndexService = searchIndexService
+        let currentInstalledBibleModules = installedBibleModules
         let strongsQueryOptions = StrongsSearchSupport.normalizedQueryOptions(for: currentQuery)
+        let (scopeBookName, scopeTestament) = Self.resolveScopeParams(
+            scope: currentScope, bookName: bookName
+        )
+        let swordScope = Self.swordScope(for: currentScope, osisBookId: osisBookId)
+        let strongsModules: [SwordModule] = if strongsQueryOptions != nil {
+            Self.resolveStrongsSearchModules(
+                currentModule: currentSwordModule,
+                installedModules: currentInstalledBibleModules,
+                swordManager: currentSwordManager
+            )
+        } else {
+            []
+        }
+        let singleModuleName = currentSelectedModules.first ?? currentSwordModule?.info.name ?? ""
 
         Task.detached(priority: .userInitiated) {
-            let (scopeBookName, scopeTestament) = Self.resolveScopeParams(
-                scope: currentScope, bookName: bookName
-            )
-            let swordScope = Self.swordScope(for: currentScope, osisBookId: osisBookId)
-
             // Android parity: find-all occurrences uses "strong:<key>" query syntax and
             // a Strong's-capable Bible module, not plain-text FTS.
             if let strongsQueryOptions {
-                let strongsModules = Self.resolveStrongsSearchModules(
-                    currentModule: swordModule,
-                    installedModules: installedBibleModules,
-                    swordManager: swordManager
-                )
                 if !strongsModules.isEmpty {
                     var hits: [SearchHit] = []
                     for strongsModule in strongsModules {
@@ -654,7 +662,7 @@ public struct SearchView: View {
                 }
             }
 
-            if let service = searchIndexService {
+            if let service = currentSearchIndexService {
                 // FTS5 index search
                 if currentSelectedModules.count > 1 {
                     let grouped = service.searchMultiple(
@@ -676,10 +684,9 @@ public struct SearchView: View {
                         isSearching = false
                     }
                 } else {
-                    let moduleName = currentSelectedModules.first ?? swordModule?.info.name ?? ""
                     let ftsResults = service.search(
                         query: currentQuery,
-                        moduleName: moduleName,
+                        moduleName: singleModuleName,
                         wordMode: currentWordMode,
                         scopeBookName: scopeBookName,
                         scopeTestament: scopeTestament
@@ -694,13 +701,12 @@ public struct SearchView: View {
                 }
             } else {
                 // Fallback: direct SWORD search (no index service)
-                if let module = swordModule {
+                if let module = currentSwordModule {
                     let decorated = currentWordMode.decorateQuery(currentQuery)
-                    let scope = Self.swordScope(for: currentScope, osisBookId: currentOsisBookId)
                     let options = SearchOptions(
                         query: decorated,
                         searchType: currentWordMode.searchType,
-                        scope: scope
+                        scope: swordScope
                     )
                     let swordResults = module.search(options)
                     let hits: [SearchHit] = swordResults.results.prefix(5000).compactMap { result in
@@ -727,7 +733,7 @@ public struct SearchView: View {
 
     // MARK: - Helpers
 
-    private static func resolveScopeParams(
+    nonisolated private static func resolveScopeParams(
         scope: ScopeChoice, bookName: String
     ) -> (scopeBookName: String?, scopeTestament: String?) {
         switch scope {
@@ -738,7 +744,7 @@ public struct SearchView: View {
         }
     }
 
-    private static func swordScope(for choice: ScopeChoice, osisBookId: String) -> String? {
+    nonisolated private static func swordScope(for choice: ScopeChoice, osisBookId: String) -> String? {
         switch choice {
         case .wholeBible: return nil
         case .oldTestament: return "Gen-Mal"
@@ -747,7 +753,7 @@ public struct SearchView: View {
         }
     }
 
-    private static func convertIndexResults(
+    nonisolated private static func convertIndexResults(
         _ ftsResults: [SearchIndexService.IndexSearchResult]
     ) -> [SearchHit] {
         ftsResults.compactMap { result in
@@ -761,7 +767,7 @@ public struct SearchView: View {
         }
     }
 
-    private static func convertGroupedResults(
+    nonisolated private static func convertGroupedResults(
         _ grouped: [String: [SearchIndexService.IndexSearchResult]],
         query: String
     ) -> [SearchHit] {
@@ -780,7 +786,7 @@ public struct SearchView: View {
         return allHits
     }
 
-    private static func resolveStrongsSearchModules(
+    nonisolated private static func resolveStrongsSearchModules(
         currentModule: SwordModule?,
         installedModules: [ModuleInfo],
         swordManager: SwordManager?

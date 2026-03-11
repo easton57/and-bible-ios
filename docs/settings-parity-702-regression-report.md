@@ -1,10 +1,10 @@
 # SETPAR-702 Regression Report
 
-Date: 2026-03-10
+Date: 2026-03-11
 
 ## Scope
 
-Regression verification for settings parity work and CI/guardrail integration, using local simulator test execution and localization guardrail execution.
+Regression verification for settings parity work, Strong's search regression hardening, and CI/guardrail integration, using local simulator test execution and localization guardrail execution.
 
 ## Environment
 
@@ -50,7 +50,7 @@ xcodebuild \
   -configuration Debug \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' \
   -derivedDataPath .derivedData \
-  -resultBundlePath .artifacts/AndBibleTests-20260310.xcresult \
+  -resultBundlePath .artifacts/AndBibleTests-strongs-integration-20260311-2.xcresult \
   CODE_SIGNING_ALLOWED=NO \
   test
 ```
@@ -59,16 +59,36 @@ Result: `PASS` (`** TEST SUCCEEDED **`)
 
 Observed test summary:
 
-- `Executed 4 tests, with 0 failures (0 unexpected)`
+- `Executed 10 tests, with 0 failures (0 unexpected)`
 - Test bundle: `AndBibleTests`
   - `testActionPreferencesUseActionShape`
   - `testAppPreferenceRegistryHasDefinitionForAllKeys`
   - `testCriticalPreferenceDefaultsMatchParityContract`
   - `testCSVSetEncodingAndDecodingRoundTrip`
+  - `testStrongsQueryNormalizationHandlesLeadingZeroes`
+  - `testStrongsQueryNormalizationAcceptsDecoratedInput`
+  - `testParseVerseKeySupportsHumanReadableFormat`
+  - `testParseVerseKeySupportsOsisFormat`
+  - `testParseVerseKeySupportsOsisFormatWithSuffix`
+  - `testStrongsSearchFindAllOccurrencesReturnsBundledKJVMatches`
 
 Result bundle (generated during the run, not committed to git):
 
-- `.artifacts/AndBibleTests-20260310.xcresult`
+- `.artifacts/AndBibleTests-strongs-integration-20260311-2.xcresult`
+
+### 3. Strong's find-all regression coverage
+
+The test suite now includes a module-backed regression test for the exact Strong's search flow that had regressed:
+
+- Query under test: `H02022`
+- Execution path: bundled `KJV` SWORD module with Strong's metadata
+- Assertion: find-all search returns at least one parsed verse hit
+
+Evidence:
+
+- `AndBibleTests/AndBibleTests.swift`
+- `Sources/BibleUI/Sources/BibleUI/Search/StrongsSearchSupport.swift`
+- `Sources/BibleUI/Sources/BibleUI/Search/SearchView.swift`
 
 ## CI Workflow Regression Verification
 
@@ -82,6 +102,7 @@ The CI workflow now includes the expected improvements and still runs guardrails
 ## Non-blocking Observations From Test Logs
 
 - Simulator/runtime noise was observed (for example CoreSimulator/ExtensionKit and duplicate-class warnings from test-host loading). These warnings did not fail build/test execution in this run.
+- `SearchView.swift` main-actor isolation warnings were removed by capturing view state before `Task.detached` and marking pure helper methods `nonisolated`.
 
 ## Outcome
 
