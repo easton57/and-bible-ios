@@ -5,19 +5,59 @@ import SwiftData
 import BibleCore
 import SwordKit
 
-/// Manage module repository sources (add, remove, enable/disable).
+/**
+ Manages remote SWORD repository sources used by the downloads browser.
+
+ The view reads repository definitions from `InstallMgr.conf`, lets the user enable or disable
+ individual sources for catalog refresh, supports adding custom HTTP sources, and can reset the
+ source list back to the default packaged configuration.
+
+ Data dependencies:
+ - `ModuleRepository` is used indirectly to read the current source configuration from disk
+ - `UserDefaults` stores the set of user-disabled repository names
+ - `InstallManager` resolves and mutates the underlying `InstallMgr.conf` file used by SWORD
+
+ Side effects:
+ - `onAppear` loads both repository configuration and disabled-source preferences
+ - add, delete, toggle, and reset actions mutate on-disk repository configuration or
+   `UserDefaults`, then reload local state from those persisted sources
+ - resetting sources deletes the current config file and recreates the default source set
+ */
 public struct RepositoryManagerView: View {
+    /// SwiftData context inherited from the parent environment.
     @Environment(\.modelContext) private var modelContext
+
+    /// All configured repository sources loaded from `InstallMgr.conf`.
     @State private var sources: [SourceConfig] = []
+
+    /// Repository names the user has disabled in local preferences.
     @State private var disabledSources: Set<String> = []
+
+    /// Whether the add-source sheet is currently presented.
     @State private var showAddSource = false
+
+    /// Whether the destructive reset confirmation alert is currently presented.
     @State private var showResetConfirm = false
+
+    /// Pending custom source display name entered in the add-source form.
     @State private var newSourceName = ""
+
+    /// Pending custom source host entered in the add-source form.
     @State private var newSourceHost = ""
+
+    /// Pending custom source catalog path entered in the add-source form.
     @State private var newSourcePath = ""
 
+    /**
+     Creates the repository manager with empty local state.
+
+     - Note: Repository configuration is loaded lazily in `onAppear`.
+     */
     public init() {}
 
+    /**
+     Builds the repository list, add-source sheet, and reset-to-defaults controls.
+     */
     public var body: some View {
         List {
             if sources.isEmpty {
@@ -82,10 +122,12 @@ public struct RepositoryManagerView: View {
         }
     }
 
+    /// Number of non-FTP sources currently enabled for refresh.
     private var enabledCount: Int {
         sources.filter { !disabledSources.contains($0.name) && $0.type != "FTP" }.count
     }
 
+    /// Whether the pending custom host indicates an unsupported FTP source.
     private var isFTPHost: Bool {
         let host = newSourceHost.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         return host.hasPrefix("ftp://") || host.hasPrefix("ftp.")
@@ -93,6 +135,12 @@ public struct RepositoryManagerView: View {
 
     // MARK: - Source Row
 
+    /**
+     Builds one repository row with enable/disable and destructive-delete affordances.
+
+     - Parameter source: Source definition to render.
+     - Returns: A row showing source metadata, support state, and local management actions.
+     */
     private func sourceRow(_ source: SourceConfig) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -143,6 +191,9 @@ public struct RepositoryManagerView: View {
 
     // MARK: - Add Source View
 
+    /**
+     Builds the modal form used to create one custom HTTP source.
+     */
     private var addSourceView: some View {
         Form {
             Section(String(localized: "source_details")) {
@@ -200,11 +251,23 @@ public struct RepositoryManagerView: View {
 
     // MARK: - Actions
 
+    /**
+     Reloads repository definitions from the install-manager configuration file.
+
+     Side effects:
+     - replaces the local `sources` array with the current on-disk configuration
+     */
     private func loadSources() {
         let repo = ModuleRepository()
         sources = repo.loadSources()
     }
 
+    /**
+     Loads the locally disabled repository names from `UserDefaults`.
+
+     Side effects:
+     - replaces the local `disabledSources` set when persisted values exist
+     */
     private func loadDisabledSources() {
         let key = "disabledRepositorySources"
         if let saved = UserDefaults.standard.array(forKey: key) as? [String] {
@@ -212,11 +275,26 @@ public struct RepositoryManagerView: View {
         }
     }
 
+    /**
+     Persists the current disabled-source set to `UserDefaults`.
+
+     Side effects:
+     - writes the `disabledSources` set under the `disabledRepositorySources` preference key
+     */
     private func saveDisabledSources() {
         let key = "disabledRepositorySources"
         UserDefaults.standard.set(Array(disabledSources), forKey: key)
     }
 
+    /**
+     Toggles one source between enabled and disabled states.
+
+     - Parameter source: Source whose enabled state should be inverted.
+
+     Side effects:
+     - mutates the local `disabledSources` set
+     - persists the updated disabled-source set to `UserDefaults`
+     */
     private func toggleSource(_ source: SourceConfig) {
         if disabledSources.contains(source.name) {
             disabledSources.remove(source.name)
@@ -226,6 +304,19 @@ public struct RepositoryManagerView: View {
         saveDisabledSources()
     }
 
+    /**
+     Deletes one custom or default source entry from `InstallMgr.conf`.
+
+     - Parameter source: Source definition to remove from the persisted configuration.
+
+     Side effects:
+     - rewrites `InstallMgr.conf` without the selected source entry
+     - removes the source from the disabled-source set and reloads local source state
+
+     Failure modes:
+     - returns without mutating persisted state if the config file cannot be read
+     - file-write failures are ignored and will leave the current on-disk configuration unchanged
+     */
     private func deleteSource(_ source: SourceConfig) {
         // Remove from config file
         let basePath = InstallManager.defaultBasePath()
@@ -253,6 +344,18 @@ public struct RepositoryManagerView: View {
         loadSources()
     }
 
+    /**
+     Appends one custom HTTP source to `InstallMgr.conf`.
+
+     Side effects:
+     - creates a default config skeleton when the file does not yet exist
+     - appends the new source definition to the on-disk config, clears the add-source form, and
+       reloads the source list
+
+     Failure modes:
+     - file-write failures are ignored, in which case the source list will reload without the new
+       source being present
+     */
     private func addSource() {
         let basePath = InstallManager.defaultBasePath()
         let configPath = (basePath as NSString).appendingPathComponent("InstallMgr.conf")
@@ -275,6 +378,18 @@ public struct RepositoryManagerView: View {
         loadSources()
     }
 
+    /**
+     Restores the repository configuration file to the default packaged source set.
+
+     Side effects:
+     - deletes the current `InstallMgr.conf` file
+     - clears disabled-source preferences and recreates the default source configuration
+     - reloads the in-memory source list from the recreated config
+
+     Failure modes:
+     - deleting the existing config uses `try?`; if removal fails, the subsequent recreation step
+       still runs and may overwrite or preserve the prior file depending on install-manager behavior
+     */
     private func resetToDefaults() {
         // Delete the config file so ensureDefaultConfig recreates it
         let basePath = InstallManager.defaultBasePath()
@@ -290,6 +405,12 @@ public struct RepositoryManagerView: View {
         loadSources()
     }
 
+    /**
+     Clears the transient add-source form fields.
+
+     Side effects:
+     - resets the local add-source text fields back to empty strings
+     */
     private func clearAddForm() {
         newSourceName = ""
         newSourceHost = ""

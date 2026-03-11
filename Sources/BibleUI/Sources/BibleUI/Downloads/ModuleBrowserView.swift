@@ -4,27 +4,79 @@ import SwiftUI
 import BibleCore
 import SwordKit
 
-/// Browse and download Bible modules from remote repositories.
+/**
+ Browses installed and remote SWORD modules, then coordinates install and uninstall actions.
+
+ The view combines locally installed module metadata from `SwordManager` with cached or refreshed
+ remote catalogs from `ModuleRepository`, and lets the user filter both sets by category,
+ language, and free-text search.
+
+ Data dependencies:
+ - `SwordManager` is created lazily to read installed module metadata from the local module store
+ - `ModuleRepository` loads configured remote sources, cached catalogs, and install/uninstall side
+   effects from disk
+ - local state tracks in-flight refresh and install operations so the UI can show progress and
+   disable duplicate actions
+
+ Side effects:
+ - `onAppear` initializes repository-backed state, loads configured sources, and restores cached
+   catalogs when available
+ - refreshing the catalog performs network-backed repository fetches, merges results, and surfaces
+   partial failures through local error state
+ - installing or uninstalling a module mutates the local module store on disk, rebuilds the
+   `SwordManager`, and refreshes the installed-module list shown in the UI
+ */
 public struct ModuleBrowserView: View {
+    /// Selected remote/local module category segment.
     @State private var selectedCategory: ModuleCategory = .bible
+
+    /// Selected language filter, or an empty string when all languages should be shown.
     @State private var selectedLanguage: String = ""
+
+    /// Free-text query applied to both installed and available module lists.
     @State private var searchText = ""
+
+    /// Whether a remote catalog refresh is currently in progress.
     @State private var isRefreshing = false
+
+    /// De-duplicated remote modules loaded from configured sources or the local cache.
     @State private var availableModules: [RemoteModuleInfo] = []
+
+    /// Installed module metadata resolved from the current local SWORD manager.
     @State private var installedModules: [ModuleInfo] = []
+
+    /// Lazily created SWORD manager used to query locally installed modules.
     @State private var swordManager: SwordManager?
+
+    /// Repository facade used for source loading, catalog refresh, and install actions.
     @State private var repository = ModuleRepository()
+
+    /// Configured remote source definitions loaded from repository configuration.
     @State private var sources: [SourceConfig] = []
+
+    /// Module names currently being installed so duplicate install actions can be suppressed.
     @State private var installingModules: Set<String> = []
+
+    /// User-visible error text for refresh, install, or uninstall failures.
     @State private var errorMessage: String?
+
+    /// Progress text describing which remote source is being refreshed.
     @State private var refreshProgress: String?
 
+    /**
+     Creates the module browser with empty local state.
+
+     - Note: The view resolves installed modules and repository data lazily in `onAppear`.
+     */
     public init() {}
 
     // MARK: - Computed Properties
 
-    /// All unique languages from available + installed modules, sorted by display name.
-    /// English is placed first, then alphabetical by resolved name, then unresolved codes last.
+    /**
+     All unique languages from available and installed modules, sorted by display name.
+
+     English is placed first, then alphabetical by resolved name, then unresolved codes last.
+     */
     private var availableLanguages: [String] {
         var langs = Set<String>()
         for m in availableModules where m.category == selectedCategory {
@@ -89,6 +141,10 @@ public struct ModuleBrowserView: View {
 
     // MARK: - Body
 
+    /**
+     Builds the filtered installed-module list, remote catalog list, and repository-management
+     toolbar actions.
+     */
     public var body: some View {
         List {
             // Category picker
@@ -204,6 +260,12 @@ public struct ModuleBrowserView: View {
 
     // MARK: - Row Views
 
+    /**
+     Builds one row for a locally installed module with removal controls.
+
+     - Parameter module: Installed module metadata to render.
+     - Returns: A row showing install state, summary metadata, and a remove action.
+     */
     private func installedModuleRow(_ module: ModuleInfo) -> some View {
         HStack {
             Image(systemName: "checkmark.circle.fill")
@@ -235,6 +297,12 @@ public struct ModuleBrowserView: View {
         }
     }
 
+    /**
+     Builds one row for a remotely available module with install-state affordances.
+
+     - Parameter module: Remote module metadata to render.
+     - Returns: A row showing remote source metadata and an install affordance when applicable.
+     */
     private func remoteModuleRow(_ module: RemoteModuleInfo) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -273,8 +341,14 @@ public struct ModuleBrowserView: View {
 
     // MARK: - Helpers
 
-    /// Convert a language code to a display name (e.g., "en" → "English").
-    /// Handles ISO 639-1 ("en"), 639-3 ("aai"), and script variants ("abq-Cyrl").
+    /**
+     Resolves a language code into a localized display name when possible.
+
+     - Parameter languageCode: ISO-style language code, optionally including script or region
+       suffixes such as `en-GB` or `abq-Cyrl`.
+     - Returns: A localized language name with suffix preservation when lookup succeeds, or the
+       uppercased original code when no localization is available.
+     */
     private func displayName(for languageCode: String) -> String {
         // Strip script/region suffixes for lookup (e.g., "abq-Cyrl" → "abq")
         let baseCode = languageCode.components(separatedBy: "-").first ?? languageCode
@@ -291,6 +365,15 @@ public struct ModuleBrowserView: View {
 
     // MARK: - Data Management
 
+    /**
+     Initializes the local SWORD manager, repository sources, and cached catalog state.
+
+     Side effects:
+     - creates a `SwordManager` instance the first time the view appears
+     - loads configured remote sources from repository storage
+     - refreshes the installed-module list from the local module directory
+     - restores cached remote catalogs when no in-memory catalog has been loaded yet
+     */
     private func setupManagers() {
         if swordManager == nil {
             swordManager = SwordManager()
@@ -317,11 +400,34 @@ public struct ModuleBrowserView: View {
         }
     }
 
+    /**
+     Reloads locally installed modules from the active `SwordManager`.
+
+     Side effects:
+     - replaces the local `installedModules` array when a manager is available
+
+     Failure modes:
+     - returns without mutating state when `swordManager` has not been initialized yet
+     */
     private func refreshInstalledList() {
         guard let mgr = swordManager else { return }
         installedModules = mgr.installedModules()
     }
 
+    /**
+     Refreshes all configured remote catalogs and updates the filtered module list.
+
+     Side effects:
+     - marks the view as refreshing, clears stale error text, and updates progress copy while each
+       source is fetched
+     - merges and de-duplicates the refreshed module set before storing it in `availableModules`
+     - records aggregate or partial-source failures in `errorMessage`
+
+     Failure modes:
+     - if no sources are configured, sets a user-visible error and exits without attempting a fetch
+     - per-source refresh failures are accumulated and surfaced after the refresh completes rather
+       than aborting the entire operation
+     */
     private func refreshCatalog() {
         isRefreshing = true
         errorMessage = nil
@@ -379,6 +485,21 @@ public struct ModuleBrowserView: View {
         }
     }
 
+    /**
+     Installs one remote module from its configured repository source.
+
+     - Parameter module: Remote module to install locally.
+
+     Side effects:
+     - records the module name in `installingModules` so the UI can show progress
+     - performs repository installation work and, on success, rebuilds local SWORD state before
+       refreshing the installed-module list
+     - surfaces installation failures in `errorMessage`
+
+     Failure modes:
+     - if the matching source cannot be resolved, sets a user-visible error and returns
+     - repository installation errors are caught and reported without crashing the view
+     */
     private func installModule(_ module: RemoteModuleInfo) {
         guard let source = repository.source(for: module.name) ?? sources.first(where: { $0.name == module.sourceName }) else {
             errorMessage = "Source not found for \(module.name)"
@@ -406,6 +527,19 @@ public struct ModuleBrowserView: View {
         }
     }
 
+    /**
+     Uninstalls one locally installed module and refreshes the installed-module list.
+
+     - Parameter name: Module name to remove from the local SWORD module store.
+
+     Side effects:
+     - invokes repository-backed uninstall file I/O
+     - rebuilds the local SWORD manager and installed-module cache after a successful uninstall
+     - records uninstall failures in `errorMessage`
+
+     Failure modes:
+     - repository uninstall errors are caught and surfaced through `errorMessage`
+     */
     private func uninstallModule(_ name: String) {
         do {
             try repository.uninstallModule(named: name)
