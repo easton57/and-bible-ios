@@ -9,6 +9,7 @@ import AppKit
 #endif
 
 extension Color {
+    /// Platform-specific secondary gray used for calculator digit buttons.
     static var systemGray2: Color {
         #if os(iOS)
         Color(uiColor: .systemGray2)
@@ -18,34 +19,75 @@ extension Color {
     }
 }
 
-/// A functional calculator that serves as a disguise for the Bible app.
-/// Used in persecution-sensitive areas where owning a Bible app could be dangerous.
-/// A specific gesture sequence switches to the Bible content.
+/**
+ Renders the discrete-mode calculator disguise used to protect access to the main app.
+
+ The calculator behaves like a lightweight four-function calculator while also exposing two unlock
+ paths: entering the configured calculator PIN and pressing `=` repeatedly to trigger the fallback
+ secret gesture.
+
+ Data dependencies:
+ - `calculatorPin` is loaded from the shared application-preference store
+ - `onUnlock` is provided by the parent to reveal Bible content once the disguise is bypassed
+
+ Side effects:
+ - button taps mutate calculator state, including current input, pending operation, and display
+ - successful PIN entry or secret-gesture completion invokes `onUnlock`
+ */
 public struct CalculatorView: View {
+    /// Current calculator display text.
     @State private var display = "0"
+
+    /// Digits or decimal value currently being entered by the user.
     @State private var currentInput = ""
+
+    /// Prior operand retained while a binary operation is pending.
     @State private var previousValue: Double = 0
+
+    /// Active arithmetic operation awaiting completion with the next operand.
     @State private var currentOperation: Operation?
+
+    /// Number of consecutive `=` taps used for the fallback secret unlock gesture.
     @State private var secretTapCount = 0
+
+    /// Legacy state slot for conditional Bible presentation.
     @State private var shouldShowBible = false
+
+    /// Configured discrete-mode PIN that can unlock the main app from calculator mode.
     @AppStorage(AppPreferenceKey.calculatorPin.rawValue)
     private var calculatorPin = AppPreferenceRegistry.stringDefault(for: .calculatorPin) ?? "1234"
 
-    private let secretTapThreshold = 7 // Taps on "=" to unlock Bible
+    /// Number of `=` taps required to trigger the fallback unlock gesture.
+    private let secretTapThreshold = 7
 
+    /**
+     Supported binary operations for the calculator keypad.
+     */
     enum Operation: String {
+        /// Addition operation.
         case add = "+"
+        /// Subtraction operation.
         case subtract = "-"
+        /// Multiplication operation.
         case multiply = "×"
+        /// Division operation.
         case divide = "÷"
     }
 
+    /// Callback invoked when the disguise should transition back to Bible content.
     let onUnlock: () -> Void
 
+    /**
+     Creates the calculator disguise with an unlock callback supplied by the parent flow.
+
+     - Parameter onUnlock: Callback invoked when the calculator PIN or fallback gesture unlocks the
+       main application content.
+     */
     public init(onUnlock: @escaping () -> Void) {
         self.onUnlock = onUnlock
     }
 
+    /// Calculator keypad layout, including the wide zero-row button.
     private let buttons: [[String]] = [
         ["C", "±", "%", "÷"],
         ["7", "8", "9", "×"],
@@ -54,11 +96,13 @@ public struct CalculatorView: View {
         ["0", ".", "="],
     ]
 
+    /**
+     Builds the calculator display and keypad layout.
+     */
     public var body: some View {
         VStack(spacing: 12) {
             Spacer()
 
-            // Display
             Text(display)
                 .font(.system(size: 60, weight: .light, design: .default))
                 .lineLimit(1)
@@ -66,7 +110,6 @@ public struct CalculatorView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.horizontal, 24)
 
-            // Button grid
             ForEach(buttons, id: \.self) { row in
                 HStack(spacing: 12) {
                     ForEach(row, id: \.self) { button in
@@ -82,6 +125,16 @@ public struct CalculatorView: View {
         .preferredColorScheme(.dark)
     }
 
+    /**
+     Handles one keypad tap, including arithmetic state, PIN matching, and secret unlock counting.
+
+     - Parameter button: Key label that was tapped.
+
+     Side effects:
+     - mutates display, input, arithmetic state, and secret-tap tracking
+     - invokes `onUnlock` when the configured PIN matches the display or the fallback tap threshold
+       is reached
+     */
     private func handleButton(_ button: String) {
         switch button {
         case "0"..."9":
@@ -130,7 +183,6 @@ public struct CalculatorView: View {
             calculateResult()
             currentOperation = nil
 
-            // PIN-based unlock: if display matches PIN
             let pin = calculatorPin.trimmingCharacters(in: .whitespaces)
             let displayValue = display.trimmingCharacters(in: .whitespaces)
             if !pin.isEmpty && displayValue == pin {
@@ -138,7 +190,6 @@ public struct CalculatorView: View {
                 return
             }
 
-            // Fallback: secret unlock gesture — tap "=" multiple times
             secretTapCount += 1
             if secretTapCount >= secretTapThreshold {
                 secretTapCount = 0
@@ -150,6 +201,17 @@ public struct CalculatorView: View {
         }
     }
 
+    /**
+     Applies the pending arithmetic operation to the previous and current operands.
+
+     Side effects:
+     - updates the display, current input, and stored previous value with the calculated result
+
+     Failure modes:
+     - returns without mutating state when no operation is pending or the current operand cannot be
+       parsed as a `Double`
+     - division by zero yields `0` rather than surfacing an error
+     */
     private func calculateResult() {
         guard let operation = currentOperation,
               let currentValue = Double(currentInput.isEmpty ? display : currentInput) else { return }
@@ -167,6 +229,13 @@ public struct CalculatorView: View {
         previousValue = result
     }
 
+    /**
+     Formats a calculator result for display.
+
+     - Parameter value: Numeric result to format.
+     - Returns: An integer-formatted string for whole numbers in a safe magnitude range, or the
+       default `Double` string representation otherwise.
+     */
     private func formatResult(_ value: Double) -> String {
         if value == value.rounded() && abs(value) < 1e15 {
             return String(format: "%.0f", value)
@@ -175,18 +244,37 @@ public struct CalculatorView: View {
     }
 }
 
-/// A single calculator button.
+/**
+ Renders one calculator keypad button.
+
+ The button chooses its background color from the button title so operators and digit keys follow
+ the expected calculator styling.
+ */
 struct CalculatorButton: View {
+    /// Button label shown to the user.
     let title: String
+
+    /// Whether this button should expand to fill extra horizontal space.
     let isWide: Bool
+
+    /// Action invoked when the button is tapped.
     let action: () -> Void
 
+    /**
+     Creates one calculator keypad button.
+
+     - Parameters:
+       - title: Button label to display.
+       - isWide: Whether the button should expand horizontally.
+       - action: Callback invoked when the button is tapped.
+     */
     init(title: String, isWide: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.isWide = isWide
         self.action = action
     }
 
+    /// Background color selected from the button role.
     private var backgroundColor: Color {
         switch title {
         case "C", "±", "%": return Color(.darkGray)
@@ -195,6 +283,9 @@ struct CalculatorButton: View {
         }
     }
 
+    /**
+     Builds the tappable keypad button surface.
+     */
     var body: some View {
         Button(action: action) {
             Text(title)
