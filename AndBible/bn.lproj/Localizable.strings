@@ -507,3 +507,16 @@
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";
 "crash_app_scheduled_summary" = "Crash scheduled in 10 seconds.";
+"sign_in_failed" = "সিঙ্ক্রোনাইজেশন ব্যাকএন্ড পরিষেবাতে সাইন ইন করা ব্যর্থ হয়েছে৷";
+"sync_adapter" = "সিঙ্ক্রোনাইজেশন ব্যাকএন্ড";
+"sync_adapter_summary" = "বর্তমান:%@";
+"adapters_google_drive" = "গুগল ড্রাইভ";
+"adapters_next_cloud" = "পরবর্তী ক্লাউড";
+"auth_server_uri" = "Server URL";
+"auth_username" = "ব্যবহারকারীর নাম";
+"auth_password" = "পাসওয়ার্ড";
+"auth_folder_path" = "Sync folder path";
+"auth_folder_path_summary" = "Parent folder for sync data (empty = root)";
+"invalid_url_message" = "The URL you entered is invalid. Please enter a valid URL (e.g., https://nextcloud.example.com)";
+"prefs_sync_introduction_summary1" = "একাধিক ডিভাইস সিঙ্ক্রোনাইজ করতে আপনি কোন ব্যাকএন্ড ক্লাউড পরিষেবা ব্যবহার করতে চান তা চয়ন করুন৷";
+"test_connection" = "Test Connection";

@@ -478,3 +478,16 @@
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";
 "crash_app_scheduled_summary" = "Crash scheduled in 10 seconds.";
+"sign_in_failed" = "Conectarea la serviciul de sincronizare a eșuat.";
+"sync_adapter" = "Serviciu de sincronizare";
+"sync_adapter_summary" = "Actual: %@";
+"adapters_google_drive" = "Google Drive";
+"adapters_next_cloud" = "Next Cloud";
+"auth_server_uri" = "URL-ul serverului";
+"auth_username" = "Nume de utilizator";
+"auth_password" = "Parola";
+"auth_folder_path" = "Sync folder path";
+"auth_folder_path_summary" = "Parent folder for sync data (empty = root)";
+"invalid_url_message" = "URL-ul introdus este greșit. Iată un exemplu de URL corect (https://nextcloud.exemplu.com)";
+"prefs_sync_introduction_summary1" = "Alege serviciul Cloud pe care vrei să-l folosești pentru a sincroniza mai multe aparate.";
+"test_connection" = "Test Connection";

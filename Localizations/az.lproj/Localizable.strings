@@ -478,3 +478,16 @@
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";
 "crash_app_scheduled_summary" = "Crash scheduled in 10 seconds.";
+"sign_in_failed" = "Signing in to synchronization backend service failed.";
+"sync_adapter" = "Synchronization Backend";
+"sync_adapter_summary" = "Current: %@";
+"adapters_google_drive" = "Google Drive";
+"adapters_next_cloud" = "Next Cloud";
+"auth_server_uri" = "Server URL";
+"auth_username" = "User name";
+"auth_password" = "Password";
+"auth_folder_path" = "Sync folder path";
+"auth_folder_path_summary" = "Parent folder for sync data (empty = root)";
+"invalid_url_message" = "The URL you entered is invalid. Please enter a valid URL (e.g., https://nextcloud.example.com)";
+"prefs_sync_introduction_summary1" = "Choose which backend cloud service you want to use to synchronize multiple devices.";
+"test_connection" = "Test Connection";

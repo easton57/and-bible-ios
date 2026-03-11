@@ -481,7 +481,7 @@
 "prefs_night_mode_summary" = "Kies om automatisch naar nacht-modus te wisselen (als het apparaat dit ondersteunt), handmatig of via apparaatinstellingen (Android 10+).  Handmatig wisselen kan vanuit het 3-stippenmenu in het hoofdscherm.";
 "prefs_night_mode_system" = "Systeem";
 "prefs_night_mode_title" = "Nachtweergave wisselen";
-"prefs_open_links_in_special_window_summary" = "Open koppelingen in speciaal venster voor snellere weergave van kruisverwijzingen en Strong\'s";
+"prefs_open_links_in_special_window_summary" = "Open koppelingen in speciaal venster voor snellere weergave van kruisverwijzingen en Strong's";
 "prefs_open_links_in_special_window_title" = "Koppelingenscherm";
 "prefs_screen_keep_on_summary" = "Voorkomen dat het scherm uitgaat tijdens het gebruiken van de app";
 "prefs_screen_keep_on_title" = "Scherm ingeschakeld houden";
@@ -507,3 +507,16 @@
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";
 "crash_app_scheduled_summary" = "Crash scheduled in 10 seconds.";
+"sign_in_failed" = "Inloggen bij synchronisatie dienst mislukt.";
+"sync_adapter" = "Synchronization Backend";
+"sync_adapter_summary" = "Huidige: %@";
+"adapters_google_drive" = "Google Drive";
+"adapters_next_cloud" = "Nextcloud";
+"auth_server_uri" = "Server URL";
+"auth_username" = "Gebruikersnaam";
+"auth_password" = "Wachtwoord";
+"auth_folder_path" = "Sync folder path";
+"auth_folder_path_summary" = "Parent folder for sync data (empty = root)";
+"invalid_url_message" = "The URL you entered is invalid. Please enter a valid URL (e.g., https://nextcloud.example.com)";
+"prefs_sync_introduction_summary1" = "Kies welke backend cloud service u wilt gebruiken om meerdere apparaten te synchroniseren.";
+"test_connection" = "Test Connection";

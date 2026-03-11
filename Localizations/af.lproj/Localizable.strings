@@ -412,7 +412,7 @@
 "add_bookmark3" = "Seleksie";
 "add_bookmark_whole_verse1" = "Verse";
 "prefs_disable_two_step_bookmarking_title" = "Een-stap boekmerk";
-"prefs_disable_two_step_bookmarking_summary" = "Wys \'Seleksie\' en \'Verse\' items direk in Bybel beskouings keurings kieslys";
+"prefs_disable_two_step_bookmarking_summary" = "Wys 'Seleksie' en 'Verse' items direk in Bybel beskouings keurings kieslys";
 
 "active_window_indicator_summary" = "Merk vensterhoeke om te help herken watter venster aktief is";
 "active_window_indicator_title" = "Wys aktiewe venste raanwyser";
@@ -443,9 +443,9 @@
 "prefs_double_tap_to_fullscreen_title" = "Dubbel-tik op Volskerm";
 "prefs_e_ink_mode_title" = "Swart & wit modus";
 "prefs_eink_mode_summary" = "Gebruik die toep in monochroom-modus (geen kleure nie), wat dit meer geskik maak vir E-ink-toestelle.";
-"prefs_interface_locale_summary" = "Kies \'n persoonlike gebruikers taal";
+"prefs_interface_locale_summary" = "Kies 'n persoonlike gebruikers taal";
 "prefs_interface_locale_title" = "Applikasie taal";
-"prefs_navigate_to_verse_summary" = "Kies vers (en hoofstuk) wanneer \'n teks gekies word";
+"prefs_navigate_to_verse_summary" = "Kies vers (en hoofstuk) wanneer 'n teks gekies word";
 "prefs_navigate_to_verse_title" = "Gaan na vers";
 "prefs_night_mode_automatic" = "Outomaties";
 "prefs_night_mode_manual" = "handleiding";
@@ -478,3 +478,16 @@
 "crash_app" = "Crash app!";
 "crash_app_summary" = "Crash app after 10 seconds. Debugging feature, visible only in debug builds.";
 "crash_app_scheduled_summary" = "Crash scheduled in 10 seconds.";
+"sign_in_failed" = "Aanmelding by sinchronisasie backend diens het misluk.";
+"sync_adapter" = "Sinchronisasie Backend";
+"sync_adapter_summary" = "Huidige: %@";
+"adapters_google_drive" = "Google Drive";
+"adapters_next_cloud" = "Volgende Cloud";
+"auth_server_uri" = "Server URL";
+"auth_username" = "Gebruiker naam";
+"auth_password" = "Wagwoord";
+"auth_folder_path" = "Sync folder path";
+"auth_folder_path_summary" = "Parent folder for sync data (empty = root)";
+"invalid_url_message" = "The URL you entered is invalid. Please enter a valid URL (e.g., https://nextcloud.example.com)";
+"prefs_sync_introduction_summary1" = "Kies watter backend cloud jy wil gebruik om verskeie toestelle te sinchroniseer.";
+"test_connection" = "Test Connection";
