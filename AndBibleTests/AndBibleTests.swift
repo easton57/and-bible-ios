@@ -1,5 +1,6 @@
 import XCTest
 import BibleCore
+@testable import BibleUI
 
 final class AndBibleTests: XCTestCase {
     func testAppPreferenceRegistryHasDefinitionForAllKeys() {
@@ -51,5 +52,42 @@ final class AndBibleTests: XCTestCase {
         XCTAssertEqual(AppPreferenceRegistry.decodeCSVSet(encoded), ["ESV", "KJV", "KJV"])
         XCTAssertEqual(AppPreferenceRegistry.decodeCSVSet(nil), [])
         XCTAssertEqual(AppPreferenceRegistry.decodeCSVSet(""), [])
+    }
+
+    func testStrongsQueryNormalizationHandlesLeadingZeroes() {
+        let options = StrongsSearchSupport.normalizedQueryOptions(for: "H02022")
+        XCTAssertEqual(
+            options?.entryAttributeQueries,
+            ["Word//Lemma./H02022", "Word//Lemma./H2022"]
+        )
+    }
+
+    func testStrongsQueryNormalizationAcceptsDecoratedInput() {
+        let options = StrongsSearchSupport.normalizedQueryOptions(for: "lemma:strong:g00123")
+        XCTAssertEqual(
+            options?.entryAttributeQueries,
+            ["Word//Lemma./G00123", "Word//Lemma./G123"]
+        )
+    }
+
+    func testParseVerseKeySupportsHumanReadableFormat() {
+        let parsed = StrongsSearchSupport.parseVerseKey("I Samuel 2:3")
+        XCTAssertEqual(parsed?.book, "I Samuel")
+        XCTAssertEqual(parsed?.chapter, 2)
+        XCTAssertEqual(parsed?.verse, 3)
+    }
+
+    func testParseVerseKeySupportsOsisFormat() {
+        let parsed = StrongsSearchSupport.parseVerseKey("Gen.1.1")
+        XCTAssertEqual(parsed?.book, "Genesis")
+        XCTAssertEqual(parsed?.chapter, 1)
+        XCTAssertEqual(parsed?.verse, 1)
+    }
+
+    func testParseVerseKeySupportsOsisFormatWithSuffix() {
+        let parsed = StrongsSearchSupport.parseVerseKey("Gen.1.1!crossReference.a")
+        XCTAssertEqual(parsed?.book, "Genesis")
+        XCTAssertEqual(parsed?.chapter, 1)
+        XCTAssertEqual(parsed?.verse, 1)
     }
 }
