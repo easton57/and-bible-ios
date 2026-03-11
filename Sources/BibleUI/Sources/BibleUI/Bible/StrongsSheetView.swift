@@ -301,6 +301,9 @@ final class StrongsSheetDelegate: NSObject, BibleBridgeDelegate {
 
     /**
      Converts a signed ARGB integer into a CSS hex color string without alpha.
+
+     - Parameter value: Signed ARGB integer emitted by the native reader theme state.
+     - Returns: Lowercase CSS hex color string in `#rrggbb` form.
      */
     private static func cssColor(fromArgbInt value: Int) -> String {
         let uint = UInt32(bitPattern: Int32(truncatingIfNeeded: value))
