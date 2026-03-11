@@ -388,40 +388,86 @@ public struct SearchView: View {
 
     private func highlightedText(_ text: String) -> Text {
         let terms = query.lowercased().split(separator: " ").map(String.init)
-        guard !terms.isEmpty else { return Text(text) }
+        let lower = text.lowercased()
 
         var result = Text("")
-        let lower = text.lowercased()
         var currentIndex = text.startIndex
 
         while currentIndex < text.endIndex {
+            // Check for Strong's tag <H\d+> or <G\d+>
+            if text[currentIndex] == "<",
+               let closingIdx = Self.strongsTagClosingIndex(in: text, from: currentIndex) {
+                let inner = String(text[text.index(after: currentIndex)..<closingIdx])
+                let isMatch = !terms.isEmpty && terms.contains(where: { inner.lowercased().contains($0) })
+                if isMatch {
+                    result = result + Text(inner)
+                        .font(.system(size: 9))
+                        .baselineOffset(-3)
+                        .foregroundColor(.accentColor)
+                } else {
+                    result = result + Text(inner)
+                        .font(.system(size: 9))
+                        .baselineOffset(-3)
+                        .foregroundColor(Color.secondary.opacity(0.5))
+                }
+                currentIndex = text.index(after: closingIdx)
+                continue
+            }
+
+            // Check for query term match
             var matched = false
-            for term in terms {
-                if lower[currentIndex...].hasPrefix(term) {
-                    let end = text.index(currentIndex, offsetBy: term.count, limitedBy: text.endIndex) ?? text.endIndex
-                    result = result + Text(text[currentIndex..<end]).bold().foregroundColor(.accentColor)
-                    currentIndex = end
-                    matched = true
-                    break
+            if !terms.isEmpty {
+                for term in terms {
+                    if lower[currentIndex...].hasPrefix(term) {
+                        let end = text.index(currentIndex, offsetBy: term.count, limitedBy: text.endIndex) ?? text.endIndex
+                        result = result + Text(text[currentIndex..<end]).bold().foregroundColor(.accentColor)
+                        currentIndex = end
+                        matched = true
+                        break
+                    }
                 }
             }
+
             if !matched {
                 let start = currentIndex
+                currentIndex = text.index(after: currentIndex)
                 while currentIndex < text.endIndex {
-                    var foundTerm = false
-                    for term in terms {
-                        if lower[currentIndex...].hasPrefix(term) {
-                            foundTerm = true
-                            break
-                        }
+                    if text[currentIndex] == "<",
+                       Self.strongsTagClosingIndex(in: text, from: currentIndex) != nil {
+                        break
                     }
-                    if foundTerm { break }
+                    if !terms.isEmpty {
+                        var foundTerm = false
+                        for term in terms {
+                            if lower[currentIndex...].hasPrefix(term) {
+                                foundTerm = true
+                                break
+                            }
+                        }
+                        if foundTerm { break }
+                    }
                     currentIndex = text.index(after: currentIndex)
                 }
                 result = result + Text(text[start..<currentIndex])
             }
         }
         return result
+    }
+
+    /// Returns the index of '>' if text[from] starts a Strong's tag like <H12345> or <G999>.
+    private static func strongsTagClosingIndex(in text: String, from start: String.Index) -> String.Index? {
+        guard text[start] == "<" else { return nil }
+        let afterLt = text.index(after: start)
+        guard afterLt < text.endIndex else { return nil }
+        let ch = text[afterLt]
+        guard ch == "H" || ch == "G" || ch == "h" || ch == "g" else { return nil }
+        var idx = text.index(after: afterLt)
+        guard idx < text.endIndex, text[idx].isNumber else { return nil }
+        while idx < text.endIndex, text[idx].isNumber {
+            idx = text.index(after: idx)
+        }
+        guard idx < text.endIndex, text[idx] == ">" else { return nil }
+        return idx
     }
 
     // MARK: - Translation Picker
