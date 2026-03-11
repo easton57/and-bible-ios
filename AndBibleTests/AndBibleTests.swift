@@ -1,5 +1,5 @@
 import XCTest
-import BibleCore
+@testable import BibleCore
 import SwordKit
 import SwiftData
 @testable import BibleUI
@@ -13,6 +13,7 @@ final class AndBibleTests: XCTestCase {
             try? fm.removeItem(atPath: path)
         }
         temporarySwordModulePaths.removeAll()
+        MockURLProtocol.requestHandler = nil
         super.tearDown()
     }
 
@@ -181,6 +182,100 @@ final class AndBibleTests: XCTestCase {
         XCTAssertEqual(filtered.map(\.id), [matchingBookmark.id])
     }
 
+    func testWebDAVPropfindBuildsAuthenticatedRequestAndParsesMultiStatus() async throws {
+        let expectedAuth = "Basic \(Data("alice:secret".utf8).base64EncodedString())"
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "PROPFIND")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), expectedAuth)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Depth"), "1")
+            XCTAssertEqual(request.url?.absoluteString, "https://example.com/remote.php/dav/files/alice/sync")
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 207,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Self.sampleWebDAVMultiStatusXML.data(using: .utf8)!)
+        }
+
+        let client = WebDAVClient(
+            baseURL: URL(string: "https://example.com/remote.php/dav/files/alice")!,
+            username: "alice",
+            password: "secret",
+            session: makeMockedURLSession()
+        )
+        let files = try await client.propfind(path: "sync", depth: 1)
+
+        XCTAssertEqual(files.count, 2)
+        XCTAssertEqual(files[0].path, "/remote.php/dav/files/alice/sync/")
+        XCTAssertTrue(files[0].isDirectory)
+        XCTAssertEqual(files[0].displayName, "sync")
+        XCTAssertEqual(files[1].path, "/remote.php/dav/files/alice/sync/1.1.sqlite3.gz")
+        XCTAssertFalse(files[1].isDirectory)
+        XCTAssertEqual(files[1].contentLength, 12345)
+        XCTAssertEqual(files[1].contentType, "application/gzip")
+    }
+
+    func testWebDAVSearchBuildsSearchRequestBody() async throws {
+        let modifiedAfter = Date(timeIntervalSince1970: 1_730_000_000)
+
+        MockURLProtocol.requestHandler = { [self] request in
+            XCTAssertEqual(request.httpMethod, "SEARCH")
+            XCTAssertEqual(request.url?.absoluteString, "https://example.com/remote.php/dav/files/alice/sync/bookmarks")
+
+            let body = try XCTUnwrap(requestBodyData(for: request))
+            let bodyString = try XCTUnwrap(String(data: body, encoding: .utf8))
+            XCTAssertTrue(bodyString.contains("<d:searchrequest"))
+            XCTAssertTrue(bodyString.contains("<d:href>/remote.php/dav/files/alice/sync/bookmarks</d:href>"))
+            XCTAssertTrue(bodyString.contains("Sun, 27 Oct 2024 03:33:20 GMT"))
+
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url),
+                statusCode: 207,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Self.sampleWebDAVMultiStatusXML.data(using: .utf8)!)
+        }
+
+        let client = WebDAVClient(
+            baseURL: URL(string: "https://example.com/remote.php/dav/files/alice")!,
+            username: "alice",
+            password: "secret",
+            session: makeMockedURLSession()
+        )
+        let files = try await client.search(path: "sync/bookmarks", modifiedAfter: modifiedAfter)
+
+        XCTAssertEqual(files.count, 2)
+    }
+
+    func testWebDAVMultiStatusParserDecodesPercentEncodedHrefs() throws {
+        let xml = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <d:multistatus xmlns:d="DAV:">
+          <d:response>
+            <d:href>/remote.php/dav/files/alice/Study%20Pad/entry%201.txt</d:href>
+            <d:propstat>
+              <d:prop>
+                <d:displayname>entry 1.txt</d:displayname>
+                <d:getcontentlength>42</d:getcontentlength>
+              </d:prop>
+              <d:status>HTTP/1.1 200 OK</d:status>
+            </d:propstat>
+          </d:response>
+        </d:multistatus>
+        """
+
+        let files = try WebDAVMultiStatusParser.parse(data: Data(xml.utf8))
+
+        XCTAssertEqual(files.count, 1)
+        XCTAssertEqual(files[0].href, "/remote.php/dav/files/alice/Study Pad/entry 1.txt")
+        XCTAssertEqual(files[0].path, "/remote.php/dav/files/alice/Study Pad/entry 1.txt")
+        XCTAssertEqual(files[0].displayName, "entry 1.txt")
+        XCTAssertEqual(files[0].contentLength, 42)
+    }
+
     private func makeTemporaryBundledSwordPath() throws -> String {
         let fm = FileManager.default
         let sourceRoot = URL(fileURLWithPath: #filePath)
@@ -219,4 +314,97 @@ final class AndBibleTests: XCTestCase {
             }
         }
     }
+
+    private func makeMockedURLSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
+    private func requestBodyData(for request: URLRequest) -> Data? {
+        if let body = request.httpBody {
+            return body
+        }
+        guard let stream = request.httpBodyStream else {
+            return nil
+        }
+
+        stream.open()
+        defer { stream.close() }
+
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+
+        var data = Data()
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read < 0 {
+                return nil
+            }
+            if read == 0 {
+                break
+            }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
+
+    private static let sampleWebDAVMultiStatusXML = """
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:multistatus xmlns:d="DAV:">
+      <d:response>
+        <d:href>/remote.php/dav/files/alice/sync/</d:href>
+        <d:propstat>
+          <d:prop>
+            <d:displayname>sync</d:displayname>
+            <d:resourcetype><d:collection /></d:resourcetype>
+            <d:getlastmodified>Wed, 26 Feb 2026 12:00:00 GMT</d:getlastmodified>
+          </d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+      <d:response>
+        <d:href>/remote.php/dav/files/alice/sync/1.1.sqlite3.gz</d:href>
+        <d:propstat>
+          <d:prop>
+            <d:displayname>1.1.sqlite3.gz</d:displayname>
+            <d:getcontentlength>12345</d:getcontentlength>
+            <d:getcontenttype>application/gzip</d:getcontenttype>
+            <d:getlastmodified>Wed, 26 Feb 2026 12:01:00 GMT</d:getlastmodified>
+          </d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>
+    </d:multistatus>
+    """
+}
+
+private final class MockURLProtocol: URLProtocol {
+    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let handler = Self.requestHandler else {
+            fatalError("MockURLProtocol.requestHandler must be set before use")
+        }
+
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }
