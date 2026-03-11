@@ -38,6 +38,7 @@ public struct OsisFragment: Codable, Sendable {
     /// Text direction passed to the web client: `ltr` or `rtl`.
     public var direction: String // "ltr" or "rtl"
 
+    /// Creates an OSIS fragment payload ready for bridge serialization.
     public init(
         xml: String,
         key: String,
@@ -102,6 +103,7 @@ public struct BookmarkStyleData: Codable, Sendable {
     /// Optional icon name overriding the default label/bookmark icon.
     public var customIcon: String?
 
+    /// Creates a label style payload matching the client bookmark-style schema.
     public init(
         color: Int = 0xFF91A7FF,
         isSpeak: Bool = false,

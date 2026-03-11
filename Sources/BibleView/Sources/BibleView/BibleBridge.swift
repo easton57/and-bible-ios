@@ -180,12 +180,18 @@ public final class BibleBridge: NSObject, WKScriptMessageHandler {
     /// Fires for native user-driven horizontal swipe gestures.
     public var onNativeHorizontalSwipe: ((NativeHorizontalSwipeDirection) -> Void)?
 
+    /// Creates a new bridge instance before it is attached to a web view.
     public override init() {
         super.init()
     }
 
     // MARK: - WKScriptMessageHandler
 
+    /// Dispatches a message posted by the Vue.js client into typed native delegate callbacks.
+    ///
+    /// Messages arrive as `{ method, args }` dictionaries through the registered
+    /// `window.webkit.messageHandlers.bibleView` handler. This method is the central routing point
+    /// for all client-originated actions.
     public func userContentController(
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage

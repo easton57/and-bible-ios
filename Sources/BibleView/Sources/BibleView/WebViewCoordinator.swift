@@ -38,6 +38,7 @@ public class WebViewCoordinator: NSObject, WKNavigationDelegate {
         #endif
     }
 
+    /// Logs a committed-navigation failure from the packaged web client.
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         logger.error("BibleView navigation failed: \(error.localizedDescription)")
     }
@@ -84,6 +85,7 @@ public class WebViewCoordinator: NSObject, WKNavigationDelegate {
         }
     }
 
+    /// Logs a provisional-navigation failure before the page finishes loading.
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         logger.error("BibleView provisional navigation failed: \(error.localizedDescription)")
     }
@@ -122,6 +124,7 @@ extension WebViewCoordinator: UIScrollViewDelegate, UIGestureRecognizerDelegate 
         }
     }
 
+    /// Allows swipe recognizers to coexist with the web view's own gesture recognizers.
     public func gestureRecognizer(
         _ gestureRecognizer: UIGestureRecognizer,
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
