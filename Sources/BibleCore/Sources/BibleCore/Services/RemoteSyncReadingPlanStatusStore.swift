@@ -1,0 +1,199 @@
+// RemoteSyncReadingPlanStatusStore.swift — Local preservation of Android reading-plan progress payloads
+
+import Foundation
+
+/**
+ Preserves Android reading-plan per-reading progress payloads in iOS's local-only settings store.
+
+ Android sync stores granular JSON status for each `(planCode, planDay)` pair, while the current
+ iOS reading-plan model only persists day-level completion. This store keeps the original Android
+ payloads locally so initial-backup restore can avoid throwing away data that iOS does not yet
+ render natively.
+
+ Data dependencies:
+ - `SettingsStore` provides local-only key-value persistence in the `LocalStore`
+
+ Side effects:
+ - writes and removes namespaced `Setting` rows in the local SwiftData settings table
+
+ Failure modes:
+ - underlying `SettingsStore` writes swallow persistence failures, so callers should treat this
+   store as best-effort preservation rather than transactional storage
+
+ Concurrency:
+ - this type inherits the confinement requirements of the supplied `SettingsStore`
+ */
+public final class RemoteSyncReadingPlanStatusStore {
+    private let settingsStore: SettingsStore
+
+    private enum Keys {
+        static let prefix = "remote_sync.readingplans.android_status"
+    }
+
+    /**
+     One preserved Android reading-plan status payload.
+
+     - Important: `readingStatusJSON` is stored verbatim so future sync work can rehydrate the
+       original Android semantics without lossy translation.
+     */
+    public struct Status: Sendable, Equatable {
+        /// Android reading-plan code that owns the status row.
+        public let planCode: String
+
+        /// One-based day number within the Android plan definition.
+        public let dayNumber: Int
+
+        /// Raw Android JSON payload from `ReadingPlanStatus.readingStatus`.
+        public let readingStatusJSON: String
+
+        /**
+         Creates a preserved Android reading-plan status payload.
+
+         - Parameters:
+           - planCode: Android reading-plan code that owns the status row.
+           - dayNumber: One-based day number within the plan definition.
+           - readingStatusJSON: Raw Android JSON payload from `ReadingPlanStatus.readingStatus`.
+         - Side effects: none.
+         - Failure modes: This initializer cannot fail.
+         */
+        public init(planCode: String, dayNumber: Int, readingStatusJSON: String) {
+            self.planCode = planCode
+            self.dayNumber = dayNumber
+            self.readingStatusJSON = readingStatusJSON
+        }
+    }
+
+    /**
+     Creates a local-only store for preserved Android reading-plan status payloads.
+
+     - Parameter settingsStore: Local settings store used for persistence.
+     - Side effects: none.
+     - Failure modes: This initializer cannot fail.
+     */
+    public init(settingsStore: SettingsStore) {
+        self.settingsStore = settingsStore
+    }
+
+    /**
+     Stores or replaces one raw Android reading-plan status payload.
+
+     - Parameters:
+       - readingStatusJSON: Raw JSON payload to preserve.
+       - planCode: Android reading-plan code that owns the payload.
+       - dayNumber: One-based day number within the plan definition.
+     - Side effects:
+       - writes one namespaced local `Setting` row
+     - Failure modes:
+       - persistence failures are swallowed by `SettingsStore`
+     */
+    public func setStatus(_ readingStatusJSON: String, planCode: String, dayNumber: Int) {
+        settingsStore.setString(scopedKey(planCode: planCode, dayNumber: dayNumber), value: readingStatusJSON)
+    }
+
+    /**
+     Reads one preserved Android reading-plan status payload.
+
+     - Parameters:
+       - planCode: Android reading-plan code that owns the payload.
+       - dayNumber: One-based day number within the plan definition.
+     - Returns: The preserved raw JSON payload, or `nil` when no value has been stored.
+     - Side effects: none.
+     - Failure modes:
+       - malformed or missing stored keys return `nil`
+     */
+    public func status(planCode: String, dayNumber: Int) -> String? {
+        let value = settingsStore.getString(scopedKey(planCode: planCode, dayNumber: dayNumber))
+        guard let value, !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    /**
+     Returns every preserved Android reading-plan status payload.
+
+     - Returns: Decoded status payloads sorted by plan code and day number.
+     - Side effects: none.
+     - Failure modes:
+       - malformed keys are skipped rather than throwing
+     */
+    public func allStatuses() -> [Status] {
+        settingsStore.entries(withPrefix: Keys.prefix).compactMap { entry in
+            decodeEntry(entry)
+        }
+        .sorted {
+            if $0.planCode == $1.planCode {
+                return $0.dayNumber < $1.dayNumber
+            }
+            return $0.planCode < $1.planCode
+        }
+    }
+
+    /**
+     Removes all preserved Android reading-plan status payloads.
+
+     - Side effects:
+       - deletes every namespaced local `Setting` row managed by this store
+     - Failure modes:
+       - persistence failures are swallowed by `SettingsStore`
+     */
+    public func clearAll() {
+        for entry in settingsStore.entries(withPrefix: Keys.prefix) {
+            settingsStore.remove(entry.key)
+        }
+    }
+
+    private func scopedKey(planCode: String, dayNumber: Int) -> String {
+        "\(Keys.prefix).\(encodeKeySegment(planCode)).\(dayNumber)"
+    }
+
+    private func decodeEntry(_ entry: Setting) -> Status? {
+        let prefix = "\(Keys.prefix)."
+        guard entry.key.hasPrefix(prefix) else {
+            return nil
+        }
+
+        let suffix = String(entry.key.dropFirst(prefix.count))
+        guard let separator = suffix.lastIndex(of: ".") else {
+            return nil
+        }
+
+        let encodedPlanCode = String(suffix[..<separator])
+        let dayString = String(suffix[suffix.index(after: separator)...])
+        guard let dayNumber = Int(dayString), dayNumber > 0 else {
+            return nil
+        }
+
+        guard let planCode = decodeKeySegment(encodedPlanCode), !entry.value.isEmpty else {
+            return nil
+        }
+
+        return Status(
+            planCode: planCode,
+            dayNumber: dayNumber,
+            readingStatusJSON: entry.value
+        )
+    }
+
+    private func encodeKeySegment(_ rawValue: String) -> String {
+        let data = Data(rawValue.utf8)
+        return data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private func decodeKeySegment(_ encodedValue: String) -> String? {
+        var base64 = encodedValue
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let remainder = base64.count % 4
+        if remainder != 0 {
+            base64 += String(repeating: "=", count: 4 - remainder)
+        }
+        guard let data = Data(base64Encoded: base64) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
+}

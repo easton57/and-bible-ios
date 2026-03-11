@@ -5,6 +5,8 @@ import SwiftData
 import SQLite3
 @testable import BibleUI
 
+private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 final class AndBibleTests: XCTestCase {
     private var temporarySwordModulePaths: [String] = []
 
@@ -216,6 +218,275 @@ final class AndBibleTests: XCTestCase {
         XCTAssertFalse(files[1].isDirectory)
         XCTAssertEqual(files[1].contentLength, 12345)
         XCTAssertEqual(files[1].contentType, "application/gzip")
+    }
+
+    func testRemoteSyncReadingPlanStatusStorePersistsAndClearsStatuses() throws {
+        let container = try makeReadingPlanRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let statusStore = RemoteSyncReadingPlanStatusStore(settingsStore: settingsStore)
+
+        statusStore.setStatus(#"{"chapterReadArray":[{"readingNumber":1,"isRead":true}]}"#, planCode: "y1ot1nt1_OTthenNT", dayNumber: 1)
+        statusStore.setStatus(#"{"chapterReadArray":[{"readingNumber":1,"isRead":false}]}"#, planCode: "plan.with.dots", dayNumber: 2)
+
+        XCTAssertEqual(
+            statusStore.status(planCode: "y1ot1nt1_OTthenNT", dayNumber: 1),
+            #"{"chapterReadArray":[{"readingNumber":1,"isRead":true}]}"#
+        )
+        XCTAssertEqual(
+            statusStore.status(planCode: "plan.with.dots", dayNumber: 2),
+            #"{"chapterReadArray":[{"readingNumber":1,"isRead":false}]}"#
+        )
+
+        XCTAssertEqual(
+            statusStore.allStatuses(),
+            [
+                .init(planCode: "plan.with.dots", dayNumber: 2, readingStatusJSON: #"{"chapterReadArray":[{"readingNumber":1,"isRead":false}]}"#),
+                .init(planCode: "y1ot1nt1_OTthenNT", dayNumber: 1, readingStatusJSON: #"{"chapterReadArray":[{"readingNumber":1,"isRead":true}]}"#),
+            ]
+        )
+
+        statusStore.clearAll()
+        XCTAssertTrue(statusStore.allStatuses().isEmpty)
+    }
+
+    func testRemoteSyncReadingPlanRestoreReadsAndroidSnapshot() throws {
+        let service = RemoteSyncReadingPlanRestoreService()
+        let databaseURL = try makeAndroidReadingPlansDatabase(
+            plans: [
+                .init(
+                    id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                    planCode: "y1ot1nt1_OTthenNT",
+                    startDate: Date(timeIntervalSince1970: 1_700_000_000),
+                    currentDay: 3
+                )
+            ],
+            statuses: [
+                .init(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                    planCode: "y1ot1nt1_OTthenNT",
+                    dayNumber: 3,
+                    readingStatusJSON: #"{"chapterReadArray":[{"readingNumber":1,"isRead":false}]}"#
+                )
+            ]
+        )
+
+        let snapshot = try service.readSnapshot(from: databaseURL)
+
+        XCTAssertEqual(snapshot.orphanStatuses, [])
+        XCTAssertEqual(snapshot.plans.count, 1)
+        XCTAssertEqual(snapshot.plans[0].id, UUID(uuidString: "11111111-1111-1111-1111-111111111111"))
+        XCTAssertEqual(snapshot.plans[0].planCode, "y1ot1nt1_OTthenNT")
+        XCTAssertEqual(snapshot.plans[0].currentDay, 3)
+        XCTAssertEqual(snapshot.plans[0].statuses.count, 1)
+        XCTAssertEqual(snapshot.plans[0].statuses[0].dayNumber, 3)
+    }
+
+    func testRemoteSyncReadingPlanRestoreReplacesLocalPlansAndPreservesAndroidStatuses() throws {
+        let container = try makeReadingPlanRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let statusStore = RemoteSyncReadingPlanStatusStore(settingsStore: settingsStore)
+        let service = RemoteSyncReadingPlanRestoreService()
+
+        let existingPlan = ReadingPlan(
+            planCode: "legacy_plan",
+            planName: "Legacy",
+            startDate: Date(timeIntervalSince1970: 42),
+            currentDay: 1,
+            totalDays: 1,
+            isActive: true
+        )
+        modelContext.insert(existingPlan)
+        try modelContext.save()
+
+        let databaseURL = try makeAndroidReadingPlansDatabase(
+            plans: [
+                .init(
+                    id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+                    planCode: "y1ot1nt1_OTthenNT",
+                    startDate: Date(timeIntervalSince1970: 1_700_000_000),
+                    currentDay: 3
+                )
+            ],
+            statuses: [
+                .init(
+                    id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+                    planCode: "y1ot1nt1_OTthenNT",
+                    dayNumber: 3,
+                    readingStatusJSON: #"{"chapterReadArray":[{"readingNumber":1,"isRead":false}]}"#
+                )
+            ]
+        )
+
+        let snapshot = try service.readSnapshot(from: databaseURL)
+        let report = try service.replaceLocalReadingPlans(
+            from: snapshot,
+            modelContext: modelContext,
+            statusStore: statusStore
+        )
+
+        XCTAssertEqual(report.restoredPlanCodes, ["y1ot1nt1_OTthenNT"])
+        XCTAssertEqual(report.preservedStatusCount, 1)
+
+        let restoredPlans = try modelContext.fetch(FetchDescriptor<ReadingPlan>())
+        XCTAssertEqual(restoredPlans.count, 1)
+        XCTAssertEqual(restoredPlans[0].id, UUID(uuidString: "33333333-3333-3333-3333-333333333333"))
+        XCTAssertEqual(restoredPlans[0].planCode, "y1ot1nt1_OTthenNT")
+        XCTAssertEqual(restoredPlans[0].currentDay, 3)
+        XCTAssertTrue(restoredPlans[0].isActive)
+        XCTAssertEqual(restoredPlans[0].days?.count, report.restoredDayCount)
+
+        let restoredDays = (restoredPlans[0].days ?? []).sorted { $0.dayNumber < $1.dayNumber }
+        XCTAssertTrue(restoredDays[0].isCompleted)
+        XCTAssertTrue(restoredDays[1].isCompleted)
+        XCTAssertFalse(restoredDays[2].isCompleted)
+
+        XCTAssertEqual(
+            statusStore.status(planCode: "y1ot1nt1_OTthenNT", dayNumber: 3),
+            #"{"chapterReadArray":[{"readingNumber":1,"isRead":false}]}"#
+        )
+    }
+
+    func testRemoteSyncReadingPlanRestoreRejectsUnknownPlanDefinitionsWithoutMutation() throws {
+        let container = try makeReadingPlanRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let statusStore = RemoteSyncReadingPlanStatusStore(settingsStore: settingsStore)
+        let service = RemoteSyncReadingPlanRestoreService()
+
+        let existingPlan = ReadingPlan(
+            id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+            planCode: "existing_plan",
+            planName: "Existing",
+            startDate: Date(timeIntervalSince1970: 100),
+            currentDay: 1,
+            totalDays: 1,
+            isActive: true
+        )
+        modelContext.insert(existingPlan)
+        try modelContext.save()
+
+        let databaseURL = try makeAndroidReadingPlansDatabase(
+            plans: [
+                .init(
+                    id: UUID(uuidString: "66666666-6666-6666-6666-666666666666")!,
+                    planCode: "custom_missing",
+                    startDate: Date(timeIntervalSince1970: 1_700_000_000),
+                    currentDay: 1
+                )
+            ],
+            statuses: []
+        )
+
+        let snapshot = try service.readSnapshot(from: databaseURL)
+        XCTAssertThrowsError(
+            try service.replaceLocalReadingPlans(
+                from: snapshot,
+                modelContext: modelContext,
+                statusStore: statusStore
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RemoteSyncReadingPlanRestoreError,
+                .unsupportedPlanDefinitions(["custom_missing"])
+            )
+        }
+
+        let plans = try modelContext.fetch(FetchDescriptor<ReadingPlan>())
+        XCTAssertEqual(plans.map(\.planCode), ["existing_plan"])
+        XCTAssertTrue(statusStore.allStatuses().isEmpty)
+    }
+
+    func testRemoteSyncReadingPlanRestoreRejectsOrphanStatusesWithoutMutation() throws {
+        let container = try makeReadingPlanRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let statusStore = RemoteSyncReadingPlanStatusStore(settingsStore: settingsStore)
+        let service = RemoteSyncReadingPlanRestoreService()
+
+        let existingPlan = ReadingPlan(
+            id: UUID(uuidString: "77777777-7777-7777-7777-777777777777")!,
+            planCode: "existing_plan",
+            planName: "Existing",
+            startDate: Date(timeIntervalSince1970: 100),
+            currentDay: 1,
+            totalDays: 1,
+            isActive: true
+        )
+        modelContext.insert(existingPlan)
+        try modelContext.save()
+
+        let databaseURL = try makeAndroidReadingPlansDatabase(
+            plans: [],
+            statuses: [
+                .init(
+                    id: UUID(uuidString: "88888888-8888-8888-8888-888888888888")!,
+                    planCode: "orphan_plan",
+                    dayNumber: 1,
+                    readingStatusJSON: #"{"chapterReadArray":[{"readingNumber":1,"isRead":true}]}"#
+                )
+            ]
+        )
+
+        let snapshot = try service.readSnapshot(from: databaseURL)
+        XCTAssertThrowsError(
+            try service.replaceLocalReadingPlans(
+                from: snapshot,
+                modelContext: modelContext,
+                statusStore: statusStore
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RemoteSyncReadingPlanRestoreError,
+                .orphanStatuses(["orphan_plan"])
+            )
+        }
+
+        let plans = try modelContext.fetch(FetchDescriptor<ReadingPlan>())
+        XCTAssertEqual(plans.map(\.planCode), ["existing_plan"])
+        XCTAssertTrue(statusStore.allStatuses().isEmpty)
+    }
+
+    func testRemoteSyncReadingPlanRestoreRejectsMalformedStatusPayloads() throws {
+        let container = try makeReadingPlanRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let statusStore = RemoteSyncReadingPlanStatusStore(settingsStore: settingsStore)
+        let service = RemoteSyncReadingPlanRestoreService()
+
+        let databaseURL = try makeAndroidReadingPlansDatabase(
+            plans: [
+                .init(
+                    id: UUID(uuidString: "99999999-9999-9999-9999-999999999999")!,
+                    planCode: "y1ot1nt1_OTthenNT",
+                    startDate: Date(timeIntervalSince1970: 1_700_000_000),
+                    currentDay: 1
+                )
+            ],
+            statuses: [
+                .init(
+                    id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+                    planCode: "y1ot1nt1_OTthenNT",
+                    dayNumber: 1,
+                    readingStatusJSON: #"{"chapterReadArray":"bad"}"#
+                )
+            ]
+        )
+
+        let snapshot = try service.readSnapshot(from: databaseURL)
+        XCTAssertThrowsError(
+            try service.replaceLocalReadingPlans(
+                from: snapshot,
+                modelContext: modelContext,
+                statusStore: statusStore
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? RemoteSyncReadingPlanRestoreError,
+                .malformedReadingStatus(planCode: "y1ot1nt1_OTthenNT", dayNumber: 1)
+            )
+        }
     }
 
     func testWebDAVSearchBuildsSearchRequestBody() async throws {
@@ -1569,34 +1840,166 @@ final class AndBibleTests: XCTestCase {
 
     private static func webDAVMultiStatusXML(folderPath: String, fileName: String) -> String {
         let normalizedFolderPath = folderPath.hasSuffix("/") ? folderPath : folderPath + "/"
-        return """
-        <?xml version="1.0" encoding="utf-8"?>
-        <d:multistatus xmlns:d="DAV:">
-          <d:response>
-            <d:href>\(normalizedFolderPath)</d:href>
-            <d:propstat>
-              <d:prop>
-                <d:displayname>\(normalizedFolderPath.split(separator: "/").last.map(String.init) ?? "")</d:displayname>
-                <d:resourcetype><d:collection /></d:resourcetype>
-                <d:getlastmodified>Wed, 26 Feb 2026 12:00:00 GMT</d:getlastmodified>
-              </d:prop>
-              <d:status>HTTP/1.1 200 OK</d:status>
-            </d:propstat>
-          </d:response>
-          <d:response>
-            <d:href>\(normalizedFolderPath)\(fileName)</d:href>
-            <d:propstat>
-              <d:prop>
-                <d:displayname>\(fileName)</d:displayname>
-                <d:getcontentlength>12345</d:getcontentlength>
-                <d:getcontenttype>application/gzip</d:getcontenttype>
-                <d:getlastmodified>Wed, 26 Feb 2026 12:01:00 GMT</d:getlastmodified>
-              </d:prop>
-              <d:status>HTTP/1.1 200 OK</d:status>
-            </d:propstat>
-          </d:response>
-        </d:multistatus>
-        """
+        let folderDisplayName = normalizedFolderPath
+            .split(separator: "/")
+            .last
+            .map(String.init) ?? ""
+        return [
+            #"<?xml version="1.0" encoding="utf-8"?>"#,
+            #"<d:multistatus xmlns:d="DAV:">"#,
+            #"  <d:response>"#,
+            "    <d:href>\(normalizedFolderPath)</d:href>",
+            #"    <d:propstat>"#,
+            #"      <d:prop>"#,
+            "        <d:displayname>\(folderDisplayName)</d:displayname>",
+            #"        <d:resourcetype><d:collection /></d:resourcetype>"#,
+            #"        <d:getlastmodified>Wed, 26 Feb 2026 12:00:00 GMT</d:getlastmodified>"#,
+            #"      </d:prop>"#,
+            #"      <d:status>HTTP/1.1 200 OK</d:status>"#,
+            #"    </d:propstat>"#,
+            #"  </d:response>"#,
+            #"  <d:response>"#,
+            "    <d:href>\(normalizedFolderPath)\(fileName)</d:href>",
+            #"    <d:propstat>"#,
+            #"      <d:prop>"#,
+            "        <d:displayname>\(fileName)</d:displayname>",
+            #"        <d:getcontentlength>12345</d:getcontentlength>"#,
+            #"        <d:getcontenttype>application/gzip</d:getcontenttype>"#,
+            #"        <d:getlastmodified>Wed, 26 Feb 2026 12:01:00 GMT</d:getlastmodified>"#,
+            #"      </d:prop>"#,
+            #"      <d:status>HTTP/1.1 200 OK</d:status>"#,
+            #"    </d:propstat>"#,
+            #"  </d:response>"#,
+            #"</d:multistatus>"#,
+        ].joined(separator: "\n")
+    }
+
+    private struct AndroidReadingPlanRow {
+        let id: UUID
+        let planCode: String
+        let startDate: Date
+        let currentDay: Int
+    }
+
+    private struct AndroidReadingPlanStatusRow {
+        let id: UUID
+        let planCode: String
+        let dayNumber: Int
+        let readingStatusJSON: String
+    }
+
+    private func makeReadingPlanRestoreModelContainer() throws -> ModelContainer {
+        let schema = Schema([
+            ReadingPlan.self,
+            ReadingPlanDay.self,
+            Setting.self,
+        ])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private func makeAndroidReadingPlansDatabase(
+        plans: [AndroidReadingPlanRow],
+        statuses: [AndroidReadingPlanStatusRow]
+    ) throws -> URL {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("android-readingplans-\(UUID().uuidString).sqlite3")
+
+        var db: OpaquePointer?
+        guard sqlite3_open(databaseURL.path, &db) == SQLITE_OK, let db else {
+            XCTFail("Failed to open temporary Android reading plan database")
+            throw RemoteSyncReadingPlanRestoreError.invalidSQLiteDatabase
+        }
+        defer { sqlite3_close(db) }
+
+        XCTAssertEqual(
+            sqlite3_exec(
+                db,
+                """
+                CREATE TABLE ReadingPlan (
+                    planCode TEXT NOT NULL,
+                    planStartDate INTEGER NOT NULL,
+                    planCurrentDay INTEGER NOT NULL DEFAULT 1,
+                    id BLOB NOT NULL PRIMARY KEY
+                );
+                CREATE TABLE ReadingPlanStatus (
+                    planCode TEXT NOT NULL,
+                    planDay INTEGER NOT NULL,
+                    readingStatus TEXT NOT NULL,
+                    id BLOB NOT NULL PRIMARY KEY
+                );
+                """,
+                nil,
+                nil,
+                nil
+            ),
+            SQLITE_OK
+        )
+
+        for plan in plans {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO ReadingPlan (planCode, planStartDate, planCurrentDay, id) VALUES (?, ?, ?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+
+            sqlite3_bind_text(statement, 1, plan.planCode, -1, sqliteTransient)
+            sqlite3_bind_int64(statement, 2, Int64(plan.startDate.timeIntervalSince1970 * 1000))
+            sqlite3_bind_int(statement, 3, Int32(plan.currentDay))
+            let blob = uuidBlob(plan.id)
+            _ = blob.withUnsafeBytes { bytes in
+                sqlite3_bind_blob(statement, 4, bytes.baseAddress, Int32(blob.count), sqliteTransient)
+            }
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        for status in statuses {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO ReadingPlanStatus (planCode, planDay, readingStatus, id) VALUES (?, ?, ?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+
+            sqlite3_bind_text(statement, 1, status.planCode, -1, sqliteTransient)
+            sqlite3_bind_int(statement, 2, Int32(status.dayNumber))
+            sqlite3_bind_text(statement, 3, status.readingStatusJSON, -1, sqliteTransient)
+            let blob = uuidBlob(status.id)
+            _ = blob.withUnsafeBytes { bytes in
+                sqlite3_bind_blob(statement, 4, bytes.baseAddress, Int32(blob.count), sqliteTransient)
+            }
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        return databaseURL
+    }
+
+    private func uuidBlob(_ uuid: UUID) -> Data {
+        let hex = uuid.uuidString.replacingOccurrences(of: "-", with: "")
+        var bytes = Data()
+        bytes.reserveCapacity(16)
+
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let nextIndex = hex.index(index, offsetBy: 2)
+            let byteString = hex[index..<nextIndex]
+            bytes.append(UInt8(byteString, radix: 16)!)
+            index = nextIndex
+        }
+        return bytes
     }
 }
 
