@@ -276,6 +276,115 @@ final class AndBibleTests: XCTestCase {
         XCTAssertEqual(files[0].contentLength, 42)
     }
 
+    func testRemoteSyncSettingsStoreDefaultsToICloudWhenBackendMissing() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        let secretStore = InMemorySecretStore()
+        let store = RemoteSyncSettingsStore(settingsStore: settingsStore, secretStore: secretStore)
+
+        XCTAssertEqual(store.selectedBackend, .iCloud)
+        XCTAssertNil(store.loadWebDAVConfiguration())
+        XCTAssertNil(store.webDAVPassword())
+    }
+
+    func testRemoteSyncSettingsStorePersistsAndroidCompatibleNextCloudKeys() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        let secretStore = InMemorySecretStore()
+        let store = RemoteSyncSettingsStore(settingsStore: settingsStore, secretStore: secretStore)
+
+        store.selectedBackend = .nextCloud
+        try store.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: " https://nextcloud.example/remote.php/dav/files/alice ",
+                username: " alice ",
+                folderPath: " Sync Folder "
+            ),
+            password: " secret "
+        )
+
+        XCTAssertEqual(settingsStore.getString("sync_adapter"), "NEXT_CLOUD")
+        XCTAssertEqual(
+            settingsStore.getString("gdrive_server_url"),
+            "https://nextcloud.example/remote.php/dav/files/alice"
+        )
+        XCTAssertEqual(settingsStore.getString("gdrive_username"), "alice")
+        XCTAssertEqual(settingsStore.getString("gdrive_folder_path"), "Sync Folder")
+        XCTAssertEqual(secretStore.secret(forKey: "gdrive_password"), "secret")
+        XCTAssertEqual(
+            store.loadWebDAVConfiguration(),
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example/remote.php/dav/files/alice",
+                username: "alice",
+                folderPath: "Sync Folder"
+            )
+        )
+        XCTAssertEqual(store.webDAVPassword(), "secret")
+    }
+
+    func testRemoteSyncSettingsStoreFallsBackToICloudForUnknownBackendValue() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        settingsStore.setString("sync_adapter", value: "DROPBOX")
+
+        let store = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+
+        XCTAssertEqual(store.selectedBackend, .iCloud)
+    }
+
+    func testRemoteSyncSettingsStoreClearsStoredValuesAndPassword() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        let secretStore = InMemorySecretStore()
+        let store = RemoteSyncSettingsStore(settingsStore: settingsStore, secretStore: secretStore)
+
+        store.selectedBackend = .nextCloud
+        try store.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example",
+                username: "alice",
+                folderPath: "sync"
+            ),
+            password: "secret"
+        )
+
+        try store.clearWebDAVConfiguration()
+
+        XCTAssertEqual(store.selectedBackend, .nextCloud)
+        XCTAssertNil(store.loadWebDAVConfiguration())
+        XCTAssertNil(store.webDAVPassword())
+        XCTAssertEqual(settingsStore.getString("gdrive_server_url"), "")
+        XCTAssertEqual(settingsStore.getString("gdrive_username"), "")
+        XCTAssertEqual(settingsStore.getString("gdrive_folder_path"), "")
+    }
+
+    func testRemoteSyncSettingsStoreClearsPasswordWhenSaveReceivesWhitespaceOnlySecret() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        let secretStore = InMemorySecretStore()
+        let store = RemoteSyncSettingsStore(settingsStore: settingsStore, secretStore: secretStore)
+
+        try store.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        XCTAssertEqual(store.webDAVPassword(), "secret")
+
+        try store.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "   "
+        )
+
+        XCTAssertNil(store.webDAVPassword())
+        XCTAssertNil(store.loadWebDAVConfiguration()?.folderPath)
+    }
+
     private func makeTemporaryBundledSwordPath() throws -> String {
         let fm = FileManager.default
         let sourceRoot = URL(fileURLWithPath: #filePath)
@@ -319,6 +428,13 @@ final class AndBibleTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         return URLSession(configuration: configuration)
+    }
+
+    private func makeInMemorySettingsStore() throws -> SettingsStore {
+        let schema = Schema([Setting.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        return SettingsStore(modelContext: ModelContext(container))
     }
 
     private func requestBodyData(for request: URLRequest) -> Data? {
@@ -378,6 +494,22 @@ final class AndBibleTests: XCTestCase {
       </d:response>
     </d:multistatus>
     """
+}
+
+private final class InMemorySecretStore: SecretStoring {
+    private var secrets: [String: String] = [:]
+
+    func secret(forKey key: String) -> String? {
+        secrets[key]
+    }
+
+    func setSecret(_ value: String, forKey key: String) throws {
+        secrets[key] = value
+    }
+
+    func removeSecret(forKey key: String) throws {
+        secrets.removeValue(forKey: key)
+    }
 }
 
 private final class MockURLProtocol: URLProtocol {
