@@ -43,16 +43,17 @@ jobs:
         if: github.event_name == 'push'
         run: python3 scripts/check_repo_standards.py commits
 
-      - name: Check Swift docblock style (pull request range)
+      - name: Check Swift docblock style (full repo on pull request)
         if: github.event_name == 'pull_request'
         run: >-
           python3 scripts/check_repo_standards.py docblocks
           --base-ref "origin/${{ github.base_ref }}"
           --head-ref HEAD
+          --all-files
 
-      - name: Check Swift docblock style (push head commit)
+      - name: Check Swift docblock style (full repo on push)
         if: github.event_name == 'push'
-        run: python3 scripts/check_repo_standards.py docblocks
+        run: python3 scripts/check_repo_standards.py docblocks --all-files
 
   localization-guardrails:
     name: Localization Guardrails

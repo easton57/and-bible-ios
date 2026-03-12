@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit tests for incremental repo standards guardrails.
+Unit tests for repo standards guardrails.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from check_repo_standards import find_multiline_slash_docblocks, validate_commit
 
 
 class RepoStandardsTests(unittest.TestCase):
-    """Covers the locked commit message shape and incremental Swift docblock style checks."""
+    """Covers the locked commit message shape and Swift docblock style checks."""
 
     def test_valid_commit_message_passes(self) -> None:
         message = "\n".join(

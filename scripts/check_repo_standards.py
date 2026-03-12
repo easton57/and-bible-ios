@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Incremental repo standards guardrails for commit messages and Swift docblock style.
+Repo standards guardrails for commit messages and Swift docblock style.
 
 Checks:
 1. Commit messages in the selected rev range must follow the locked commit-message standard.
-2. Changed Swift files in the selected rev range must not introduce multi-line `///` docblocks.
+2. Swift files in the selected scope must not contain multi-line `///` docblocks.
 
-The docblock check is intentionally incremental. The repo still contains pre-existing legacy
-multi-line `///` blocks, so CI only enforces the rule on Swift files touched by the current
-commit range.
+The docblock checker supports both incremental and full-repo scans. CI now uses the full-repo
+mode because the tracked Swift baseline has been normalized to the locked `/** */` standard.
 """
 
 from __future__ import annotations
