@@ -918,6 +918,114 @@ final class AndBibleTests: XCTestCase {
         XCTAssertTrue(statusStore.allStatuses().isEmpty)
     }
 
+    /**
+     Verifies that initial-backup upload writes a full Android reading-plan database and records the
+     accepted patch-zero baseline locally.
+     */
+    func testRemoteSyncInitialBackupUploadWritesReadingPlanDatabaseAndResetsBaseline() async throws {
+        let container = try makeReadingPlanRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let patchStatusStore = RemoteSyncPatchStatusStore(settingsStore: settingsStore)
+        let stateStore = RemoteSyncStateStore(settingsStore: settingsStore)
+        let metadataRestoreService = RemoteSyncInitialBackupMetadataRestoreService()
+        let restoreService = RemoteSyncReadingPlanRestoreService()
+
+        let template = try XCTUnwrap(
+            ReadingPlanService.availablePlans.first(where: { $0.code == "y1ot1nt1_OTthenNT" })
+        )
+        let plan = ReadingPlanService.startPlan(template: template, modelContext: modelContext)
+        plan.startDate = Date(timeIntervalSince1970: 1_735_689_600)
+        plan.currentDay = 2
+        let firstDay = try XCTUnwrap(plan.days?.first(where: { $0.dayNumber == 1 }))
+        firstDay.isCompleted = true
+        firstDay.completedDate = Date(timeIntervalSince1970: 1_735_689_700)
+        try modelContext.save()
+
+        let syncFolderID = "/org.andbible.ios-sync-readingplans"
+        let adapter = MockRemoteSyncAdapter()
+        await adapter.enqueueUploadResult(
+            RemoteSyncFile(
+                id: "\(syncFolderID)/initial.sqlite3.gz",
+                name: "initial.sqlite3.gz",
+                size: 0,
+                timestamp: 2_000,
+                parentID: syncFolderID,
+                mimeType: NextCloudSyncAdapter.gzipMimeType
+            )
+        )
+        let service = RemoteSyncInitialBackupUploadService(
+            adapter: adapter,
+            deviceIdentifier: "ios-device",
+            nowProvider: { 1_900 }
+        )
+
+        let report = try await service.uploadInitialBackup(
+            for: .readingPlans,
+            bootstrapState: RemoteSyncBootstrapState(syncFolderID: syncFolderID),
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.category, .readingPlans)
+        XCTAssertEqual(
+            report.patchZeroStatus,
+            RemoteSyncPatchStatus(
+                sourceDevice: "ios-device",
+                patchNumber: 0,
+                sizeBytes: report.uploadedFile.size,
+                appliedDate: 2_000
+            )
+        )
+        XCTAssertEqual(
+            patchStatusStore.statuses(for: .readingPlans),
+            [
+                RemoteSyncPatchStatus(
+                    sourceDevice: "ios-device",
+                    patchNumber: 0,
+                    sizeBytes: report.uploadedFile.size,
+                    appliedDate: 2_000
+                )
+            ]
+        )
+        XCTAssertEqual(stateStore.progressState(for: .readingPlans).lastPatchWritten, 1_900)
+        XCTAssertNil(stateStore.progressState(for: .readingPlans).lastSynchronized)
+
+        let events = await adapter.eventsSnapshot()
+        XCTAssertEqual(events, [
+            .upload(
+                name: "initial.sqlite3.gz",
+                parentID: syncFolderID,
+                contentType: NextCloudSyncAdapter.gzipMimeType
+            )
+        ])
+
+        let uploadedFiles = await adapter.uploadedFilesSnapshot()
+        let uploadedArchive = try XCTUnwrap(uploadedFiles.first)
+        let archiveURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("uploaded-readingplan-initial-\(UUID().uuidString).sqlite3.gz")
+        let databaseURL = archiveURL.deletingPathExtension()
+        defer {
+            try? FileManager.default.removeItem(at: archiveURL)
+            try? FileManager.default.removeItem(at: databaseURL)
+        }
+        try uploadedArchive.data.write(to: archiveURL, options: .atomic)
+        let initialDatabaseData = try gunzipTestData(uploadedArchive.data)
+        try initialDatabaseData.write(to: databaseURL, options: .atomic)
+
+        let metadataSnapshot = try metadataRestoreService.readSnapshot(from: databaseURL)
+        XCTAssertTrue(metadataSnapshot.logEntries.isEmpty)
+        XCTAssertTrue(metadataSnapshot.patchStatuses.isEmpty)
+
+        let snapshot = try restoreService.readSnapshot(from: databaseURL)
+        XCTAssertEqual(snapshot.orphanStatuses, [])
+        XCTAssertEqual(snapshot.plans.count, 1)
+        XCTAssertEqual(snapshot.plans[0].planCode, "y1ot1nt1_OTthenNT")
+        XCTAssertEqual(snapshot.plans[0].currentDay, 2)
+        XCTAssertEqual(snapshot.plans[0].statuses.count, 1)
+        XCTAssertEqual(snapshot.plans[0].statuses[0].dayNumber, 1)
+    }
+
     func testRemoteSyncBookmarkPlaybackSettingsStorePersistsAndClearsEntries() throws {
         let container = try makeBookmarkRestoreModelContainer()
         let modelContext = ModelContext(container)
@@ -1910,6 +2018,184 @@ final class AndBibleTests: XCTestCase {
         XCTAssertEqual(labels.count, 3)
         XCTAssertTrue(try modelContext.fetch(FetchDescriptor<GenericBookmark>()).isEmpty)
         XCTAssertTrue(try modelContext.fetch(FetchDescriptor<StudyPadTextEntry>()).isEmpty)
+    }
+
+    /**
+     Verifies that initial-backup upload writes a full Android bookmark database and records the
+     accepted patch-zero baseline locally.
+     */
+    func testRemoteSyncInitialBackupUploadWritesBookmarkDatabaseAndResetsBaseline() async throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let patchStatusStore = RemoteSyncPatchStatusStore(settingsStore: settingsStore)
+        let stateStore = RemoteSyncStateStore(settingsStore: settingsStore)
+        let metadataRestoreService = RemoteSyncInitialBackupMetadataRestoreService()
+        let restoreDispatcher = RemoteSyncInitialBackupRestoreService()
+        let restoreService = RemoteSyncBookmarkRestoreService()
+
+        let speakLabelID = Label.speakLabelId
+        let userLabelID = UUID(uuidString: "be100000-0000-0000-0000-000000000001")!
+        let bibleBookmarkID = UUID(uuidString: "be100000-0000-0000-0000-000000000010")!
+        let genericBookmarkID = UUID(uuidString: "be100000-0000-0000-0000-000000000020")!
+        let studyPadEntryID = UUID(uuidString: "be100000-0000-0000-0000-000000000030")!
+
+        let initialDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: speakLabelID, name: Label.speakLabelName, colour: Int(Int32(bitPattern: 0xFFCCAA33))),
+                .init(id: userLabelID, name: "Prayer", colour: Int(Int32(bitPattern: 0xFF008800)))
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 40,
+                    kjvOrdinalEnd: 41,
+                    ordinalStart: 40,
+                    ordinalEnd: 41,
+                    playbackSettingsJSON: #"{"bookId":"KJV","speed":120}"#,
+                    createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+                    book: "Leviticus",
+                    primaryLabelID: userLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_700_000_100),
+                    wholeVerse: false,
+                    type: "EXAMPLE",
+                    customIcon: "star",
+                    editActionMode: "APPEND",
+                    editActionContent: "Amen"
+                )
+            ],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Bible note")
+            ],
+            bibleLinks: [
+                .init(bookmarkID: bibleBookmarkID, labelID: userLabelID, orderNumber: 2, indentLevel: 1, expandContent: false)
+            ],
+            genericBookmarks: [
+                .init(
+                    id: genericBookmarkID,
+                    key: "Entry.1",
+                    createdAt: Date(timeIntervalSince1970: 1_700_000_200),
+                    bookInitials: "MHC",
+                    ordinalStart: 5,
+                    ordinalEnd: 5,
+                    primaryLabelID: userLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_700_000_300),
+                    wholeVerse: true,
+                    playbackSettingsJSON: #"{"bookId":"MHC","queue":true}"#
+                )
+            ],
+            genericNotes: [
+                .init(bookmarkID: genericBookmarkID, notes: "Generic note")
+            ],
+            genericLinks: [
+                .init(bookmarkID: genericBookmarkID, labelID: userLabelID, orderNumber: 1, indentLevel: 0, expandContent: true)
+            ],
+            studyPadEntries: [
+                .init(id: studyPadEntryID, labelID: userLabelID, orderNumber: 4, indentLevel: 2)
+            ],
+            studyPadTexts: [
+                .init(entryID: studyPadEntryID, text: "Study text")
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: initialDatabaseURL) }
+
+        let stagedBackup = RemoteSyncStagedInitialBackup(
+            remoteFile: RemoteSyncFile(
+                id: "/org.andbible.ios-sync-bookmarks/seed/initial.sqlite3.gz",
+                name: "initial.sqlite3.gz",
+                size: 1,
+                timestamp: 1_500,
+                parentID: "/org.andbible.ios-sync-bookmarks/seed",
+                mimeType: "application/gzip"
+            ),
+            databaseFileURL: initialDatabaseURL,
+            schemaVersion: 1
+        )
+        _ = try restoreDispatcher.restoreInitialBackup(
+            stagedBackup,
+            category: .bookmarks,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+        let localLabelNames = Set(try modelContext.fetch(FetchDescriptor<Label>()).map(\.name))
+
+        let syncFolderID = "/org.andbible.ios-sync-bookmarks"
+        let adapter = MockRemoteSyncAdapter()
+        await adapter.enqueueUploadResult(
+            RemoteSyncFile(
+                id: "\(syncFolderID)/initial.sqlite3.gz",
+                name: "initial.sqlite3.gz",
+                size: 0,
+                timestamp: 2_500,
+                parentID: syncFolderID,
+                mimeType: NextCloudSyncAdapter.gzipMimeType
+            )
+        )
+        let service = RemoteSyncInitialBackupUploadService(
+            adapter: adapter,
+            deviceIdentifier: "ios-device",
+            nowProvider: { 2_400 }
+        )
+
+        let report = try await service.uploadInitialBackup(
+            for: .bookmarks,
+            bootstrapState: RemoteSyncBootstrapState(syncFolderID: syncFolderID),
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.category, .bookmarks)
+        XCTAssertEqual(
+            patchStatusStore.statuses(for: .bookmarks),
+            [
+                RemoteSyncPatchStatus(
+                    sourceDevice: "ios-device",
+                    patchNumber: 0,
+                    sizeBytes: report.uploadedFile.size,
+                    appliedDate: 2_500
+                )
+            ]
+        )
+        XCTAssertEqual(stateStore.progressState(for: .bookmarks).lastPatchWritten, 2_400)
+        XCTAssertNil(stateStore.progressState(for: .bookmarks).lastSynchronized)
+
+        let events = await adapter.eventsSnapshot()
+        XCTAssertEqual(events, [
+            .upload(
+                name: "initial.sqlite3.gz",
+                parentID: syncFolderID,
+                contentType: NextCloudSyncAdapter.gzipMimeType
+            )
+        ])
+
+        let uploadedFiles = await adapter.uploadedFilesSnapshot()
+        let uploadedArchive = try XCTUnwrap(uploadedFiles.first)
+        let archiveURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("uploaded-bookmark-initial-\(UUID().uuidString).sqlite3.gz")
+        let databaseURL = archiveURL.deletingPathExtension()
+        defer {
+            try? FileManager.default.removeItem(at: archiveURL)
+            try? FileManager.default.removeItem(at: databaseURL)
+        }
+        try uploadedArchive.data.write(to: archiveURL, options: .atomic)
+        let initialDatabaseData = try gunzipTestData(uploadedArchive.data)
+        try initialDatabaseData.write(to: databaseURL, options: .atomic)
+
+        let metadataSnapshot = try metadataRestoreService.readSnapshot(from: databaseURL)
+        XCTAssertTrue(metadataSnapshot.logEntries.isEmpty)
+        XCTAssertTrue(metadataSnapshot.patchStatuses.isEmpty)
+
+        let snapshot = try restoreService.readSnapshot(from: databaseURL)
+        XCTAssertEqual(snapshot.labels.count, localLabelNames.count)
+        XCTAssertEqual(Set(snapshot.labels.map(\.name)), localLabelNames)
+        XCTAssertEqual(snapshot.bibleBookmarks.count, 1)
+        XCTAssertEqual(snapshot.bibleBookmarks[0].notes, "Bible note")
+        XCTAssertEqual(snapshot.bibleBookmarks[0].labelLinks.count, 1)
+        XCTAssertEqual(snapshot.genericBookmarks.count, 1)
+        XCTAssertEqual(snapshot.genericBookmarks[0].notes, "Generic note")
+        XCTAssertEqual(snapshot.genericBookmarks[0].labelLinks.count, 1)
+        XCTAssertEqual(snapshot.studyPadEntries.count, 1)
+        XCTAssertEqual(snapshot.studyPadEntries[0].text, "Study text")
     }
 
     /// Verifies that bookmark initial restore refreshes the outbound fingerprint baseline so later local deletes emit delete patches.
@@ -4273,6 +4559,138 @@ final class AndBibleTests: XCTestCase {
             ),
             .download(id: retriedPatch.id),
         ])
+    }
+
+    /**
+     Verifies that creating a fresh remote folder uploads the local baseline as `initial.sqlite3.gz`
+     and suppresses sparse local upload during the same synchronization pass.
+     */
+    func testRemoteSyncSynchronizationServiceCreateRemoteFolderUploadsInitialBackupAndSuppressesSparseUpload() async throws {
+        let container = try makeReadingPlanRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let patchStatusStore = RemoteSyncPatchStatusStore(settingsStore: settingsStore)
+        let stateStore = RemoteSyncStateStore(settingsStore: settingsStore)
+
+        let template = try XCTUnwrap(
+            ReadingPlanService.availablePlans.first(where: { $0.code == "y1ot1nt1_OTthenNT" })
+        )
+        let plan = ReadingPlanService.startPlan(template: template, modelContext: modelContext)
+        plan.startDate = Date(timeIntervalSince1970: 1_735_689_600)
+        plan.currentDay = 2
+        let firstDay = try XCTUnwrap(plan.days?.first(where: { $0.dayNumber == 1 }))
+        firstDay.isCompleted = true
+        firstDay.completedDate = Date(timeIntervalSince1970: 1_735_689_700)
+        try modelContext.save()
+
+        let syncFolderID = "/org.andbible.ios-sync-readingplans"
+        let deviceFolderID = "\(syncFolderID)/ios-device"
+        let adapter = MockRemoteSyncAdapter()
+        await adapter.setMakeKnownResponse("device-known-ios-device-secret")
+        await adapter.enqueueCreateFolderResult(
+            RemoteSyncFile(
+                id: syncFolderID,
+                name: "org.andbible.ios-sync-readingplans",
+                size: 0,
+                timestamp: 1_000,
+                parentID: "/",
+                mimeType: NextCloudSyncAdapter.folderMimeType
+            )
+        )
+        await adapter.enqueueCreateFolderResult(
+            RemoteSyncFile(
+                id: deviceFolderID,
+                name: "ios-device",
+                size: 0,
+                timestamp: 1_100,
+                parentID: syncFolderID,
+                mimeType: NextCloudSyncAdapter.folderMimeType
+            )
+        )
+        await adapter.enqueueUploadResult(
+            RemoteSyncFile(
+                id: "\(syncFolderID)/initial.sqlite3.gz",
+                name: "initial.sqlite3.gz",
+                size: 0,
+                timestamp: 4_000_100,
+                parentID: syncFolderID,
+                mimeType: NextCloudSyncAdapter.gzipMimeType
+            )
+        )
+        await adapter.enqueueListFilesResult([
+            RemoteSyncFile(
+                id: deviceFolderID,
+                name: "ios-device",
+                size: 0,
+                timestamp: 1_100,
+                parentID: syncFolderID,
+                mimeType: NextCloudSyncAdapter.folderMimeType
+            )
+        ])
+        await adapter.enqueueListFilesResult([])
+
+        let service = RemoteSyncSynchronizationService(
+            adapter: adapter,
+            bundleIdentifier: "org.andbible.ios",
+            deviceIdentifier: "ios-device",
+            nowProvider: { 4_000_000 }
+        )
+
+        let report = try await service.createRemoteFolderAndSynchronize(
+            for: .readingPlans,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.category, .readingPlans)
+        XCTAssertEqual(report.discoveredPatchCount, 0)
+        XCTAssertNil(report.initialRestoreReport)
+        XCTAssertNil(report.patchReplayReport)
+        XCTAssertNil(report.patchUploadReport)
+        XCTAssertEqual(report.lastPatchWritten, 4_000_000)
+        XCTAssertEqual(report.lastSynchronized, 4_000_000)
+        let uploadedFiles = await adapter.uploadedFilesSnapshot()
+        let patchZeroSize = Int64(try XCTUnwrap(uploadedFiles.first?.data.count))
+        XCTAssertEqual(
+            patchStatusStore.statuses(for: .readingPlans),
+            [
+                RemoteSyncPatchStatus(
+                    sourceDevice: "ios-device",
+                    patchNumber: 0,
+                    sizeBytes: patchZeroSize,
+                    appliedDate: 4_000_100
+                )
+            ]
+        )
+        XCTAssertEqual(stateStore.progressState(for: .readingPlans).lastPatchWritten, 4_000_000)
+        XCTAssertEqual(stateStore.progressState(for: .readingPlans).lastSynchronized, 4_000_000)
+
+        let events = await adapter.eventsSnapshot()
+        XCTAssertEqual(events, [
+            .createFolder(name: "org.andbible.ios-sync-readingplans", parentID: nil),
+            .makeKnown(syncFolderID: syncFolderID, deviceIdentifier: "ios-device"),
+            .createFolder(name: "ios-device", parentID: syncFolderID),
+            .upload(
+                name: "initial.sqlite3.gz",
+                parentID: syncFolderID,
+                contentType: NextCloudSyncAdapter.gzipMimeType
+            ),
+            .listFiles(
+                parentIDs: [syncFolderID],
+                name: nil,
+                mimeType: NextCloudSyncAdapter.folderMimeType,
+                modifiedAtLeast: nil
+            ),
+            .listFiles(
+                parentIDs: [deviceFolderID],
+                name: nil,
+                mimeType: nil,
+                modifiedAtLeast: nil
+            ),
+        ])
+
+        XCTAssertEqual(uploadedFiles.count, 1)
+        XCTAssertEqual(uploadedFiles[0].name, "initial.sqlite3.gz")
     }
 
     /// Verifies that adopting a remote folder restores its initial backup, records patch zero, and then runs ready-state synchronization.

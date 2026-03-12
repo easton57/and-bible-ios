@@ -1450,6 +1450,160 @@ final class WorkspaceSyncRestoreTests: XCTestCase {
     }
 
     /**
+     Verifies that initial-backup upload writes a full Android workspace database, preserves
+     history aliases, and records the accepted patch-zero baseline locally.
+     */
+    func testRemoteSyncInitialBackupUploadWritesWorkspaceDatabaseAndResetsBaseline() async throws {
+        let container = try makeWorkspaceRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let patchStatusStore = RemoteSyncPatchStatusStore(settingsStore: settingsStore)
+        let stateStore = RemoteSyncStateStore(settingsStore: settingsStore)
+        let fidelityStore = RemoteSyncWorkspaceFidelityStore(settingsStore: settingsStore)
+        let metadataRestoreService = RemoteSyncInitialBackupMetadataRestoreService()
+        let restoreDispatcher = RemoteSyncInitialBackupRestoreService()
+        let restoreService = RemoteSyncWorkspaceRestoreService()
+
+        let workspaceID = UUID(uuidString: "c6300000-0000-0000-0000-000000000001")!
+        let windowID = UUID(uuidString: "c6300000-0000-0000-0000-000000000002")!
+        let initialDatabaseURL = try makeAndroidWorkspacesDatabase(
+            workspaces: [
+                .init(id: workspaceID, name: "Travel", orderNumber: 0)
+            ],
+            windows: [
+                .init(
+                    id: windowID,
+                    workspaceID: workspaceID,
+                    isSynchronized: true,
+                    isPinMode: false,
+                    isLinksWindow: false,
+                    orderNumber: 0,
+                    syncGroup: 0,
+                    layoutState: "split",
+                    layoutWeight: 1.0
+                )
+            ],
+            pageManagers: [
+                .init(
+                    windowID: windowID,
+                    bibleDocument: "KJV",
+                    bibleVersification: "KJVA",
+                    bibleBook: 0,
+                    bibleChapterNo: 1,
+                    bibleVerseNo: 1,
+                    currentCategoryName: "BIBLE",
+                    jsState: #"{"scrollY":0}"#
+                )
+            ],
+            historyItems: [
+                .init(
+                    remoteID: 77,
+                    windowID: windowID,
+                    createdAt: Date(timeIntervalSince1970: 1_735_689_600),
+                    document: "KJV",
+                    key: "Gen.1.1",
+                    anchorOrdinal: 101
+                )
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: initialDatabaseURL) }
+
+        let stagedBackup = RemoteSyncStagedInitialBackup(
+            remoteFile: RemoteSyncFile(
+                id: "/org.andbible.ios-sync-workspaces/seed/initial.sqlite3.gz",
+                name: "initial.sqlite3.gz",
+                size: 1,
+                timestamp: 1_500,
+                parentID: "/org.andbible.ios-sync-workspaces/seed",
+                mimeType: "application/gzip"
+            ),
+            databaseFileURL: initialDatabaseURL,
+            schemaVersion: 1
+        )
+        _ = try restoreDispatcher.restoreInitialBackup(
+            stagedBackup,
+            category: .workspaces,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        let syncFolderID = "/org.andbible.ios-sync-workspaces"
+        let adapter = WorkspaceMockRemoteSyncAdapter()
+        await adapter.enqueueUploadResult(
+            RemoteSyncFile(
+                id: "\(syncFolderID)/initial.sqlite3.gz",
+                name: "initial.sqlite3.gz",
+                size: 0,
+                timestamp: 2_000,
+                parentID: syncFolderID,
+                mimeType: NextCloudSyncAdapter.gzipMimeType
+            )
+        )
+        let service = RemoteSyncInitialBackupUploadService(
+            adapter: adapter,
+            deviceIdentifier: "ios-device",
+            nowProvider: { 1_900 }
+        )
+
+        let report = try await service.uploadInitialBackup(
+            for: .workspaces,
+            bootstrapState: RemoteSyncBootstrapState(syncFolderID: syncFolderID),
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.category, .workspaces)
+        XCTAssertEqual(
+            patchStatusStore.statuses(for: .workspaces),
+            [
+                RemoteSyncPatchStatus(
+                    sourceDevice: "ios-device",
+                    patchNumber: 0,
+                    sizeBytes: report.uploadedFile.size,
+                    appliedDate: 2_000
+                )
+            ]
+        )
+        XCTAssertEqual(stateStore.progressState(for: .workspaces).lastPatchWritten, 1_900)
+        XCTAssertNil(stateStore.progressState(for: .workspaces).lastSynchronized)
+        XCTAssertEqual(fidelityStore.allHistoryItemAliases().map(\.remoteHistoryItemID), [77])
+
+        let events = await adapter.eventsSnapshot()
+        XCTAssertEqual(events, [
+            .upload(
+                name: "initial.sqlite3.gz",
+                parentID: syncFolderID,
+                contentType: NextCloudSyncAdapter.gzipMimeType
+            )
+        ])
+
+        let uploadedFiles = await adapter.uploadedFilesSnapshot()
+        let uploadedArchive = try XCTUnwrap(uploadedFiles.first)
+        let archiveURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("uploaded-workspace-initial-\(UUID().uuidString).sqlite3.gz")
+        let databaseURL = archiveURL.deletingPathExtension()
+        defer {
+            try? FileManager.default.removeItem(at: archiveURL)
+            try? FileManager.default.removeItem(at: databaseURL)
+        }
+        try uploadedArchive.data.write(to: archiveURL, options: .atomic)
+        let initialDatabaseData = try workspaceGunzipTestData(uploadedArchive.data)
+        try initialDatabaseData.write(to: databaseURL, options: .atomic)
+
+        let metadataSnapshot = try metadataRestoreService.readSnapshot(from: databaseURL)
+        XCTAssertTrue(metadataSnapshot.logEntries.isEmpty)
+        XCTAssertTrue(metadataSnapshot.patchStatuses.isEmpty)
+
+        let snapshot = try restoreService.readSnapshot(from: databaseURL)
+        XCTAssertEqual(snapshot.workspaces.count, 1)
+        XCTAssertEqual(snapshot.workspaces[0].name, "Travel")
+        XCTAssertEqual(snapshot.workspaces[0].windows.count, 1)
+        XCTAssertEqual(snapshot.workspaces[0].windows[0].pageManager.currentCategoryName, "BIBLE")
+        XCTAssertEqual(snapshot.workspaces[0].windows[0].historyItems.count, 1)
+        XCTAssertEqual(snapshot.workspaces[0].windows[0].historyItems[0].remoteID, 77)
+    }
+
+    /**
      Verifies that outbound upload writes an Android-shaped sparse workspace patch, uploads it, and advances local sync bookkeeping.
      */
     func testRemoteSyncWorkspacePatchUploadWritesAndUploadsSparsePatch() async throws {

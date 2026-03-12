@@ -150,6 +150,7 @@ public enum RemoteSyncSynchronizationOutcome: Sendable, Equatable {
  - inspect or validate the category bootstrap state
  - surface adopt-versus-create decisions without mutating local data
  - after remote adoption, download and restore `initial.sqlite3.gz`
+ - after remote creation, upload a local `initial.sqlite3.gz` baseline before continuing
  - for ready categories, discover, stage, download, and replay incremental remote patches
  - after remote replay, upload one outbound sparse patch when the category supports local export
  - persist Android-aligned `lastPatchWritten` and `lastSynchronized` bookkeeping
@@ -159,6 +160,7 @@ public enum RemoteSyncSynchronizationOutcome: Sendable, Equatable {
  - `RemoteSyncPatchDiscoveryService` finds remote initial backups and pending patch archives
  - `RemoteSyncArchiveStagingService` downloads initial-backup and patch archives into temporary files
  - `RemoteSyncInitialBackupRestoreService` restores staged initial backups into local SwiftData
+ - `RemoteSyncInitialBackupUploadService` exports and uploads local initial backups into fresh remote folders
  - category-specific patch apply services replay staged Android patch archives into local SwiftData
  - `RemoteSyncBookmarkPatchUploadService` exports and uploads outbound sparse bookmark patches
  - `RemoteSyncWorkspacePatchUploadService` exports and uploads outbound sparse workspace patches
@@ -169,6 +171,7 @@ public enum RemoteSyncSynchronizationOutcome: Sendable, Equatable {
  Side effects:
  - performs remote backend listing, download, marker, and device-folder creation requests
  - may restore a full staged initial backup into local SwiftData
+ - may export and upload a full staged initial backup from local SwiftData into a fresh remote folder
  - may replay staged remote patches into local SwiftData and local-only fidelity stores
  - may upload one outbound sparse bookmark, workspace, or reading-plan patch and rewrite local baseline metadata after success
  - persists bootstrap, patch-status, and progress metadata through `SettingsStore`
@@ -189,6 +192,7 @@ public final class RemoteSyncSynchronizationService {
     private let bundleIdentifier: String
     private let deviceIdentifier: String
     private let initialBackupRestoreService: RemoteSyncInitialBackupRestoreService
+    private let initialBackupUploadService: RemoteSyncInitialBackupUploadService
     private let readingPlanPatchApplyService: RemoteSyncReadingPlanPatchApplyService
     private let readingPlanPatchUploadService: RemoteSyncReadingPlanPatchUploadService
     private let bookmarkPatchApplyService: RemoteSyncBookmarkPatchApplyService
@@ -207,6 +211,7 @@ public final class RemoteSyncSynchronizationService {
        - bundleIdentifier: App bundle identifier used to build Android-style sync folder names.
        - deviceIdentifier: Stable device identifier used for device folders and patch-zero bookkeeping.
        - initialBackupRestoreService: Service used to restore staged initial backups.
+       - initialBackupUploadService: Service used to export and upload local initial backups into fresh remote folders.
        - readingPlanPatchApplyService: Reading-plan patch replay service.
        - readingPlanPatchUploadService: Reading-plan outbound patch upload service.
        - bookmarkPatchApplyService: Bookmark patch replay service.
@@ -224,6 +229,7 @@ public final class RemoteSyncSynchronizationService {
         bundleIdentifier: String,
         deviceIdentifier: String,
         initialBackupRestoreService: RemoteSyncInitialBackupRestoreService = RemoteSyncInitialBackupRestoreService(),
+        initialBackupUploadService: RemoteSyncInitialBackupUploadService? = nil,
         readingPlanPatchApplyService: RemoteSyncReadingPlanPatchApplyService = RemoteSyncReadingPlanPatchApplyService(),
         readingPlanPatchUploadService: RemoteSyncReadingPlanPatchUploadService? = nil,
         bookmarkPatchApplyService: RemoteSyncBookmarkPatchApplyService = RemoteSyncBookmarkPatchApplyService(),
@@ -240,6 +246,12 @@ public final class RemoteSyncSynchronizationService {
         self.bundleIdentifier = bundleIdentifier
         self.deviceIdentifier = deviceIdentifier
         self.initialBackupRestoreService = initialBackupRestoreService
+        self.initialBackupUploadService = initialBackupUploadService
+            ?? RemoteSyncInitialBackupUploadService(
+                adapter: adapter,
+                deviceIdentifier: deviceIdentifier,
+                nowProvider: nowProvider
+            )
         self.readingPlanPatchApplyService = readingPlanPatchApplyService
         self.readingPlanPatchUploadService = readingPlanPatchUploadService
             ?? RemoteSyncReadingPlanPatchUploadService(
@@ -300,7 +312,8 @@ public final class RemoteSyncSynchronizationService {
                 modelContext: modelContext,
                 settingsStore: settingsStore,
                 currentSchemaVersion: currentSchemaVersion,
-                initialRestoreReport: nil
+                initialRestoreReport: nil,
+                suppressOutboundUpload: false
             )
             return .synchronized(report)
         case .requiresRemoteAdoption(let candidate):
@@ -393,7 +406,69 @@ public final class RemoteSyncSynchronizationService {
             modelContext: modelContext,
             settingsStore: settingsStore,
             currentSchemaVersion: currentSchemaVersion,
-            initialRestoreReport: initialRestoreReport
+            initialRestoreReport: initialRestoreReport,
+            suppressOutboundUpload: true
+        )
+    }
+
+    /**
+     Creates or replaces a remote folder, uploads the current local baseline as `initial.sqlite3.gz`,
+     and then continues with ready-state synchronization.
+
+     This method mirrors Android's "copy this device to cloud" branch after the user chooses to
+     replace a discovered folder or create a fresh remote category folder:
+     - optionally delete the stale remote folder
+     - create the new sync folder, secret marker, and current device folder
+     - export and upload the current local category state as `initial.sqlite3.gz`
+     - continue with normal pending-patch discovery/application without echoing a sparse local patch
+       in the same pass
+
+     - Parameters:
+       - category: Logical sync category being uploaded into a fresh remote folder.
+       - replacingRemoteFolderID: Optional existing remote folder identifier that should be deleted before creation.
+       - modelContext: SwiftData context whose category-specific models define the local baseline.
+       - settingsStore: Local-only settings store backing bootstrap and sync metadata.
+       - currentSchemaVersion: Highest schema version that should be encoded into the uploaded initial backup.
+     - Returns: Completed synchronization report after the initial upload and ready-state replay pass.
+     - Side effects:
+       - may delete an existing remote folder before creating a replacement
+       - creates a new remote sync folder, secret marker, and device folder
+       - uploads `initial.sqlite3.gz` built from current local state
+       - resets local accepted baseline metadata to patch zero
+       - updates `lastSynchronized` bookkeeping in `RemoteSyncStateStore`
+     - Failure modes:
+       - rethrows bootstrap, upload, discovery, staging, restore, and patch-apply failures from the lower layers
+     */
+    public func createRemoteFolderAndSynchronize(
+        for category: RemoteSyncCategory,
+        replacingRemoteFolderID: String? = nil,
+        modelContext: ModelContext,
+        settingsStore: SettingsStore,
+        currentSchemaVersion: Int = 1
+    ) async throws -> RemoteSyncCategorySynchronizationReport {
+        let bootstrapCoordinator = makeBootstrapCoordinator(settingsStore: settingsStore)
+
+        let bootstrapState = try await bootstrapCoordinator.createRemoteFolder(
+            for: category,
+            replacingRemoteFolderID: replacingRemoteFolderID
+        )
+
+        _ = try await initialBackupUploadService.uploadInitialBackup(
+            for: category,
+            bootstrapState: bootstrapState,
+            modelContext: modelContext,
+            settingsStore: settingsStore,
+            schemaVersion: currentSchemaVersion
+        )
+
+        return try await synchronizeReadyCategory(
+            category,
+            bootstrapState: bootstrapState,
+            modelContext: modelContext,
+            settingsStore: settingsStore,
+            currentSchemaVersion: currentSchemaVersion,
+            initialRestoreReport: nil,
+            suppressOutboundUpload: true
         )
     }
 
@@ -412,10 +487,12 @@ public final class RemoteSyncSynchronizationService {
        - settingsStore: Local-only settings store backing bootstrap and sync metadata.
        - currentSchemaVersion: Highest schema version the caller can safely read from remote archives.
        - initialRestoreReport: Optional initial-backup restore summary that should be carried into the final report.
+       - suppressOutboundUpload: Whether the pass should skip sparse local upload because the same run just adopted or created the remote baseline.
      - Returns: Completed synchronization report for the ready category.
      - Side effects:
        - updates `lastSynchronized` bookkeeping in `RemoteSyncStateStore`
        - may stage and replay remote patches
+       - may suppress sparse local upload when the same pass already exchanged a full initial backup
      - Failure modes:
        - rethrows discovery, staging, and patch-apply failures from the lower layers
        - retries once after `RemoteSyncPatchDiscoveryError.patchFilesSkipped`
@@ -427,7 +504,8 @@ public final class RemoteSyncSynchronizationService {
         modelContext: ModelContext,
         settingsStore: SettingsStore,
         currentSchemaVersion: Int,
-        initialRestoreReport: RemoteSyncInitialBackupRestoreReport?
+        initialRestoreReport: RemoteSyncInitialBackupRestoreReport?,
+        suppressOutboundUpload: Bool
     ) async throws -> RemoteSyncCategorySynchronizationReport {
         let stateStore = RemoteSyncStateStore(settingsStore: settingsStore)
         let originalProgressState = stateStore.progressState(for: category)
@@ -440,7 +518,8 @@ public final class RemoteSyncSynchronizationService {
                 modelContext: modelContext,
                 settingsStore: settingsStore,
                 currentSchemaVersion: currentSchemaVersion,
-                initialRestoreReport: initialRestoreReport
+                initialRestoreReport: initialRestoreReport,
+                suppressOutboundUpload: suppressOutboundUpload
             )
         } catch RemoteSyncPatchDiscoveryError.patchFilesSkipped {
             var resetProgressState = originalProgressState
@@ -454,7 +533,8 @@ public final class RemoteSyncSynchronizationService {
                 modelContext: modelContext,
                 settingsStore: settingsStore,
                 currentSchemaVersion: currentSchemaVersion,
-                initialRestoreReport: initialRestoreReport
+                initialRestoreReport: initialRestoreReport,
+                suppressOutboundUpload: suppressOutboundUpload
             )
         } catch RemoteSyncPatchDiscoveryError.incompatiblePatchVersion(let version) {
             stateStore.setProgressState(originalProgressState, for: category)
@@ -475,12 +555,13 @@ public final class RemoteSyncSynchronizationService {
        - settingsStore: Local-only settings store backing bootstrap and sync metadata.
        - currentSchemaVersion: Highest schema version the caller can safely read from remote archives.
        - initialRestoreReport: Optional initial-backup restore summary that should be carried into the final report.
+       - suppressOutboundUpload: Whether the pass should skip sparse local upload because the same run already exchanged a full initial backup.
      - Returns: Completed synchronization report for one ready-state attempt.
      - Side effects:
        - persists `lastSynchronized` before remote discovery
        - stages, downloads, and replays remote patches when discovery finds any
        - may upload one outbound sparse patch after replay when the category supports local export
-         and the pass did not just restore remote baseline state from `initial.sqlite3.gz`
+         and the pass is not explicitly suppressing outbound upload
        - removes staged patch archives after application or failure
      - Failure modes:
        - rethrows discovery, staging, patch-apply, and patch-upload failures from the lower layers
@@ -492,7 +573,8 @@ public final class RemoteSyncSynchronizationService {
         modelContext: ModelContext,
         settingsStore: SettingsStore,
         currentSchemaVersion: Int,
-        initialRestoreReport: RemoteSyncInitialBackupRestoreReport?
+        initialRestoreReport: RemoteSyncInitialBackupRestoreReport?,
+        suppressOutboundUpload: Bool
     ) async throws -> RemoteSyncCategorySynchronizationReport {
         let stateStore = RemoteSyncStateStore(settingsStore: settingsStore)
         let discoveryService = makePatchDiscoveryService(settingsStore: settingsStore)
@@ -525,15 +607,15 @@ public final class RemoteSyncSynchronizationService {
         }
 
         let patchUploadReport: RemoteSyncCategoryPatchUploadReport?
-        if initialRestoreReport == nil {
+        if suppressOutboundUpload {
+            patchUploadReport = nil
+        } else {
             patchUploadReport = try await uploadPendingPatchIfSupported(
                 for: category,
                 bootstrapState: bootstrapState,
                 modelContext: modelContext,
                 settingsStore: settingsStore
             )
-        } else {
-            patchUploadReport = nil
         }
 
         let finalProgressState = stateStore.progressState(for: category)
