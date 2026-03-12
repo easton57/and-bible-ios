@@ -5384,6 +5384,331 @@ final class AndBibleTests: XCTestCase {
         }
     }
 
+    func testRemoteSyncSettingsStorePersistsGlobalLastSynchronizedAndIntervalFallbacks() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        let store = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+
+        XCTAssertEqual(store.remoteSyncIntervalSeconds, RemoteSyncSettingsStore.defaultSyncIntervalSeconds)
+        XCTAssertNil(store.globalLastSynchronized)
+
+        settingsStore.setString("gdrive_sync_interval", value: "42")
+        store.globalLastSynchronized = 12_345
+
+        XCTAssertEqual(store.remoteSyncIntervalSeconds, 42)
+        XCTAssertEqual(store.globalLastSynchronized, 12_345)
+
+        settingsStore.setString("gdrive_sync_interval", value: "-1")
+        settingsStore.setString("globalLastSynchronized", value: "not-a-number")
+
+        XCTAssertEqual(store.remoteSyncIntervalSeconds, RemoteSyncSettingsStore.defaultSyncIntervalSeconds)
+        XCTAssertNil(store.globalLastSynchronized)
+    }
+
+    @MainActor
+    func testRemoteSyncLifecycleServiceSynchronizesEnabledNextCloudCategoriesAndUpdatesGlobalTimestamp() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let secretStore = InMemorySecretStore()
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: secretStore
+        )
+        remoteSettingsStore.selectedBackend = .nextCloud
+        try remoteSettingsStore.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example.com",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+        remoteSettingsStore.setSyncEnabled(true, for: .workspaces)
+
+        let synchronizer = MockRemoteSyncLifecycleSynchronizer()
+        synchronizer.synchronizeResults[.bookmarks] = .synchronized(makeLifecycleSyncReport(for: .bookmarks))
+        synchronizer.synchronizeResults[.workspaces] = .synchronized(makeLifecycleSyncReport(for: .workspaces))
+
+        let lifecycleService = RemoteSyncLifecycleService(
+            modelContainer: container,
+            bundleIdentifier: "org.andbible.ios",
+            synchronizationServiceFactory: { _, _, _ in synchronizer },
+            remoteSettingsStoreFactory: { RemoteSyncSettingsStore(settingsStore: $0, secretStore: secretStore) },
+            nowProvider: { 50_000 }
+        )
+
+        var synchronizedCategories: [RemoteSyncCategory] = []
+        lifecycleService.onCategorySynchronized = { report in
+            synchronizedCategories.append(report.category)
+        }
+
+        let didSynchronize = await lifecycleService.synchronizeIfNeeded(force: true)
+
+        XCTAssertTrue(didSynchronize)
+        XCTAssertEqual(synchronizer.synchronizeCalls, [.bookmarks, .workspaces])
+        XCTAssertEqual(synchronizedCategories, [.bookmarks, .workspaces])
+        XCTAssertEqual(remoteSettingsStore.globalLastSynchronized, 50_000)
+    }
+
+    @MainActor
+    func testRemoteSyncLifecycleServiceRespectsSyncIntervalForNonForcedPasses() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let secretStore = InMemorySecretStore()
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: secretStore
+        )
+        remoteSettingsStore.selectedBackend = .nextCloud
+        try remoteSettingsStore.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example.com",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+        remoteSettingsStore.globalLastSynchronized = 100_000
+
+        let synchronizer = MockRemoteSyncLifecycleSynchronizer()
+        synchronizer.synchronizeResults[.bookmarks] = .synchronized(makeLifecycleSyncReport(for: .bookmarks))
+
+        let lifecycleService = RemoteSyncLifecycleService(
+            modelContainer: container,
+            bundleIdentifier: "org.andbible.ios",
+            synchronizationServiceFactory: { _, _, _ in synchronizer },
+            remoteSettingsStoreFactory: { RemoteSyncSettingsStore(settingsStore: $0, secretStore: secretStore) },
+            nowProvider: { 100_000 + 60_000 }
+        )
+
+        let didSynchronize = await lifecycleService.synchronizeIfNeeded(force: false)
+
+        XCTAssertFalse(didSynchronize)
+        XCTAssertTrue(synchronizer.synchronizeCalls.isEmpty)
+        XCTAssertEqual(remoteSettingsStore.globalLastSynchronized, 100_000)
+    }
+
+    @MainActor
+    func testRemoteSyncLifecycleServiceSkipsPassesWhenNetworkIsUnavailable() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let secretStore = InMemorySecretStore()
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: secretStore
+        )
+        remoteSettingsStore.selectedBackend = .nextCloud
+        try remoteSettingsStore.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example.com",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+
+        let synchronizer = MockRemoteSyncLifecycleSynchronizer()
+        let lifecycleService = RemoteSyncLifecycleService(
+            modelContainer: container,
+            bundleIdentifier: "org.andbible.ios",
+            synchronizationServiceFactory: { _, _, _ in synchronizer },
+            remoteSettingsStoreFactory: { RemoteSyncSettingsStore(settingsStore: $0, secretStore: secretStore) },
+            networkAvailableProvider: { false },
+            nowProvider: { 75_000 }
+        )
+
+        let didSynchronize = await lifecycleService.synchronizeIfNeeded(force: true)
+
+        XCTAssertFalse(didSynchronize)
+        XCTAssertTrue(synchronizer.synchronizeCalls.isEmpty)
+        XCTAssertNil(remoteSettingsStore.globalLastSynchronized)
+    }
+
+    @MainActor
+    func testRemoteSyncLifecycleServiceAutomaticallyCreatesMissingRemoteFolders() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let secretStore = InMemorySecretStore()
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: secretStore
+        )
+        remoteSettingsStore.selectedBackend = .nextCloud
+        try remoteSettingsStore.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example.com",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+
+        let synchronizer = MockRemoteSyncLifecycleSynchronizer()
+        synchronizer.synchronizeResults[.bookmarks] = .requiresRemoteCreation(
+            RemoteSyncBootstrapCreation(
+                category: .bookmarks,
+                syncFolderName: RemoteSyncCategory.bookmarks.syncFolderName(bundleIdentifier: "org.andbible.ios")
+            )
+        )
+        synchronizer.createResults[.bookmarks] = makeLifecycleSyncReport(for: .bookmarks)
+
+        let lifecycleService = RemoteSyncLifecycleService(
+            modelContainer: container,
+            bundleIdentifier: "org.andbible.ios",
+            synchronizationServiceFactory: { _, _, _ in synchronizer },
+            remoteSettingsStoreFactory: { RemoteSyncSettingsStore(settingsStore: $0, secretStore: secretStore) },
+            nowProvider: { 88_000 }
+        )
+
+        let didSynchronize = await lifecycleService.synchronizeIfNeeded(force: true)
+
+        XCTAssertTrue(didSynchronize)
+        XCTAssertEqual(synchronizer.synchronizeCalls, [.bookmarks])
+        XCTAssertEqual(synchronizer.createCalls, [.bookmarks])
+        XCTAssertEqual(remoteSettingsStore.globalLastSynchronized, 88_000)
+    }
+
+    @MainActor
+    func testRemoteSyncLifecycleServiceReportsInteractionRequiredWithoutUpdatingGlobalTimestamp() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let secretStore = InMemorySecretStore()
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: secretStore
+        )
+        remoteSettingsStore.selectedBackend = .nextCloud
+        try remoteSettingsStore.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example.com",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        remoteSettingsStore.setSyncEnabled(true, for: .workspaces)
+
+        let synchronizer = MockRemoteSyncLifecycleSynchronizer()
+        let candidate = RemoteSyncBootstrapCandidate(
+            category: .workspaces,
+            syncFolderName: RemoteSyncCategory.workspaces.syncFolderName(bundleIdentifier: "org.andbible.ios"),
+            remoteFolderID: "/existing-workspaces"
+        )
+        synchronizer.synchronizeResults[.workspaces] = .requiresRemoteAdoption(candidate)
+
+        let lifecycleService = RemoteSyncLifecycleService(
+            modelContainer: container,
+            bundleIdentifier: "org.andbible.ios",
+            synchronizationServiceFactory: { _, _, _ in synchronizer },
+            remoteSettingsStoreFactory: { RemoteSyncSettingsStore(settingsStore: $0, secretStore: secretStore) },
+            nowProvider: { 99_000 }
+        )
+
+        var interactionCategory: RemoteSyncCategory?
+        lifecycleService.onInteractionRequired = { category, _ in
+            interactionCategory = category
+        }
+
+        let didSynchronize = await lifecycleService.synchronizeIfNeeded(force: true)
+
+        XCTAssertFalse(didSynchronize)
+        XCTAssertEqual(interactionCategory, .workspaces)
+        XCTAssertEqual(synchronizer.synchronizeCalls, [.workspaces])
+        XCTAssertNil(remoteSettingsStore.globalLastSynchronized)
+    }
+
+    @MainActor
+    func testRemoteSyncLifecycleServiceAdoptsRemoteFolderAfterUserDecision() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let secretStore = InMemorySecretStore()
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: secretStore
+        )
+        remoteSettingsStore.selectedBackend = .nextCloud
+        try remoteSettingsStore.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example.com",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        remoteSettingsStore.setSyncEnabled(true, for: .workspaces)
+
+        let synchronizer = MockRemoteSyncLifecycleSynchronizer()
+        let candidate = RemoteSyncBootstrapCandidate(
+            category: .workspaces,
+            syncFolderName: RemoteSyncCategory.workspaces.syncFolderName(bundleIdentifier: "org.andbible.ios"),
+            remoteFolderID: "/existing-workspaces"
+        )
+        synchronizer.adoptResults[.workspaces] = makeLifecycleSyncReport(for: .workspaces)
+
+        let lifecycleService = RemoteSyncLifecycleService(
+            modelContainer: container,
+            bundleIdentifier: "org.andbible.ios",
+            synchronizationServiceFactory: { _, _, _ in synchronizer },
+            remoteSettingsStoreFactory: { RemoteSyncSettingsStore(settingsStore: $0, secretStore: secretStore) },
+            nowProvider: { 123_000 }
+        )
+
+        let didSynchronize = await lifecycleService.adoptRemoteFolderAndSynchronize(candidate)
+
+        XCTAssertTrue(didSynchronize)
+        XCTAssertEqual(synchronizer.adoptCalls, [.workspaces])
+        XCTAssertEqual(remoteSettingsStore.globalLastSynchronized, 123_000)
+    }
+
+    @MainActor
+    func testRemoteSyncLifecycleServiceReplacesRemoteFolderAfterUserDecision() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let secretStore = InMemorySecretStore()
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: secretStore
+        )
+        remoteSettingsStore.selectedBackend = .nextCloud
+        try remoteSettingsStore.saveWebDAVConfiguration(
+            WebDAVSyncConfiguration(
+                serverURL: "https://nextcloud.example.com",
+                username: "alice",
+                folderPath: nil
+            ),
+            password: "secret"
+        )
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+
+        let synchronizer = MockRemoteSyncLifecycleSynchronizer()
+        let candidate = RemoteSyncBootstrapCandidate(
+            category: .bookmarks,
+            syncFolderName: RemoteSyncCategory.bookmarks.syncFolderName(bundleIdentifier: "org.andbible.ios"),
+            remoteFolderID: "/existing-bookmarks"
+        )
+        synchronizer.createResults[.bookmarks] = makeLifecycleSyncReport(for: .bookmarks)
+
+        let lifecycleService = RemoteSyncLifecycleService(
+            modelContainer: container,
+            bundleIdentifier: "org.andbible.ios",
+            synchronizationServiceFactory: { _, _, _ in synchronizer },
+            remoteSettingsStoreFactory: { RemoteSyncSettingsStore(settingsStore: $0, secretStore: secretStore) },
+            nowProvider: { 144_000 }
+        )
+
+        let didSynchronize = await lifecycleService.replaceRemoteFolderAndSynchronize(candidate)
+
+        XCTAssertTrue(didSynchronize)
+        XCTAssertEqual(synchronizer.createCalls, [.bookmarks])
+        XCTAssertEqual(remoteSettingsStore.globalLastSynchronized, 144_000)
+    }
+
     private func makeTemporaryBundledSwordPath() throws -> String {
         let fm = FileManager.default
         let sourceRoot = URL(fileURLWithPath: #filePath)
@@ -5430,10 +5755,30 @@ final class AndBibleTests: XCTestCase {
     }
 
     private func makeInMemorySettingsStore() throws -> SettingsStore {
+        SettingsStore(modelContext: ModelContext(try makeInMemorySettingsContainer()))
+    }
+
+    private func makeInMemorySettingsContainer() throws -> ModelContainer {
         let schema = Schema([Setting.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
-        return SettingsStore(modelContext: ModelContext(container))
+        return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private func makeLifecycleSyncReport(for category: RemoteSyncCategory) -> RemoteSyncCategorySynchronizationReport {
+        RemoteSyncCategorySynchronizationReport(
+            category: category,
+            bootstrapState: RemoteSyncBootstrapState(
+                syncFolderID: "/sync/\(category.rawValue)",
+                deviceFolderID: "/sync/\(category.rawValue)/device",
+                secretFileName: "device-known-ios"
+            ),
+            initialRestoreReport: nil,
+            patchReplayReport: nil,
+            patchUploadReport: nil,
+            discoveredPatchCount: 0,
+            lastPatchWritten: nil,
+            lastSynchronized: 1_000
+        )
     }
 
     private func requestBodyData(for request: URLRequest) -> Data? {
@@ -6608,6 +6953,106 @@ private struct MockRemoteSyncUploadedFile: Equatable {
     let parentID: String
     let contentType: String
     let data: Data
+}
+
+/**
+ Test double for `RemoteSyncCategorySynchronizing`.
+
+ The lifecycle runner only needs category synchronization plus the auto-create branch, so this fake
+ records both call paths and returns preloaded outcomes without touching WebDAV transport.
+ */
+@MainActor
+private final class MockRemoteSyncLifecycleSynchronizer: RemoteSyncCategorySynchronizing {
+    /// Preloaded outcomes returned from `synchronize(_:modelContext:settingsStore:)`.
+    var synchronizeResults: [RemoteSyncCategory: RemoteSyncSynchronizationOutcome] = [:]
+
+    /// Preloaded reports returned from `adoptRemoteFolderAndSynchronize(...)`.
+    var adoptResults: [RemoteSyncCategory: RemoteSyncCategorySynchronizationReport] = [:]
+
+    /// Preloaded reports returned from `createRemoteFolderAndSynchronize(...)`.
+    var createResults: [RemoteSyncCategory: RemoteSyncCategorySynchronizationReport] = [:]
+
+    /// Categories passed through the main synchronization entry point.
+    private(set) var synchronizeCalls: [RemoteSyncCategory] = []
+
+    /// Categories passed through the adopt-existing-folder recovery path.
+    private(set) var adoptCalls: [RemoteSyncCategory] = []
+
+    /// Categories passed through the auto-create recovery path.
+    private(set) var createCalls: [RemoteSyncCategory] = []
+
+    /**
+     Returns the preloaded outcome for a category and records the call.
+
+     - Parameters:
+       - category: Logical sync category requested by the lifecycle runner.
+       - modelContext: Unused test context supplied by the caller.
+       - settingsStore: Unused test settings store supplied by the caller.
+     - Returns: Preloaded synchronization outcome for the category.
+     - Side Effects: Appends the category to `synchronizeCalls`.
+     - Failure modes: Missing preloaded outcomes trap the test with `XCTFail`-style precondition semantics.
+     */
+    func synchronize(
+        _ category: RemoteSyncCategory,
+        modelContext: ModelContext,
+        settingsStore: SettingsStore
+    ) async throws -> RemoteSyncSynchronizationOutcome {
+        synchronizeCalls.append(category)
+        guard let result = synchronizeResults[category] else {
+            preconditionFailure("Missing synchronize result for \(category)")
+        }
+        return result
+    }
+
+    /**
+     Returns the preloaded adopt-existing-folder report for a category and records the call.
+
+     - Parameters:
+       - category: Logical sync category requested by the lifecycle runner.
+       - remoteFolderID: Existing remote folder identifier chosen by the user.
+       - modelContext: Unused test context supplied by the caller.
+       - settingsStore: Unused test settings store supplied by the caller.
+     - Returns: Preloaded synchronization report for the category.
+     - Side Effects: Appends the category to `adoptCalls`.
+     - Failure modes: Missing preloaded reports trap the test with `XCTFail`-style precondition semantics.
+     */
+    func adoptRemoteFolderAndSynchronize(
+        for category: RemoteSyncCategory,
+        remoteFolderID: String,
+        modelContext: ModelContext,
+        settingsStore: SettingsStore
+    ) async throws -> RemoteSyncCategorySynchronizationReport {
+        adoptCalls.append(category)
+        guard let result = adoptResults[category] else {
+            preconditionFailure("Missing adopt result for \(category)")
+        }
+        return result
+    }
+
+    /**
+     Returns the preloaded auto-create report for a category and records the call.
+
+     - Parameters:
+       - category: Logical sync category requested by the lifecycle runner.
+       - replacingRemoteFolderID: Optional folder identifier that would be deleted first in production.
+       - modelContext: Unused test context supplied by the caller.
+       - settingsStore: Unused test settings store supplied by the caller.
+     - Returns: Preloaded synchronization report for the category.
+     - Side Effects: Appends the category to `createCalls`.
+     - Failure modes: Missing preloaded reports trap the test with `XCTFail`-style precondition semantics.
+     */
+    func createRemoteFolderAndSynchronize(
+        for category: RemoteSyncCategory,
+        replacingRemoteFolderID: String?,
+        modelContext: ModelContext,
+        settingsStore: SettingsStore
+    ) async throws -> RemoteSyncCategorySynchronizationReport {
+        createCalls.append(category)
+        guard let result = createResults[category] else {
+            preconditionFailure("Missing create result for \(category)")
+        }
+        return result
+    }
 }
 
 private func gunzipTestData(_ data: Data) throws -> Data {

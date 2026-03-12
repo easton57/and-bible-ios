@@ -341,6 +341,9 @@ public final class KeychainSecretStore: SecretStoring {
  sync backends can be configured without destabilizing the existing `SyncService`.
  */
 public final class RemoteSyncSettingsStore {
+    /// Android's default foreground sync interval in seconds.
+    public static let defaultSyncIntervalSeconds: Int64 = 5 * 60
+
     /**
      Android-compatible keys reused for NextCloud/WebDAV sync settings persistence.
 
@@ -353,6 +356,8 @@ public final class RemoteSyncSettingsStore {
         static let webDAVUsername = "gdrive_username"
         static let webDAVFolderPath = "gdrive_folder_path"
         static let webDAVPassword = "gdrive_password"
+        static let syncInterval = "gdrive_sync_interval"
+        static let globalLastSynchronized = "globalLastSynchronized"
         static let syncCategoryPrefix = "gdrive_"
         static let deviceIdentifier = "remote_sync_device_identifier"
     }
@@ -453,6 +458,59 @@ public final class RemoteSyncSettingsStore {
         let generated = UUID().uuidString.lowercased()
         settingsStore.setString(Keys.deviceIdentifier, value: generated)
         return generated
+    }
+
+    /**
+     Returns the Android-style foreground sync interval in seconds.
+
+     Android stores the interval under `gdrive_sync_interval` and falls back to five minutes when
+     the key is missing. iOS mirrors that storage contract so lifecycle-driven NextCloud sync can
+     respect imported Android values without introducing a second interval key.
+
+     - Returns: Configured foreground sync interval in whole seconds.
+     - Side Effects: Reads the raw interval value from `SettingsStore`.
+     - Failure modes:
+       - missing, malformed, or negative stored values fall back to `defaultSyncIntervalSeconds`
+     */
+    public var remoteSyncIntervalSeconds: Int64 {
+        guard let raw = settingsStore.getString(Keys.syncInterval)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              let parsed = Int64(raw),
+              parsed >= 0 else {
+            return Self.defaultSyncIntervalSeconds
+        }
+        return parsed
+    }
+
+    /**
+     Returns or updates Android's global remote-sync completion timestamp.
+
+     Android stores one process-wide `globalLastSynchronized` timestamp to throttle foreground
+     periodic sync work across all remote categories. iOS mirrors that global key so lifecycle
+     polling can reuse the same scheduler semantics instead of inventing a new timestamp key.
+
+     - Side Effects:
+       - reads or writes `globalLastSynchronized` through `SettingsStore`
+     - Failure modes:
+       - malformed persisted values read back as `nil`
+       - write failures are swallowed by `SettingsStore`
+     */
+    public var globalLastSynchronized: Int64? {
+        get {
+            guard let raw = settingsStore.getString(Keys.globalLastSynchronized)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty else {
+                return nil
+            }
+            return Int64(raw)
+        }
+        set {
+            if let newValue {
+                settingsStore.setString(Keys.globalLastSynchronized, value: String(newValue))
+            } else {
+                settingsStore.setString(Keys.globalLastSynchronized, value: "")
+            }
+        }
     }
 
     /**
