@@ -147,6 +147,9 @@ struct AndBibleApp: App {
     @State private var pendingRemoteConfirmation: PendingRemoteSyncConfirmation?
     @State private var remoteSyncErrorMessage: String?
     private let remoteSyncNetworkMonitor: RemoteSyncNetworkMonitor
+    #if os(iOS)
+    private let remoteSyncBackgroundRefreshCoordinator: RemoteSyncBackgroundRefreshCoordinator
+    #endif
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -259,6 +262,16 @@ struct AndBibleApp: App {
                 Self.restoreActiveWorkspace(windowManager: windowMgr, modelContainer: container)
             }
             self._remoteSyncLifecycleService = State(initialValue: remoteSyncLifecycleService)
+            #if os(iOS)
+            let remoteSyncBackgroundRefreshCoordinator = RemoteSyncBackgroundRefreshCoordinator(
+                modelContainer: container,
+                synchronizeIfNeeded: { force in
+                    await remoteSyncLifecycleService.synchronizeIfNeeded(force: force)
+                }
+            )
+            remoteSyncBackgroundRefreshCoordinator.register()
+            self.remoteSyncBackgroundRefreshCoordinator = remoteSyncBackgroundRefreshCoordinator
+            #endif
 
             // Ensure at least one workspace exists
             Self.restoreActiveWorkspace(
@@ -301,6 +314,9 @@ struct AndBibleApp: App {
             }
             .task {
                 configureRemoteSyncLifecycleCallbacks()
+                #if os(iOS)
+                remoteSyncBackgroundRefreshCoordinator.scheduleNextRefreshIfNeeded()
+                #endif
                 await googleDriveAuthService.restorePreviousSignInIfNeeded()
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -310,8 +326,14 @@ struct AndBibleApp: App {
                     updateAppIcon(discrete: isDiscreteMode)
                     Task {
                         await remoteSyncLifecycleService.sceneDidBecomeActive()
+                        #if os(iOS)
+                        remoteSyncBackgroundRefreshCoordinator.scheduleNextRefreshIfNeeded()
+                        #endif
                     }
                 } else if newPhase == .background {
+                    #if os(iOS)
+                    remoteSyncBackgroundRefreshCoordinator.scheduleNextRefreshIfNeeded()
+                    #endif
                     runRemoteSyncBackgroundPass()
                 } else if newPhase == .inactive {
                     remoteSyncLifecycleService.stopPeriodicSync()

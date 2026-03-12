@@ -6200,6 +6200,158 @@ final class AndBibleTests: XCTestCase {
         XCTAssertEqual(remoteSettingsStore.globalLastSynchronized, 166_000)
     }
 
+    @MainActor
+    func testRemoteSyncBackgroundRefreshCoordinatorSchedulesUsingStoredInterval() throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+        remoteSettingsStore.selectedBackend = .googleDrive
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+        settingsStore.setString("gdrive_sync_interval", value: "900")
+
+        let scheduler = FakeRemoteSyncBackgroundRefreshScheduler()
+        let now = Date(timeIntervalSince1970: 1_000)
+        let coordinator = RemoteSyncBackgroundRefreshCoordinator(
+            modelContainer: container,
+            scheduler: scheduler,
+            nowProvider: { now },
+            synchronizeIfNeeded: { _ in true }
+        )
+
+        coordinator.scheduleNextRefreshIfNeeded()
+
+        XCTAssertEqual(
+            scheduler.cancelledIdentifiers,
+            [RemoteSyncBackgroundRefreshCoordinator.defaultTaskIdentifier]
+        )
+        XCTAssertEqual(
+            scheduler.submittedRequests,
+            [
+                RemoteSyncBackgroundRefreshRequest(
+                    identifier: RemoteSyncBackgroundRefreshCoordinator.defaultTaskIdentifier,
+                    earliestBeginDate: now.addingTimeInterval(900)
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testRemoteSyncBackgroundRefreshCoordinatorCancelsWhenNoRemoteCategoriesAreEnabled() throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+        remoteSettingsStore.selectedBackend = .googleDrive
+
+        let scheduler = FakeRemoteSyncBackgroundRefreshScheduler()
+        let coordinator = RemoteSyncBackgroundRefreshCoordinator(
+            modelContainer: container,
+            scheduler: scheduler,
+            synchronizeIfNeeded: { _ in true }
+        )
+
+        coordinator.scheduleNextRefreshIfNeeded()
+
+        XCTAssertTrue(scheduler.submittedRequests.isEmpty)
+        XCTAssertEqual(
+            scheduler.cancelledIdentifiers,
+            [RemoteSyncBackgroundRefreshCoordinator.defaultTaskIdentifier]
+        )
+    }
+
+    @MainActor
+    func testRemoteSyncBackgroundRefreshCoordinatorLaunchHandlerRunsThrottledSyncAndCompletesTask() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+        remoteSettingsStore.selectedBackend = .googleDrive
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+
+        let scheduler = FakeRemoteSyncBackgroundRefreshScheduler()
+        let syncExpectation = expectation(description: "background refresh invoked synchronizeIfNeeded")
+        let completionExpectation = expectation(description: "background refresh task completed")
+        var observedForceFlags: [Bool] = []
+
+        let coordinator = RemoteSyncBackgroundRefreshCoordinator(
+            modelContainer: container,
+            scheduler: scheduler,
+            synchronizeIfNeeded: { force in
+                observedForceFlags.append(force)
+                syncExpectation.fulfill()
+                return true
+            }
+        )
+        coordinator.register()
+
+        let task = FakeRemoteSyncBackgroundRefreshTask()
+        task.onCompletion = { success in
+            XCTAssertTrue(success)
+            completionExpectation.fulfill()
+        }
+
+        scheduler.launchHandler?(task)
+
+        await fulfillment(of: [syncExpectation, completionExpectation], timeout: 1.0)
+
+        XCTAssertEqual(observedForceFlags, [false])
+        XCTAssertEqual(task.completions, [true])
+        XCTAssertEqual(scheduler.submittedRequests.count, 1)
+    }
+
+    @MainActor
+    func testRemoteSyncBackgroundRefreshCoordinatorExpirationCompletesTaskAsFailure() async throws {
+        let container = try makeInMemorySettingsContainer()
+        let settingsStore = SettingsStore(modelContext: ModelContext(container))
+        let remoteSettingsStore = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+        remoteSettingsStore.selectedBackend = .googleDrive
+        remoteSettingsStore.setSyncEnabled(true, for: .bookmarks)
+
+        let scheduler = FakeRemoteSyncBackgroundRefreshScheduler()
+        let expirationExpectation = expectation(description: "background refresh task installed expiration handler")
+        let completionExpectation = expectation(description: "background refresh task completed after expiration")
+
+        let coordinator = RemoteSyncBackgroundRefreshCoordinator(
+            modelContainer: container,
+            scheduler: scheduler,
+            synchronizeIfNeeded: { _ in
+                do {
+                    try await Task.sleep(nanoseconds: 5_000_000_000)
+                } catch {
+                    // Cancellation is expected when the task expires.
+                }
+                return true
+            }
+        )
+        coordinator.register()
+
+        let task = FakeRemoteSyncBackgroundRefreshTask()
+        task.onExpirationHandlerSet = {
+            expirationExpectation.fulfill()
+        }
+        task.onCompletion = { success in
+            XCTAssertFalse(success)
+            completionExpectation.fulfill()
+        }
+
+        scheduler.launchHandler?(task)
+        await fulfillment(of: [expirationExpectation], timeout: 1.0)
+        task.expirationHandler?()
+        await fulfillment(of: [completionExpectation], timeout: 1.0)
+
+        XCTAssertEqual(task.completions, [false])
+    }
+
     private func makeTemporaryBundledSwordPath() throws -> String {
         let fm = FileManager.default
         let sourceRoot = URL(fileURLWithPath: #filePath)
@@ -7572,6 +7724,110 @@ private final class MockRemoteSyncLifecycleSynchronizer: RemoteSyncCategorySynch
         return result
     }
 }
+
+#if os(iOS)
+/**
+ In-memory scheduler double for `RemoteSyncBackgroundRefreshCoordinator` tests.
+
+ The fake captures registrations, submitted requests, and cancellations so tests can verify the
+ coordinator's scheduling policy without talking to `BGTaskScheduler`.
+ */
+@MainActor
+private final class FakeRemoteSyncBackgroundRefreshScheduler: RemoteSyncBackgroundRefreshScheduling {
+    /// Identifier most recently registered with the fake scheduler.
+    private(set) var registeredIdentifier: String?
+
+    /// Launch handler installed by the coordinator under test.
+    var launchHandler: ((any RemoteSyncBackgroundRefreshTaskHandling) -> Void)?
+
+    /// Requests submitted through the fake scheduler.
+    private(set) var submittedRequests: [RemoteSyncBackgroundRefreshRequest] = []
+
+    /// Identifiers cancelled through the fake scheduler.
+    private(set) var cancelledIdentifiers: [String] = []
+
+    /**
+     Captures the registration request and stores the launch handler.
+
+     - Parameters:
+       - identifier: Stable task identifier supplied by the coordinator.
+       - launchHandler: Handler invoked by tests to simulate a launched task.
+     - Returns: `true` so registration succeeds in tests.
+     - Side effects: Stores the identifier and launch handler for later assertions.
+     - Failure modes: This helper cannot fail.
+     */
+    func register(
+        forTaskWithIdentifier identifier: String,
+        launchHandler: @escaping (any RemoteSyncBackgroundRefreshTaskHandling) -> Void
+    ) -> Bool {
+        registeredIdentifier = identifier
+        self.launchHandler = launchHandler
+        return true
+    }
+
+    /**
+     Records one submitted background refresh request.
+
+     - Parameter request: Request supplied by the coordinator.
+     - Side effects: Appends the request to `submittedRequests`.
+     - Failure modes: This helper cannot fail.
+     */
+    func submit(_ request: RemoteSyncBackgroundRefreshRequest) throws {
+        submittedRequests.append(request)
+    }
+
+    /**
+     Records one cancellation request.
+
+     - Parameter identifier: Stable task identifier cancelled by the coordinator.
+     - Side effects: Appends the identifier to `cancelledIdentifiers`.
+     - Failure modes: This helper cannot fail.
+     */
+    func cancel(taskRequestWithIdentifier identifier: String) {
+        cancelledIdentifiers.append(identifier)
+    }
+}
+
+/**
+ In-memory task double for background-refresh coordinator tests.
+
+ Tests use this handle to observe completion state and manually trigger the expiration callback.
+ */
+@MainActor
+private final class FakeRemoteSyncBackgroundRefreshTask: RemoteSyncBackgroundRefreshTaskHandling {
+    /// Callback fired when the coordinator installs an expiration handler.
+    var onExpirationHandlerSet: (() -> Void)?
+
+    /// Callback fired when the coordinator completes the task.
+    var onCompletion: ((Bool) -> Void)?
+
+    /// Completion statuses recorded for this fake task.
+    private(set) var completions: [Bool] = []
+
+    /// Expiration handler installed by the coordinator.
+    var expirationHandler: (() -> Void)? {
+        didSet {
+            if expirationHandler != nil {
+                onExpirationHandlerSet?()
+            }
+        }
+    }
+
+    /**
+     Records one task completion result.
+
+     - Parameter success: Completion status supplied by the coordinator.
+     - Side effects:
+       - appends the status to `completions`
+       - invokes `onCompletion`
+     - Failure modes: This helper cannot fail.
+     */
+    func setTaskCompleted(success: Bool) {
+        completions.append(success)
+        onCompletion?(success)
+    }
+}
+#endif
 
 /**
  Lightweight Google user double for `GoogleDriveAuthService` tests.
