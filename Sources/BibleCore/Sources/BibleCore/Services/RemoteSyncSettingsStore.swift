@@ -353,6 +353,8 @@ public final class RemoteSyncSettingsStore {
         static let webDAVUsername = "gdrive_username"
         static let webDAVFolderPath = "gdrive_folder_path"
         static let webDAVPassword = "gdrive_password"
+        static let syncCategoryPrefix = "gdrive_"
+        static let deviceIdentifier = "remote_sync_device_identifier"
     }
 
     /// Local-only SwiftData-backed settings store for backend selection and non-secret fields.
@@ -397,6 +399,60 @@ public final class RemoteSyncSettingsStore {
         set {
             settingsStore.setString(Keys.backend, value: newValue.rawValue)
         }
+    }
+
+    /**
+     Returns whether Android-style remote sync is enabled for one category.
+
+     Android persists these toggles under the historical `gdrive_*` keys even when NextCloud is
+     the active backend. iOS reuses the same booleans so category enablement remains parity-safe
+     across shared settings semantics and later lifecycle-driven sync orchestration.
+
+     - Parameter category: Logical sync category to inspect.
+     - Returns: `true` when remote sync is enabled for the category.
+     - Side Effects: Reads the category toggle from `SettingsStore`.
+     - Failure modes: Missing or malformed stored values fall back to `false`.
+     */
+    public func isSyncEnabled(for category: RemoteSyncCategory) -> Bool {
+        settingsStore.getBool(syncEnabledKey(for: category), default: false)
+    }
+
+    /**
+     Persists whether Android-style remote sync is enabled for one category.
+
+     - Parameters:
+       - isEnabled: Whether the category should participate in remote sync.
+       - category: Logical sync category to update.
+     - Side Effects: Writes the Android-compatible `gdrive_*` category toggle into `SettingsStore`.
+     - Failure modes: Underlying SwiftData save failures are swallowed by `SettingsStore`.
+     */
+    public func setSyncEnabled(_ isEnabled: Bool, for category: RemoteSyncCategory) {
+        settingsStore.setBool(syncEnabledKey(for: category), value: isEnabled)
+    }
+
+    /**
+     Returns the stable local device identifier used for Android-style patch folders and markers.
+
+     Android prefers the platform `ANDROID_ID` and falls back to a generated UUID persisted in app
+     settings. iOS has no direct equivalent that matches Android's persistence semantics, so this
+     store generates one lowercase UUID on first access and reuses it thereafter.
+
+     - Returns: Stable device identifier for remote sync folder names, patch status, and marker files.
+     - Side Effects:
+       - may persist a newly generated identifier into `SettingsStore` on first access
+     - Failure modes:
+       - if the stored value is missing or blank, a new identifier is generated instead of failing
+     */
+    public func deviceIdentifier() -> String {
+        let existing = settingsStore.getString(Keys.deviceIdentifier)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let existing, !existing.isEmpty {
+            return existing
+        }
+
+        let generated = UUID().uuidString.lowercased()
+        settingsStore.setString(Keys.deviceIdentifier, value: generated)
+        return generated
     }
 
     /**
@@ -510,5 +566,17 @@ public final class RemoteSyncSettingsStore {
         settingsStore.setString(Keys.webDAVUsername, value: "")
         settingsStore.setString(Keys.webDAVFolderPath, value: "")
         try secretStore.removeSecret(forKey: Keys.webDAVPassword)
+    }
+
+    /**
+     Builds the Android-compatible category-toggle key for one sync category.
+
+     - Parameter category: Logical sync category to scope.
+     - Returns: Historical `gdrive_*` preference key for that category.
+     - Side Effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func syncEnabledKey(for category: RemoteSyncCategory) -> String {
+        "\(Keys.syncCategoryPrefix)\(category.rawValue)"
     }
 }

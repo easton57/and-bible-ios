@@ -3065,6 +3065,45 @@ final class AndBibleTests: XCTestCase {
         XCTAssertNil(store.loadWebDAVConfiguration()?.folderPath)
     }
 
+    func testRemoteSyncSettingsStorePersistsAndroidCompatibleCategoryToggleKeys() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        let store = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+
+        XCTAssertFalse(store.isSyncEnabled(for: .bookmarks))
+        XCTAssertFalse(store.isSyncEnabled(for: .workspaces))
+        XCTAssertFalse(store.isSyncEnabled(for: .readingPlans))
+
+        store.setSyncEnabled(true, for: .bookmarks)
+        store.setSyncEnabled(true, for: .readingPlans)
+        store.setSyncEnabled(false, for: .workspaces)
+
+        XCTAssertEqual(settingsStore.getString("gdrive_bookmarks"), "true")
+        XCTAssertEqual(settingsStore.getString("gdrive_workspaces"), "false")
+        XCTAssertEqual(settingsStore.getString("gdrive_readingplans"), "true")
+        XCTAssertTrue(store.isSyncEnabled(for: .bookmarks))
+        XCTAssertFalse(store.isSyncEnabled(for: .workspaces))
+        XCTAssertTrue(store.isSyncEnabled(for: .readingPlans))
+    }
+
+    func testRemoteSyncSettingsStoreGeneratesStableLowercaseDeviceIdentifier() throws {
+        let settingsStore = try makeInMemorySettingsStore()
+        let store = RemoteSyncSettingsStore(
+            settingsStore: settingsStore,
+            secretStore: InMemorySecretStore()
+        )
+
+        let generated = store.deviceIdentifier()
+        let reused = store.deviceIdentifier()
+
+        XCTAssertEqual(generated, reused)
+        XCTAssertEqual(settingsStore.getString("remote_sync_device_identifier"), generated)
+        XCTAssertEqual(generated, generated.lowercased())
+        XCTAssertFalse(generated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
     func testWebDAVSyncConfigurationExpandsServerRootToNextCloudDAVEndpoint() async throws {
         let configuration = WebDAVSyncConfiguration(
             serverURL: "https://nextcloud.example.com",

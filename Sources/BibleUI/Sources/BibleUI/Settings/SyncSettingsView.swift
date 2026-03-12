@@ -64,6 +64,21 @@ public struct SyncSettingsView: View {
     /// Latest result from the manual NextCloud/WebDAV connection test, if any.
     @State private var remoteConnectionStatus: RemoteConnectionStatus?
 
+    /// Persisted enabled state for each Android-style remote sync category.
+    @State private var remoteCategoryEnabled: [RemoteSyncCategory: Bool] = [:]
+
+    /// Transient in-flight or failed synchronization state for each remote sync category.
+    @State private var remoteCategoryStatuses: [RemoteSyncCategory: RemoteSyncCategoryStatus] = [:]
+
+    /// Pending adopt-versus-create prompt for a discovered remote folder.
+    @State private var pendingRemoteAdoption: RemoteSyncBootstrapCandidate?
+
+    /// Pending destructive confirmation after the user chose adopt or replace.
+    @State private var pendingRemoteConfirmation: PendingRemoteConfirmation?
+
+    /// Global remote-sync error message shown in an alert after a category sync failure.
+    @State private var remoteSyncErrorMessage: String?
+
     /**
      Represents the last manual WebDAV connection-test result shown in the status section.
 
@@ -75,6 +90,57 @@ public struct SyncSettingsView: View {
 
         /// The most recent connection test failed with a human-readable message.
         case failure(String)
+    }
+
+    /**
+     Represents the transient synchronization state of one Android-style remote sync category.
+
+     The persisted enablement toggle lives in `RemoteSyncSettingsStore`. This enum only captures
+     ephemeral UI state that should not survive view recreation, such as an in-flight bootstrap or
+     the latest failure message produced while the user is interacting with settings.
+     */
+    private enum RemoteSyncCategoryStatus: Equatable {
+        /// No transient work or error is active for the category.
+        case idle
+
+        /// Synchronization is currently in flight for the category.
+        case syncing
+
+        /// The latest synchronization attempt failed with a human-readable message.
+        case failed(String)
+    }
+
+    /**
+     Describes the destructive confirmation step that follows Android's adopt-versus-create prompt.
+
+     Android first asks whether a same-named remote folder should be adopted or replaced, then
+     presents a second confirmation explaining which side will be reset. iOS preserves the same
+     two-step flow so the user must explicitly confirm destructive local or remote replacement.
+     */
+    private enum PendingRemoteConfirmation: Identifiable, Equatable {
+        /// Confirm replacing local content with the discovered remote folder.
+        case resetLocal(RemoteSyncBootstrapCandidate)
+
+        /// Confirm replacing the discovered remote folder with local content.
+        case resetCloud(RemoteSyncBootstrapCandidate)
+
+        /// Stable alert identity derived from the category and confirmation branch.
+        var id: String {
+            switch self {
+            case .resetLocal(let candidate):
+                return "reset-local-\(candidate.category.rawValue)"
+            case .resetCloud(let candidate):
+                return "reset-cloud-\(candidate.category.rawValue)"
+            }
+        }
+
+        /// Sync category affected by the pending destructive choice.
+        var category: RemoteSyncCategory {
+            switch self {
+            case .resetLocal(let candidate), .resetCloud(let candidate):
+                return candidate.category
+            }
+        }
     }
 
     /**
@@ -109,6 +175,64 @@ public struct SyncSettingsView: View {
             remoteSettingsStore.selectedBackend = newValue
             remoteConnectionStatus = nil
         }
+        .alert(
+            String(localized: "cloud_sync_title"),
+            isPresented: Binding(
+                get: { pendingRemoteAdoption != nil },
+                set: { newValue in
+                    if !newValue {
+                        pendingRemoteAdoption = nil
+                    }
+                }
+            ),
+            presenting: pendingRemoteAdoption
+        ) { candidate in
+            Button(String(localized: "cloud_fetch_and_restore_initial")) {
+                pendingRemoteConfirmation = .resetLocal(candidate)
+                pendingRemoteAdoption = nil
+            }
+            Button(String(localized: "cloud_create_new")) {
+                pendingRemoteConfirmation = .resetCloud(candidate)
+                pendingRemoteAdoption = nil
+            }
+            Button(String(localized: "cloud_disable_sync"), role: .cancel) {
+                disableRemoteSync(for: candidate.category)
+                pendingRemoteAdoption = nil
+            }
+        } message: { candidate in
+            Text(
+                String(
+                    format: String(localized: "overrideBackup"),
+                    remoteCategoryContentDescription(for: candidate.category)
+                )
+            )
+        }
+        .alert(
+            String(localized: "are_you_sure"),
+            isPresented: Binding(
+                get: { pendingRemoteConfirmation != nil },
+                set: { newValue in
+                    if !newValue {
+                        pendingRemoteConfirmation = nil
+                    }
+                }
+            ),
+            presenting: pendingRemoteConfirmation
+        ) { confirmation in
+            Button(String(localized: "ok"), role: .destructive) {
+                let capturedConfirmation = confirmation
+                pendingRemoteConfirmation = nil
+                Task {
+                    await continueRemoteSynchronization(after: capturedConfirmation)
+                }
+            }
+            Button(String(localized: "cancel"), role: .cancel) {
+                disableRemoteSync(for: confirmation.category)
+                pendingRemoteConfirmation = nil
+            }
+        } message: { confirmation in
+            Text(remoteConfirmationMessage(for: confirmation))
+        }
         .confirmationDialog(
             String(localized: "disable_sync_title"),
             isPresented: $showDisableConfirmation,
@@ -125,6 +249,23 @@ public struct SyncSettingsView: View {
             Button(String(localized: "ok")) {}
         } message: {
             Text(String(localized: "restart_to_apply_sync"))
+        }
+        .alert(
+            String(localized: "cloud_sync_title"),
+            isPresented: Binding(
+                get: { remoteSyncErrorMessage != nil },
+                set: { newValue in
+                    if !newValue {
+                        remoteSyncErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: "ok")) {
+                remoteSyncErrorMessage = nil
+            }
+        } message: {
+            Text(remoteSyncErrorMessage ?? String(localized: "sync_error"))
         }
     }
 
@@ -263,6 +404,28 @@ public struct SyncSettingsView: View {
             } header: {
                 Text(String(localized: "sync_status"))
             }
+
+            Section {
+                ForEach(RemoteSyncCategory.allCases, id: \.self) { category in
+                    Toggle(isOn: remoteCategoryBinding(for: category)) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(remoteCategoryTitle(for: category))
+                            Text(remoteCategoryContentDescription(for: category))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            if let supplementalText = remoteCategorySupplementalText(for: category) {
+                                Text(supplementalText)
+                                    .font(.caption)
+                                    .foregroundStyle(remoteCategorySupplementalColor(for: category))
+                            }
+                        }
+                    }
+                    .disabled(isRemoteSyncInteractionLocked)
+                }
+            } header: {
+                Text(String(localized: "synchronization_categories"))
+            }
         }
     }
 
@@ -317,6 +480,48 @@ public struct SyncSettingsView: View {
         } else {
             Text("—")
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /**
+     Binding used by the Android-style category toggles in the NextCloud section.
+
+     Side effects:
+     - enabling a category persists the Android `gdrive_*` toggle and starts synchronization
+     - disabling a category persists the Android `gdrive_*` toggle immediately and clears transient UI state
+     */
+    private func remoteCategoryBinding(for category: RemoteSyncCategory) -> Binding<Bool> {
+        Binding(
+            get: { remoteCategoryEnabled[category] ?? remoteSettingsStore.isSyncEnabled(for: category) },
+            set: { newValue in
+                if newValue {
+                    remoteCategoryEnabled[category] = true
+                    Task {
+                        await beginRemoteSynchronization(for: category)
+                    }
+                } else {
+                    disableRemoteSync(for: category)
+                }
+            }
+        )
+    }
+
+    /**
+     Whether category toggles should be locked while remote synchronization UI is in a modal state.
+
+     Failure modes:
+     - returns `true` during connection tests, in-flight category sync, or pending confirmation prompts
+     */
+    private var isRemoteSyncInteractionLocked: Bool {
+        if isTestingConnection || pendingRemoteAdoption != nil || pendingRemoteConfirmation != nil {
+            return true
+        }
+
+        return remoteCategoryStatuses.values.contains { status in
+            if case .syncing = status {
+                return true
+            }
+            return false
         }
     }
 
@@ -381,6 +586,11 @@ public struct SyncSettingsView: View {
             folderPath = configuration.folderPath ?? ""
         }
         password = remoteSettingsStore.webDAVPassword() ?? ""
+        remoteCategoryEnabled = Dictionary(
+            uniqueKeysWithValues: RemoteSyncCategory.allCases.map { category in
+                (category, remoteSettingsStore.isSyncEnabled(for: category))
+            }
+        )
         hasLoadedSettings = true
     }
 
@@ -407,6 +617,356 @@ public struct SyncSettingsView: View {
             ),
             password: password
         )
+    }
+
+    /**
+     Starts Android-style synchronization for one enabled NextCloud category.
+
+     The first pass mirrors Android's `setupDrivePref()` path:
+     - persist the category toggle as enabled
+     - inspect bootstrap state
+     - automatically create a new remote folder when no folder exists
+     - surface the adopt-versus-create prompt when a same-named remote folder already exists
+
+     - Parameter category: Logical sync category the user just enabled.
+     - Side effects:
+       - persists the WebDAV form and category toggle before synchronization starts
+       - may perform remote bootstrap validation, initial-backup restore, or sparse patch sync
+       - may present adopt-versus-create alerts by mutating view state
+     - Failure modes:
+       - invalid or incomplete WebDAV configuration disables the category again and surfaces an error
+       - transport or synchronization failures leave the category enabled to match Android's retry semantics, while surfacing the latest error
+     */
+    @MainActor
+    private func beginRemoteSynchronization(for category: RemoteSyncCategory) async {
+        persistRemoteSettings()
+
+        do {
+            let service = try makeRemoteSynchronizationService()
+            let settingsStore = SettingsStore(modelContext: modelContext)
+
+            remoteSettingsStore.setSyncEnabled(true, for: category)
+            remoteCategoryEnabled[category] = true
+            remoteCategoryStatuses[category] = .syncing
+
+            do {
+                let outcome = try await service.synchronize(
+                    category,
+                    modelContext: modelContext,
+                    settingsStore: settingsStore
+                )
+
+                switch outcome {
+                case .synchronized(let report):
+                    remoteCategoryStatuses[category] = .idle
+                    finishRemoteSynchronization(with: report, for: category)
+                case .requiresRemoteAdoption(let candidate):
+                    pendingRemoteAdoption = candidate
+                    remoteCategoryStatuses[category] = .idle
+                case .requiresRemoteCreation:
+                    let report = try await service.createRemoteFolderAndSynchronize(
+                        for: category,
+                        modelContext: modelContext,
+                        settingsStore: settingsStore
+                    )
+                    remoteCategoryStatuses[category] = .idle
+                    finishRemoteSynchronization(with: report, for: category)
+                }
+            } catch {
+                handleRemoteSynchronizationError(error, for: category, revertEnablement: false)
+            }
+        } catch {
+            handleRemoteSynchronizationError(error, for: category, revertEnablement: true)
+        }
+    }
+
+    /**
+     Continues synchronization after the user confirmed adopting or replacing a discovered remote folder.
+
+     - Parameter confirmation: Destructive action the user confirmed.
+     - Side effects:
+       - may overwrite local or remote category state through the synchronization coordinator
+       - updates transient category status and error alert state
+     - Failure modes:
+       - transport or synchronization failures surface an alert and keep the category enabled so the
+         user can retry later, matching Android's behavior after a failed sync attempt
+     */
+    @MainActor
+    private func continueRemoteSynchronization(after confirmation: PendingRemoteConfirmation) async {
+        let category = confirmation.category
+        remoteCategoryStatuses[category] = .syncing
+
+        do {
+            let service = try makeRemoteSynchronizationService()
+            let settingsStore = SettingsStore(modelContext: modelContext)
+            let report: RemoteSyncCategorySynchronizationReport
+
+            switch confirmation {
+            case .resetLocal(let candidate):
+                report = try await service.adoptRemoteFolderAndSynchronize(
+                    for: candidate.category,
+                    remoteFolderID: candidate.remoteFolderID,
+                    modelContext: modelContext,
+                    settingsStore: settingsStore
+                )
+            case .resetCloud(let candidate):
+                report = try await service.createRemoteFolderAndSynchronize(
+                    for: candidate.category,
+                    replacingRemoteFolderID: candidate.remoteFolderID,
+                    modelContext: modelContext,
+                    settingsStore: settingsStore
+                )
+            }
+
+            remoteCategoryStatuses[category] = .idle
+            finishRemoteSynchronization(with: report, for: category)
+        } catch {
+            handleRemoteSynchronizationError(error, for: category, revertEnablement: false)
+        }
+    }
+
+    /**
+     Applies the successful result of one category synchronization pass to the local UI state.
+
+     - Parameters:
+       - report: Completed synchronization report.
+       - category: Logical sync category that finished.
+     - Side effects:
+       - refreshes the toggle state from persisted settings
+       - clears any stale per-category failure message
+     - Failure modes: This helper cannot fail.
+     */
+    @MainActor
+    private func finishRemoteSynchronization(
+        with report: RemoteSyncCategorySynchronizationReport,
+        for category: RemoteSyncCategory
+    ) {
+        remoteCategoryEnabled[category] = remoteSettingsStore.isSyncEnabled(for: report.category)
+        remoteCategoryStatuses[category] = .idle
+    }
+
+    /**
+     Disables one Android-style remote sync category immediately.
+
+     - Parameter category: Logical sync category to disable.
+     - Side effects:
+       - writes the Android `gdrive_*` toggle as `false`
+       - clears transient in-flight or error UI state for the category
+     - Failure modes:
+       - `SettingsStore` write failures are swallowed by `RemoteSyncSettingsStore`
+     */
+    @MainActor
+    private func disableRemoteSync(for category: RemoteSyncCategory) {
+        remoteSettingsStore.setSyncEnabled(false, for: category)
+        remoteCategoryEnabled[category] = false
+        remoteCategoryStatuses[category] = .idle
+    }
+
+    /**
+     Maps synchronization errors into Android-aligned user-visible state.
+
+     - Parameters:
+       - error: Failure emitted by remote settings validation or synchronization services.
+       - category: Logical sync category that was being synchronized.
+       - revertEnablement: Whether the category toggle should be turned off after the failure.
+     - Side effects:
+       - may disable the category toggle for validation or incompatibility failures
+       - stores a per-category failure message and presents a global alert
+     - Failure modes: This helper cannot fail.
+     */
+    @MainActor
+    private func handleRemoteSynchronizationError(
+        _ error: Error,
+        for category: RemoteSyncCategory,
+        revertEnablement: Bool
+    ) {
+        let message: String
+
+        switch error {
+        case WebDAVClientError.invalidURL:
+            message = String(localized: "invalid_url_message")
+        case RemoteSyncPatchDiscoveryError.incompatiblePatchVersion:
+            disableRemoteSync(for: category)
+            message = [
+                String(localized: "sync_cant_fetch"),
+                String(
+                    format: String(localized: "sync_disabling"),
+                    remoteCategoryContentDescription(for: category)
+                ),
+                String(localized: "sync_update_app"),
+            ]
+            .joined(separator: " ")
+        default:
+            let localizedMessage = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            message = localizedMessage.isEmpty ? String(localized: "sync_error") : localizedMessage
+            if revertEnablement {
+                disableRemoteSync(for: category)
+            }
+        }
+
+        remoteCategoryStatuses[category] = .failed(message)
+        remoteSyncErrorMessage = message
+    }
+
+    /**
+     Creates a NextCloud synchronization coordinator from the current form values.
+
+     - Returns: Configured synchronization service bound to the current WebDAV settings.
+     - Side effects:
+       - reads and may generate the stable remote device identifier through `RemoteSyncSettingsStore`
+     - Failure modes:
+       - throws `WebDAVClientError.invalidURL` when the configured server URL cannot be normalized
+       - throws `WebDAVClientError.invalidURL` when required credentials are missing
+     */
+    private func makeRemoteSynchronizationService() throws -> RemoteSyncSynchronizationService {
+        guard let configuration = remoteSettingsStore.loadWebDAVConfiguration() else {
+            throw WebDAVClientError.invalidURL
+        }
+
+        let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPassword.isEmpty else {
+            throw WebDAVClientError.invalidURL
+        }
+
+        let adapter = try NextCloudSyncAdapter(configuration: configuration, password: trimmedPassword)
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "org.andbible.ios"
+        let deviceIdentifier = remoteSettingsStore.deviceIdentifier()
+        return RemoteSyncSynchronizationService(
+            adapter: adapter,
+            bundleIdentifier: bundleIdentifier,
+            deviceIdentifier: deviceIdentifier
+        )
+    }
+
+    /**
+     Returns the localized category title used by the Android-style NextCloud toggles.
+
+     - Parameter category: Logical sync category to label.
+     - Returns: Localized category title.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func remoteCategoryTitle(for category: RemoteSyncCategory) -> String {
+        switch category {
+        case .bookmarks:
+            return String(localized: "bookmarks")
+        case .workspaces:
+            return String(localized: "help_workspaces_title")
+        case .readingPlans:
+            return String(localized: "reading_plans_plural")
+        }
+    }
+
+    /**
+     Returns Android's category description string for the supplied sync category.
+
+     - Parameter category: Logical sync category to describe.
+     - Returns: Localized Android-aligned category description.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func remoteCategoryContentDescription(for category: RemoteSyncCategory) -> String {
+        switch category {
+        case .bookmarks:
+            return String(localized: "bookmarks_contents")
+        case .workspaces:
+            return String(localized: "workspaces_contents")
+        case .readingPlans:
+            return String(localized: "reading_plans_content")
+        }
+    }
+
+    /**
+     Returns the transient status or last-updated caption shown beneath one category toggle.
+
+     - Parameter category: Logical sync category to describe.
+     - Returns: Supplemental caption text, or `nil` when nothing extra should be shown.
+     - Side effects: Reads the persisted remote progress state when no transient status is active.
+     - Failure modes: Missing sync timestamps produce `nil`.
+     */
+    private func remoteCategorySupplementalText(for category: RemoteSyncCategory) -> String? {
+        if let status = remoteCategoryStatuses[category] {
+            switch status {
+            case .idle:
+                break
+            case .syncing:
+                return String(localized: "synchronizing")
+            case .failed(let message):
+                return message
+            }
+        }
+
+        guard remoteCategoryEnabled[category] ?? remoteSettingsStore.isSyncEnabled(for: category) else {
+            return nil
+        }
+
+        let progressState = RemoteSyncStateStore(settingsStore: SettingsStore(modelContext: modelContext))
+            .progressState(for: category)
+        guard let lastSynchronized = progressState.lastSynchronized, lastSynchronized > 0 else {
+            return nil
+        }
+
+        return String(
+            format: String(localized: "last_updated"),
+            formattedSyncTimestamp(milliseconds: lastSynchronized)
+        )
+    }
+
+    /**
+     Returns the color used for the supplemental category caption.
+
+     - Parameter category: Logical sync category being rendered.
+     - Returns: Semantic color for the category's supplemental caption.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func remoteCategorySupplementalColor(for category: RemoteSyncCategory) -> Color {
+        switch remoteCategoryStatuses[category] ?? .idle {
+        case .idle:
+            return .secondary
+        case .syncing:
+            return .secondary
+        case .failed:
+            return .orange
+        }
+    }
+
+    /**
+     Returns the localized destructive-confirmation message for one adopt-or-replace choice.
+
+     - Parameter confirmation: Pending destructive confirmation branch.
+     - Returns: Localized confirmation body text.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func remoteConfirmationMessage(for confirmation: PendingRemoteConfirmation) -> String {
+        switch confirmation {
+        case .resetLocal(let candidate):
+            return String(
+                format: String(localized: "are_you_sure_reset_local"),
+                remoteCategoryContentDescription(for: candidate.category)
+            )
+        case .resetCloud(let candidate):
+            return String(
+                format: String(localized: "are_you_sure_reset_cloud"),
+                remoteCategoryContentDescription(for: candidate.category)
+            )
+        }
+    }
+
+    /**
+     Formats an Android-style absolute sync timestamp for category summaries.
+
+     - Parameter milliseconds: Milliseconds since 1970.
+     - Returns: Timestamp formatted as `dd-MM-yyyy HH:mm:ss`.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func formattedSyncTimestamp(milliseconds: Int64) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = "dd-MM-yyyy HH:mm:ss"
+        return formatter.string(from: Date(timeIntervalSince1970: TimeInterval(milliseconds) / 1000.0))
     }
 
     /**
