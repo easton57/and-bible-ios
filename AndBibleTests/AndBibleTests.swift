@@ -1378,6 +1378,539 @@ final class AndBibleTests: XCTestCase {
         XCTAssertEqual(aliasStore.localLabelID(forRemoteLabelID: remoteSpeakID), Label.speakLabelId)
     }
 
+    func testRemoteSyncBookmarkPatchApplyReplaysNewerRowsAndPreservesSystemLabelAliases() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let restoreService = RemoteSyncBookmarkRestoreService()
+        let patchService = RemoteSyncBookmarkPatchApplyService()
+        let logEntryStore = RemoteSyncLogEntryStore(settingsStore: settingsStore)
+        let patchStatusStore = RemoteSyncPatchStatusStore(settingsStore: settingsStore)
+        let playbackStore = RemoteSyncBookmarkPlaybackSettingsStore(settingsStore: settingsStore)
+        let aliasStore = RemoteSyncBookmarkLabelAliasStore(settingsStore: settingsStore)
+
+        let remoteSpeakID = UUID(uuidString: "bb100000-0000-0000-0000-000000000001")!
+        let remoteUserLabelID = UUID(uuidString: "bb100000-0000-0000-0000-000000000010")!
+        let bibleBookmarkID = UUID(uuidString: "bb100000-0000-0000-0000-000000000020")!
+        let genericBookmarkID = UUID(uuidString: "bb100000-0000-0000-0000-000000000021")!
+        let studyPadEntryID = UUID(uuidString: "bb100000-0000-0000-0000-000000000030")!
+
+        let initialDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: remoteSpeakID, name: Label.speakLabelName, colour: Int(Int32(bitPattern: 0xFFFF9999))),
+                .init(id: remoteUserLabelID, name: "Prayer", colour: Int(Int32(bitPattern: 0xFF00FF00)))
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 40,
+                    kjvOrdinalEnd: 41,
+                    ordinalStart: 40,
+                    ordinalEnd: 41,
+                    playbackSettingsJSON: #"{"bookId":"KJV","speed":120}"#,
+                    createdAt: Date(timeIntervalSince1970: 1_735_700_000),
+                    book: "Leviticus",
+                    primaryLabelID: remoteUserLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_700_100)
+                )
+            ],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Old bible note")
+            ],
+            bibleLinks: [
+                .init(bookmarkID: bibleBookmarkID, labelID: remoteUserLabelID, orderNumber: 1, indentLevel: 0, expandContent: true)
+            ],
+            genericBookmarks: [
+                .init(
+                    id: genericBookmarkID,
+                    key: "Entry.1",
+                    createdAt: Date(timeIntervalSince1970: 1_735_700_200),
+                    bookInitials: "MHC",
+                    ordinalStart: 2,
+                    ordinalEnd: 2,
+                    primaryLabelID: remoteUserLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_700_300),
+                    wholeVerse: true,
+                    playbackSettingsJSON: #"{"bookId":"MHC","queue":true}"#,
+                    customIcon: "book"
+                )
+            ],
+            genericNotes: [
+                .init(bookmarkID: genericBookmarkID, notes: "Old generic note")
+            ],
+            genericLinks: [
+                .init(bookmarkID: genericBookmarkID, labelID: remoteUserLabelID, orderNumber: 2, indentLevel: 0, expandContent: true)
+            ],
+            studyPadEntries: [
+                .init(id: studyPadEntryID, labelID: remoteUserLabelID, orderNumber: 5, indentLevel: 1)
+            ],
+            studyPadTexts: [
+                .init(entryID: studyPadEntryID, text: "Old study text")
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: initialDatabaseURL) }
+
+        let initialSnapshot = try restoreService.readSnapshot(from: initialDatabaseURL)
+        _ = try restoreService.replaceLocalBookmarks(
+            from: initialSnapshot,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        logEntryStore.replaceEntries([
+            RemoteSyncLogEntry(
+                tableName: "Label",
+                entityID1: .blob(uuidBlob(remoteUserLabelID)),
+                entityID2: .null(),
+                type: .upsert,
+                lastUpdated: 1_000,
+                sourceDevice: "seed-device"
+            ),
+            RemoteSyncLogEntry(
+                tableName: "BibleBookmark",
+                entityID1: .blob(uuidBlob(bibleBookmarkID)),
+                entityID2: .null(),
+                type: .upsert,
+                lastUpdated: 1_000,
+                sourceDevice: "seed-device"
+            ),
+            RemoteSyncLogEntry(
+                tableName: "BibleBookmarkNotes",
+                entityID1: .blob(uuidBlob(bibleBookmarkID)),
+                entityID2: .null(),
+                type: .upsert,
+                lastUpdated: 1_000,
+                sourceDevice: "seed-device"
+            ),
+            RemoteSyncLogEntry(
+                tableName: "GenericBookmark",
+                entityID1: .blob(uuidBlob(genericBookmarkID)),
+                entityID2: .null(),
+                type: .upsert,
+                lastUpdated: 1_000,
+                sourceDevice: "seed-device"
+            ),
+            RemoteSyncLogEntry(
+                tableName: "StudyPadTextEntryText",
+                entityID1: .blob(uuidBlob(studyPadEntryID)),
+                entityID2: .null(),
+                type: .upsert,
+                lastUpdated: 1_000,
+                sourceDevice: "seed-device"
+            ),
+        ], for: .bookmarks)
+
+        let patchDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: remoteUserLabelID, name: "Prayer updated", colour: Int(Int32(bitPattern: 0xFF33AA33)), favourite: true)
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 40,
+                    kjvOrdinalEnd: 42,
+                    ordinalStart: 40,
+                    ordinalEnd: 42,
+                    playbackSettingsJSON: #"{"bookId":"KJV","speed":140}"#,
+                    createdAt: Date(timeIntervalSince1970: 1_735_700_000),
+                    book: "Leviticus",
+                    primaryLabelID: remoteSpeakID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_701_100),
+                    customIcon: "star"
+                )
+            ],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Patched bible note")
+            ],
+            bibleLinks: [
+                .init(bookmarkID: bibleBookmarkID, labelID: remoteSpeakID, orderNumber: 3, indentLevel: 0, expandContent: true)
+            ],
+            genericBookmarks: [
+                .init(
+                    id: genericBookmarkID,
+                    key: "Entry.1",
+                    createdAt: Date(timeIntervalSince1970: 1_735_700_200),
+                    bookInitials: "MHC",
+                    ordinalStart: 2,
+                    ordinalEnd: 2,
+                    primaryLabelID: remoteSpeakID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_701_300),
+                    wholeVerse: true,
+                    playbackSettingsJSON: #"{"bookId":"MHC","queue":false}"#,
+                    customIcon: "comment"
+                )
+            ],
+            studyPadTexts: [
+                .init(entryID: studyPadEntryID, text: "Patched study text")
+            ],
+            logEntries: [
+                .init(tableName: "Label", entityID1: .blob(uuidBlob(remoteUserLabelID)), entityID2: .null(), type: .upsert, lastUpdated: 2_000, sourceDevice: "android-a"),
+                .init(tableName: "BibleBookmark", entityID1: .blob(uuidBlob(bibleBookmarkID)), entityID2: .null(), type: .upsert, lastUpdated: 2_100, sourceDevice: "android-a"),
+                .init(tableName: "BibleBookmarkNotes", entityID1: .blob(uuidBlob(bibleBookmarkID)), entityID2: .null(), type: .upsert, lastUpdated: 2_200, sourceDevice: "android-a"),
+                .init(tableName: "BibleBookmarkToLabel", entityID1: .blob(uuidBlob(bibleBookmarkID)), entityID2: .blob(uuidBlob(remoteSpeakID)), type: .upsert, lastUpdated: 2_300, sourceDevice: "android-a"),
+                .init(tableName: "GenericBookmark", entityID1: .blob(uuidBlob(genericBookmarkID)), entityID2: .null(), type: .upsert, lastUpdated: 2_400, sourceDevice: "android-a"),
+                .init(tableName: "StudyPadTextEntryText", entityID1: .blob(uuidBlob(studyPadEntryID)), entityID2: .null(), type: .upsert, lastUpdated: 2_500, sourceDevice: "android-a"),
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: patchDatabaseURL) }
+
+        let stagedArchive = try makeBookmarkPatchArchive(
+            patchDatabaseURL: patchDatabaseURL,
+            sourceDevice: "android-a",
+            patchNumber: 1,
+            fileTimestamp: 3_000
+        )
+        defer { try? FileManager.default.removeItem(at: stagedArchive.archiveFileURL) }
+
+        let report = try patchService.applyPatchArchives(
+            [stagedArchive],
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.appliedPatchCount, 1)
+        XCTAssertEqual(report.appliedLogEntryCount, 6)
+        XCTAssertEqual(report.skippedLogEntryCount, 0)
+        XCTAssertEqual(
+            report.restoreReport,
+            RemoteSyncBookmarkRestoreReport(
+                restoredLabelCount: 4,
+                restoredBibleBookmarkCount: 1,
+                restoredGenericBookmarkCount: 1,
+                restoredStudyPadEntryCount: 1,
+                preservedPlaybackSettingsCount: 2,
+                preservedSystemLabelAliasCount: 3
+            )
+        )
+
+        let labels = try modelContext.fetch(FetchDescriptor<Label>())
+        XCTAssertEqual(labels.first(where: { $0.id == remoteUserLabelID })?.name, "Prayer updated")
+
+        let bibleBookmarks = try modelContext.fetch(FetchDescriptor<BibleBookmark>())
+        XCTAssertEqual(bibleBookmarks.count, 1)
+        XCTAssertEqual(bibleBookmarks[0].primaryLabelId, Label.speakLabelId)
+        XCTAssertEqual(bibleBookmarks[0].notes?.notes, "Patched bible note")
+        XCTAssertEqual(
+            Set(bibleBookmarks[0].bookmarkToLabels?.compactMap { $0.label?.id } ?? []),
+            Set([remoteUserLabelID, Label.speakLabelId])
+        )
+
+        let genericBookmarks = try modelContext.fetch(FetchDescriptor<GenericBookmark>())
+        XCTAssertEqual(genericBookmarks.count, 1)
+        XCTAssertEqual(genericBookmarks[0].primaryLabelId, Label.speakLabelId)
+        XCTAssertEqual(genericBookmarks[0].customIcon, "comment")
+
+        let studyPadEntries = try modelContext.fetch(FetchDescriptor<StudyPadTextEntry>())
+        XCTAssertEqual(studyPadEntries.count, 1)
+        XCTAssertEqual(studyPadEntries[0].textEntry?.text, "Patched study text")
+
+        XCTAssertEqual(
+            playbackStore.playbackSettingsJSON(for: bibleBookmarkID, kind: .bible),
+            #"{"bookId":"KJV","speed":140}"#
+        )
+        XCTAssertEqual(
+            playbackStore.playbackSettingsJSON(for: genericBookmarkID, kind: .generic),
+            #"{"bookId":"MHC","queue":false}"#
+        )
+        XCTAssertEqual(aliasStore.localLabelID(forRemoteLabelID: remoteSpeakID), Label.speakLabelId)
+        XCTAssertEqual(patchStatusStore.lastPatchNumber(for: .bookmarks, sourceDevice: "android-a"), 1)
+        XCTAssertEqual(
+            logEntryStore.entry(
+                for: .bookmarks,
+                tableName: "Label",
+                entityID1: .blob(uuidBlob(remoteUserLabelID)),
+                entityID2: .null()
+            )?.lastUpdated,
+            2_000
+        )
+    }
+
+    func testRemoteSyncBookmarkPatchApplyDeletesBookmarkChildrenByCompositeIdentifiers() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let restoreService = RemoteSyncBookmarkRestoreService()
+        let patchService = RemoteSyncBookmarkPatchApplyService()
+
+        let remoteUserLabelID = UUID(uuidString: "bb200000-0000-0000-0000-000000000010")!
+        let bibleBookmarkID = UUID(uuidString: "bb200000-0000-0000-0000-000000000020")!
+        let genericBookmarkID = UUID(uuidString: "bb200000-0000-0000-0000-000000000021")!
+
+        let initialDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: remoteUserLabelID, name: "Prayer", colour: Int(Int32(bitPattern: 0xFF00FF00)))
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 50,
+                    kjvOrdinalEnd: 50,
+                    ordinalStart: 50,
+                    ordinalEnd: 50,
+                    createdAt: Date(timeIntervalSince1970: 1_735_710_000),
+                    primaryLabelID: remoteUserLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_710_100)
+                )
+            ],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Delete me")
+            ],
+            bibleLinks: [
+                .init(bookmarkID: bibleBookmarkID, labelID: remoteUserLabelID, orderNumber: 1, indentLevel: 0, expandContent: true)
+            ],
+            genericBookmarks: [
+                .init(
+                    id: genericBookmarkID,
+                    key: "Entry.2",
+                    createdAt: Date(timeIntervalSince1970: 1_735_710_200),
+                    bookInitials: "MHC",
+                    ordinalStart: 8,
+                    ordinalEnd: 8,
+                    primaryLabelID: remoteUserLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_710_300)
+                )
+            ],
+            genericNotes: [
+                .init(bookmarkID: genericBookmarkID, notes: "Delete generic")
+            ],
+            genericLinks: [
+                .init(bookmarkID: genericBookmarkID, labelID: remoteUserLabelID, orderNumber: 2, indentLevel: 0, expandContent: true)
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: initialDatabaseURL) }
+
+        let initialSnapshot = try restoreService.readSnapshot(from: initialDatabaseURL)
+        _ = try restoreService.replaceLocalBookmarks(
+            from: initialSnapshot,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        let patchDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [],
+            logEntries: [
+                .init(tableName: "BibleBookmarkNotes", entityID1: .blob(uuidBlob(bibleBookmarkID)), entityID2: .null(), type: .delete, lastUpdated: 2_000, sourceDevice: "android-b"),
+                .init(tableName: "BibleBookmarkToLabel", entityID1: .blob(uuidBlob(bibleBookmarkID)), entityID2: .blob(uuidBlob(remoteUserLabelID)), type: .delete, lastUpdated: 2_100, sourceDevice: "android-b"),
+                .init(tableName: "GenericBookmarkNotes", entityID1: .blob(uuidBlob(genericBookmarkID)), entityID2: .null(), type: .delete, lastUpdated: 2_200, sourceDevice: "android-b"),
+                .init(tableName: "GenericBookmarkToLabel", entityID1: .blob(uuidBlob(genericBookmarkID)), entityID2: .blob(uuidBlob(remoteUserLabelID)), type: .delete, lastUpdated: 2_300, sourceDevice: "android-b"),
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: patchDatabaseURL) }
+
+        let stagedArchive = try makeBookmarkPatchArchive(
+            patchDatabaseURL: patchDatabaseURL,
+            sourceDevice: "android-b",
+            patchNumber: 2,
+            fileTimestamp: 4_000
+        )
+        defer { try? FileManager.default.removeItem(at: stagedArchive.archiveFileURL) }
+
+        let report = try patchService.applyPatchArchives(
+            [stagedArchive],
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.appliedPatchCount, 1)
+        XCTAssertEqual(report.appliedLogEntryCount, 4)
+        XCTAssertEqual(report.skippedLogEntryCount, 0)
+
+        let bibleBookmarks = try modelContext.fetch(FetchDescriptor<BibleBookmark>())
+        XCTAssertEqual(bibleBookmarks.count, 1)
+        XCTAssertNil(bibleBookmarks[0].notes)
+        XCTAssertTrue(bibleBookmarks[0].bookmarkToLabels?.isEmpty ?? true)
+
+        let genericBookmarks = try modelContext.fetch(FetchDescriptor<GenericBookmark>())
+        XCTAssertEqual(genericBookmarks.count, 1)
+        XCTAssertNil(genericBookmarks[0].notes)
+        XCTAssertTrue(genericBookmarks[0].bookmarkToLabels?.isEmpty ?? true)
+    }
+
+    func testRemoteSyncBookmarkPatchApplySkipsOlderRows() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let restoreService = RemoteSyncBookmarkRestoreService()
+        let patchService = RemoteSyncBookmarkPatchApplyService()
+        let logEntryStore = RemoteSyncLogEntryStore(settingsStore: settingsStore)
+        let patchStatusStore = RemoteSyncPatchStatusStore(settingsStore: settingsStore)
+
+        let remoteUserLabelID = UUID(uuidString: "bb300000-0000-0000-0000-000000000010")!
+        let bibleBookmarkID = UUID(uuidString: "bb300000-0000-0000-0000-000000000020")!
+
+        let initialDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: remoteUserLabelID, name: "Prayer", colour: Int(Int32(bitPattern: 0xFF00FF00)))
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 60,
+                    kjvOrdinalEnd: 60,
+                    ordinalStart: 60,
+                    ordinalEnd: 60,
+                    createdAt: Date(timeIntervalSince1970: 1_735_720_000),
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_720_100)
+                )
+            ],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Local newer note")
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: initialDatabaseURL) }
+
+        let initialSnapshot = try restoreService.readSnapshot(from: initialDatabaseURL)
+        _ = try restoreService.replaceLocalBookmarks(
+            from: initialSnapshot,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        logEntryStore.replaceEntries([
+            .init(
+                tableName: "BibleBookmarkNotes",
+                entityID1: .blob(uuidBlob(bibleBookmarkID)),
+                entityID2: .null(),
+                type: .upsert,
+                lastUpdated: 5_000,
+                sourceDevice: "ios-local"
+            )
+        ], for: .bookmarks)
+
+        let patchDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Older remote note")
+            ],
+            logEntries: [
+                .init(tableName: "BibleBookmarkNotes", entityID1: .blob(uuidBlob(bibleBookmarkID)), entityID2: .null(), type: .upsert, lastUpdated: 4_000, sourceDevice: "android-c")
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: patchDatabaseURL) }
+
+        let stagedArchive = try makeBookmarkPatchArchive(
+            patchDatabaseURL: patchDatabaseURL,
+            sourceDevice: "android-c",
+            patchNumber: 3,
+            fileTimestamp: 5_500
+        )
+        defer { try? FileManager.default.removeItem(at: stagedArchive.archiveFileURL) }
+
+        let report = try patchService.applyPatchArchives(
+            [stagedArchive],
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.appliedPatchCount, 0)
+        XCTAssertEqual(report.appliedLogEntryCount, 0)
+        XCTAssertEqual(report.skippedLogEntryCount, 1)
+
+        let bibleBookmarks = try modelContext.fetch(FetchDescriptor<BibleBookmark>())
+        XCTAssertEqual(bibleBookmarks.count, 1)
+        XCTAssertEqual(bibleBookmarks[0].notes?.notes, "Local newer note")
+        XCTAssertNil(patchStatusStore.status(for: .bookmarks, sourceDevice: "android-c", patchNumber: 3))
+        XCTAssertEqual(
+            logEntryStore.entry(
+                for: .bookmarks,
+                tableName: "BibleBookmarkNotes",
+                entityID1: .blob(uuidBlob(bibleBookmarkID)),
+                entityID2: .null()
+            )?.lastUpdated,
+            5_000
+        )
+    }
+
+    func testRemoteSyncBookmarkPatchApplyRunsForeignKeyCleanupForLaterTablesWithoutPatchRows() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let restoreService = RemoteSyncBookmarkRestoreService()
+        let patchService = RemoteSyncBookmarkPatchApplyService()
+
+        let remoteUserLabelID = UUID(uuidString: "bb400000-0000-0000-0000-000000000010")!
+        let genericBookmarkID = UUID(uuidString: "bb400000-0000-0000-0000-000000000021")!
+        let studyPadEntryID = UUID(uuidString: "bb400000-0000-0000-0000-000000000030")!
+
+        let initialDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: remoteUserLabelID, name: "Prayer", colour: Int(Int32(bitPattern: 0xFF00FF00)))
+            ],
+            genericBookmarks: [
+                .init(
+                    id: genericBookmarkID,
+                    key: "Entry.3",
+                    createdAt: Date(timeIntervalSince1970: 1_735_730_000),
+                    bookInitials: "MHC",
+                    ordinalStart: 3,
+                    ordinalEnd: 3,
+                    primaryLabelID: remoteUserLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_730_100)
+                )
+            ],
+            genericLinks: [
+                .init(bookmarkID: genericBookmarkID, labelID: remoteUserLabelID, orderNumber: 1, indentLevel: 0, expandContent: true)
+            ],
+            studyPadEntries: [
+                .init(id: studyPadEntryID, labelID: remoteUserLabelID, orderNumber: 1, indentLevel: 0)
+            ],
+            studyPadTexts: [
+                .init(entryID: studyPadEntryID, text: "Study text")
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: initialDatabaseURL) }
+
+        let initialSnapshot = try restoreService.readSnapshot(from: initialDatabaseURL)
+        _ = try restoreService.replaceLocalBookmarks(
+            from: initialSnapshot,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        let patchDatabaseURL = try makeAndroidBookmarksDatabase(
+            labels: [],
+            logEntries: [
+                .init(tableName: "Label", entityID1: .blob(uuidBlob(remoteUserLabelID)), entityID2: .null(), type: .delete, lastUpdated: 2_000, sourceDevice: "android-d")
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: patchDatabaseURL) }
+
+        let stagedArchive = try makeBookmarkPatchArchive(
+            patchDatabaseURL: patchDatabaseURL,
+            sourceDevice: "android-d",
+            patchNumber: 4,
+            fileTimestamp: 6_000
+        )
+        defer { try? FileManager.default.removeItem(at: stagedArchive.archiveFileURL) }
+
+        let report = try patchService.applyPatchArchives(
+            [stagedArchive],
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(report.appliedPatchCount, 1)
+        XCTAssertEqual(report.appliedLogEntryCount, 1)
+        XCTAssertEqual(report.skippedLogEntryCount, 0)
+        XCTAssertEqual(
+            report.restoreReport,
+            RemoteSyncBookmarkRestoreReport(
+                restoredLabelCount: 3,
+                restoredBibleBookmarkCount: 0,
+                restoredGenericBookmarkCount: 0,
+                restoredStudyPadEntryCount: 0,
+                preservedPlaybackSettingsCount: 0,
+                preservedSystemLabelAliasCount: 3
+            )
+        )
+
+        let labels = try modelContext.fetch(FetchDescriptor<Label>())
+        XCTAssertNil(labels.first(where: { $0.name == "Prayer" }))
+        XCTAssertEqual(labels.count, 3)
+        XCTAssertTrue(try modelContext.fetch(FetchDescriptor<GenericBookmark>()).isEmpty)
+        XCTAssertTrue(try modelContext.fetch(FetchDescriptor<StudyPadTextEntry>()).isEmpty)
+    }
+
     func testWebDAVSearchBuildsSearchRequestBody() async throws {
         let modifiedAfter = Date(timeIntervalSince1970: 1_730_000_000)
 
@@ -3160,6 +3693,51 @@ final class AndBibleTests: XCTestCase {
         )
     }
 
+    /**
+     Creates one staged bookmark patch archive from a temporary SQLite database fixture.
+
+     - Parameters:
+       - patchDatabaseURL: Local SQLite database containing Android bookmark patch rows.
+       - sourceDevice: Android source-device name owning the patch stream.
+       - patchNumber: Monotonic patch number within the source-device stream.
+       - fileTimestamp: Remote millisecond timestamp that should be recorded on the staged archive.
+     - Returns: Staged patch archive pointing at a temporary gzip file.
+     - Side effects:
+       - reads the supplied SQLite database
+       - writes one temporary gzip archive beneath the process temporary directory
+     - Failure modes:
+       - rethrows filesystem read and write errors
+       - rethrows gzip-compression failures from `RemoteSyncArchiveStagingService`
+     */
+    private func makeBookmarkPatchArchive(
+        patchDatabaseURL: URL,
+        sourceDevice: String,
+        patchNumber: Int64,
+        fileTimestamp: Int64
+    ) throws -> RemoteSyncStagedPatchArchive {
+        let archiveData = try RemoteSyncArchiveStagingService.gzip(Data(contentsOf: patchDatabaseURL))
+        let archiveURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("android-bookmarks-patch-\(UUID().uuidString).sqlite3.gz")
+        try archiveData.write(to: archiveURL, options: .atomic)
+
+        return RemoteSyncStagedPatchArchive(
+            patch: RemoteSyncDiscoveredPatch(
+                sourceDevice: sourceDevice,
+                patchNumber: patchNumber,
+                schemaVersion: 1,
+                file: RemoteSyncFile(
+                    id: "/org.andbible.ios-sync-bookmarks/\(sourceDevice)/\(patchNumber).sqlite3.gz",
+                    name: "\(patchNumber).sqlite3.gz",
+                    size: Int64(archiveData.count),
+                    timestamp: fileTimestamp,
+                    parentID: "/org.andbible.ios-sync-bookmarks/\(sourceDevice)",
+                    mimeType: "application/gzip"
+                )
+            ),
+            archiveFileURL: archiveURL
+        )
+    }
+
     private func makeAndroidBookmarksDatabase(
         labels: [AndroidLabelRow],
         bibleBookmarks: [AndroidBibleBookmarkRow] = [],
@@ -3169,7 +3747,8 @@ final class AndBibleTests: XCTestCase {
         genericNotes: [AndroidBookmarkNoteRow] = [],
         genericLinks: [AndroidBookmarkLabelLinkRow] = [],
         studyPadEntries: [AndroidStudyPadEntryRow] = [],
-        studyPadTexts: [AndroidStudyPadTextRow] = []
+        studyPadTexts: [AndroidStudyPadTextRow] = [],
+        logEntries: [AndroidLogEntryRow] = []
     ) throws -> URL {
         let databaseURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("android-bookmarks-\(UUID().uuidString).sqlite3")
@@ -3269,6 +3848,15 @@ final class AndBibleTests: XCTestCase {
                 CREATE TABLE StudyPadTextEntryText (
                     studyPadTextEntryId BLOB NOT NULL PRIMARY KEY,
                     text TEXT NOT NULL
+                );
+                CREATE TABLE LogEntry (
+                    tableName TEXT NOT NULL,
+                    entityId1 BLOB NOT NULL,
+                    entityId2 BLOB,
+                    type TEXT NOT NULL,
+                    lastUpdated INTEGER NOT NULL,
+                    sourceDevice TEXT NOT NULL,
+                    PRIMARY KEY (tableName, entityId1, entityId2)
                 );
                 """,
                 nil,
@@ -3421,6 +4009,28 @@ final class AndBibleTests: XCTestCase {
             )
             bindUUIDBlob(text.entryID, to: statement, index: 1)
             sqlite3_bind_text(statement, 2, text.text, -1, sqliteTransient)
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        for entry in logEntries {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO LogEntry (tableName, entityId1, entityId2, type, lastUpdated, sourceDevice) VALUES (?, ?, ?, ?, ?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+            sqlite3_bind_text(statement, 1, entry.tableName, -1, sqliteTransient)
+            bindSQLiteValue(entry.entityID1, to: statement, index: 2)
+            bindSQLiteValue(entry.entityID2, to: statement, index: 3)
+            sqlite3_bind_text(statement, 4, entry.type.rawValue, -1, sqliteTransient)
+            sqlite3_bind_int64(statement, 5, entry.lastUpdated)
+            sqlite3_bind_text(statement, 6, entry.sourceDevice, -1, sqliteTransient)
             XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
             sqlite3_finalize(statement)
         }
