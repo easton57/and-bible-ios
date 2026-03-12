@@ -6,7 +6,7 @@ import SwiftData
 /**
  Errors emitted while restoring a staged remote initial backup into live local data.
 
- The dispatcher currently supports reading-plan backups only. Bookmark and workspace restores are
+ The dispatcher currently supports bookmark and reading-plan backups. Workspace restores are still
  intentionally rejected until their schema mapping and fidelity-preservation rules are implemented.
  */
 public enum RemoteSyncInitialBackupRestoreError: Error, Equatable {
@@ -21,6 +21,9 @@ public enum RemoteSyncInitialBackupRestoreError: Error, Equatable {
  layers for telemetry, logging, or later UI.
  */
 public enum RemoteSyncInitialBackupRestoreReport: Sendable, Equatable {
+    /// Successful restore report for the bookmark sync category.
+    case bookmarks(RemoteSyncBookmarkRestoreReport)
+
     /// Successful restore report for the reading-plan sync category.
     case readingPlans(RemoteSyncReadingPlanRestoreReport)
 }
@@ -28,15 +31,17 @@ public enum RemoteSyncInitialBackupRestoreReport: Sendable, Equatable {
 /**
  Restores staged remote initial backups into local SwiftData using category-specific services.
 
- Android sync treats bookmarks, workspaces, and reading plans as separate SQLite databases with
- different schemas. This dispatcher preserves that boundary on iOS: it selects the correct
- category restore implementation for a staged backup instead of forcing unrelated categories
- through one generic SQLite importer.
+Android sync treats bookmarks, workspaces, and reading plans as separate SQLite databases with
+different schemas. This dispatcher preserves that boundary on iOS: it selects the correct
+category restore implementation for a staged backup instead of forcing unrelated categories
+through one generic SQLite importer.
 
- Data dependencies:
- - `RemoteSyncReadingPlanRestoreService` restores staged Android `readingplans.sqlite3` backups
- - `SettingsStore` provides local-only persistence for fidelity-preserving side stores such as
-   `RemoteSyncReadingPlanStatusStore`
+Data dependencies:
+- `RemoteSyncBookmarkRestoreService` restores staged Android `bookmarks.sqlite3` backups
+- `RemoteSyncReadingPlanRestoreService` restores staged Android `readingplans.sqlite3` backups
+- `SettingsStore` provides local-only persistence for fidelity-preserving side stores such as
+  `RemoteSyncReadingPlanStatusStore`, `RemoteSyncBookmarkPlaybackSettingsStore`, and
+  `RemoteSyncBookmarkLabelAliasStore`
 
  Side effects:
  - mutates live local SwiftData records for the supported category
@@ -51,18 +56,23 @@ public enum RemoteSyncInitialBackupRestoreReport: Sendable, Equatable {
  - this type inherits the confinement rules of the supplied `ModelContext` and `SettingsStore`
  */
 public final class RemoteSyncInitialBackupRestoreService {
+    private let bookmarkRestoreService: RemoteSyncBookmarkRestoreService
     private let readingPlanRestoreService: RemoteSyncReadingPlanRestoreService
 
     /**
      Creates a category-level initial-backup restore dispatcher.
 
-     - Parameter readingPlanRestoreService: Restore service used for the reading-plan category.
+     - Parameters:
+       - bookmarkRestoreService: Restore service used for the bookmark category.
+       - readingPlanRestoreService: Restore service used for the reading-plan category.
      - Side effects: none.
      - Failure modes: This initializer cannot fail.
      */
     public init(
+        bookmarkRestoreService: RemoteSyncBookmarkRestoreService = RemoteSyncBookmarkRestoreService(),
         readingPlanRestoreService: RemoteSyncReadingPlanRestoreService = RemoteSyncReadingPlanRestoreService()
     ) {
+        self.bookmarkRestoreService = bookmarkRestoreService
         self.readingPlanRestoreService = readingPlanRestoreService
     }
 
@@ -90,6 +100,14 @@ public final class RemoteSyncInitialBackupRestoreService {
         settingsStore: SettingsStore
     ) throws -> RemoteSyncInitialBackupRestoreReport {
         switch category {
+        case .bookmarks:
+            let snapshot = try bookmarkRestoreService.readSnapshot(from: stagedBackup.databaseFileURL)
+            let report = try bookmarkRestoreService.replaceLocalBookmarks(
+                from: snapshot,
+                modelContext: modelContext,
+                settingsStore: settingsStore
+            )
+            return .bookmarks(report)
         case .readingPlans:
             let snapshot = try readingPlanRestoreService.readSnapshot(from: stagedBackup.databaseFileURL)
             let statusStore = RemoteSyncReadingPlanStatusStore(settingsStore: settingsStore)
@@ -99,7 +117,7 @@ public final class RemoteSyncInitialBackupRestoreService {
                 statusStore: statusStore
             )
             return .readingPlans(report)
-        case .bookmarks, .workspaces:
+        case .workspaces:
             throw RemoteSyncInitialBackupRestoreError.unsupportedCategory(category)
         }
     }

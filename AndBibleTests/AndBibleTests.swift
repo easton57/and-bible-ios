@@ -587,19 +587,480 @@ final class AndBibleTests: XCTestCase {
         XCTAssertThrowsError(
             try service.restoreInitialBackup(
                 stagedBackup,
-                category: .bookmarks,
+                category: .workspaces,
                 modelContext: modelContext,
                 settingsStore: settingsStore
             )
         ) { error in
             XCTAssertEqual(
                 error as? RemoteSyncInitialBackupRestoreError,
-                .unsupportedCategory(.bookmarks)
+                .unsupportedCategory(.workspaces)
             )
         }
 
         XCTAssertTrue(try modelContext.fetch(FetchDescriptor<ReadingPlan>()).isEmpty)
         XCTAssertTrue(RemoteSyncReadingPlanStatusStore(settingsStore: settingsStore).allStatuses().isEmpty)
+    }
+
+    func testRemoteSyncBookmarkPlaybackSettingsStorePersistsAndClearsEntries() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let store = RemoteSyncBookmarkPlaybackSettingsStore(settingsStore: settingsStore)
+        let bibleBookmarkID = UUID(uuidString: "b1000000-0000-0000-0000-000000000001")!
+        let genericBookmarkID = UUID(uuidString: "b1000000-0000-0000-0000-000000000002")!
+
+        store.setPlaybackSettingsJSON(#"{"bookId":"KJV","speed":120}"#, for: bibleBookmarkID, kind: .bible)
+        store.setPlaybackSettingsJSON(#"{"bookId":"MHC","queue":true}"#, for: genericBookmarkID, kind: .generic)
+
+        XCTAssertEqual(
+            store.playbackSettingsJSON(for: bibleBookmarkID, kind: .bible),
+            #"{"bookId":"KJV","speed":120}"#
+        )
+        XCTAssertEqual(
+            store.playbackSettingsJSON(for: genericBookmarkID, kind: .generic),
+            #"{"bookId":"MHC","queue":true}"#
+        )
+        XCTAssertEqual(
+            store.allEntries(),
+            [
+                .init(
+                    bookmarkKind: .bible,
+                    bookmarkID: bibleBookmarkID,
+                    playbackSettingsJSON: #"{"bookId":"KJV","speed":120}"#
+                ),
+                .init(
+                    bookmarkKind: .generic,
+                    bookmarkID: genericBookmarkID,
+                    playbackSettingsJSON: #"{"bookId":"MHC","queue":true}"#
+                ),
+            ]
+        )
+
+        store.clearAll()
+        XCTAssertTrue(store.allEntries().isEmpty)
+    }
+
+    func testRemoteSyncBookmarkLabelAliasStorePersistsAndClearsAliases() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let store = RemoteSyncBookmarkLabelAliasStore(settingsStore: settingsStore)
+        let remoteSpeakID = UUID(uuidString: "c1000000-0000-0000-0000-000000000001")!
+        let remoteUnlabeledID = UUID(uuidString: "c1000000-0000-0000-0000-000000000002")!
+
+        store.setAlias(remoteLabelID: remoteSpeakID, localLabelID: Label.speakLabelId)
+        store.setAlias(remoteLabelID: remoteUnlabeledID, localLabelID: Label.unlabeledId)
+
+        XCTAssertEqual(store.localLabelID(forRemoteLabelID: remoteSpeakID), Label.speakLabelId)
+        XCTAssertEqual(store.localLabelID(forRemoteLabelID: remoteUnlabeledID), Label.unlabeledId)
+        XCTAssertEqual(
+            store.allAliases(),
+            [
+                .init(remoteLabelID: remoteSpeakID, localLabelID: Label.speakLabelId),
+                .init(remoteLabelID: remoteUnlabeledID, localLabelID: Label.unlabeledId),
+            ]
+        )
+
+        store.clearAll()
+        XCTAssertTrue(store.allAliases().isEmpty)
+    }
+
+    func testRemoteSyncBookmarkRestoreReadsAndroidSnapshot() throws {
+        let service = RemoteSyncBookmarkRestoreService()
+        let speakLabelID = UUID(uuidString: "d1000000-0000-0000-0000-000000000001")!
+        let userLabelID = UUID(uuidString: "d1000000-0000-0000-0000-000000000010")!
+        let bibleBookmarkID = UUID(uuidString: "d1000000-0000-0000-0000-000000000020")!
+        let genericBookmarkID = UUID(uuidString: "d1000000-0000-0000-0000-000000000021")!
+        let studyPadEntryID = UUID(uuidString: "d1000000-0000-0000-0000-000000000030")!
+
+        let databaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: speakLabelID, name: Label.speakLabelName, colour: Int(Int32(bitPattern: 0xFFFF0000))),
+                .init(id: userLabelID, name: "Prayer", colour: Int(Int32(bitPattern: 0xFF00FF00)), favourite: true, type: "HIGHLIGHT")
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 10,
+                    kjvOrdinalEnd: 12,
+                    ordinalStart: 10,
+                    ordinalEnd: 12,
+                    playbackSettingsJSON: #"{"bookId":"KJV","speed":110}"#,
+                    createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+                    book: "Genesis",
+                    startOffset: 3,
+                    endOffset: 8,
+                    primaryLabelID: speakLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_700_000_100),
+                    wholeVerse: false,
+                    type: "EXAMPLE",
+                    customIcon: "star",
+                    editActionMode: "APPEND",
+                    editActionContent: "Amen"
+                )
+            ],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Bible note")
+            ],
+            bibleLinks: [
+                .init(bookmarkID: bibleBookmarkID, labelID: userLabelID, orderNumber: 2, indentLevel: 1, expandContent: false)
+            ],
+            genericBookmarks: [
+                .init(
+                    id: genericBookmarkID,
+                    key: "Entry.1",
+                    createdAt: Date(timeIntervalSince1970: 1_700_000_200),
+                    bookInitials: "MHC",
+                    ordinalStart: 5,
+                    ordinalEnd: 5,
+                    primaryLabelID: userLabelID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_700_000_300),
+                    wholeVerse: true,
+                    playbackSettingsJSON: #"{"bookId":"MHC","queue":true}"#
+                )
+            ],
+            genericNotes: [
+                .init(bookmarkID: genericBookmarkID, notes: "Generic note")
+            ],
+            genericLinks: [
+                .init(bookmarkID: genericBookmarkID, labelID: userLabelID, orderNumber: 1, indentLevel: 0, expandContent: true)
+            ],
+            studyPadEntries: [
+                .init(id: studyPadEntryID, labelID: userLabelID, orderNumber: 4, indentLevel: 2)
+            ],
+            studyPadTexts: [
+                .init(entryID: studyPadEntryID, text: "Study text")
+            ]
+        )
+
+        let snapshot = try service.readSnapshot(from: databaseURL)
+
+        XCTAssertEqual(snapshot.labels.count, 2)
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: snapshot.labels.map { ($0.name, $0.id) }),
+            [
+                Label.speakLabelName: speakLabelID,
+                "Prayer": userLabelID,
+            ]
+        )
+        XCTAssertEqual(snapshot.bibleBookmarks.count, 1)
+        XCTAssertEqual(snapshot.bibleBookmarks[0].id, bibleBookmarkID)
+        XCTAssertEqual(snapshot.bibleBookmarks[0].notes, "Bible note")
+        XCTAssertEqual(snapshot.bibleBookmarks[0].primaryLabelID, speakLabelID)
+        XCTAssertEqual(snapshot.bibleBookmarks[0].labelLinks, [
+            .init(labelID: userLabelID, orderNumber: 2, indentLevel: 1, expandContent: false)
+        ])
+        XCTAssertEqual(snapshot.genericBookmarks.count, 1)
+        XCTAssertEqual(snapshot.genericBookmarks[0].notes, "Generic note")
+        XCTAssertEqual(snapshot.studyPadEntries, [
+            .init(id: studyPadEntryID, labelID: userLabelID, orderNumber: 4, indentLevel: 2, text: "Study text")
+        ])
+    }
+
+    func testRemoteSyncBookmarkRestoreReplacesLocalDataAndPreservesAndroidFidelity() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let service = RemoteSyncBookmarkRestoreService()
+
+        let legacyLabel = Label(name: "Legacy")
+        modelContext.insert(legacyLabel)
+        let legacyBookmark = BibleBookmark(kjvOrdinalStart: 1, kjvOrdinalEnd: 1)
+        legacyBookmark.book = "Genesis"
+        modelContext.insert(legacyBookmark)
+        try modelContext.save()
+
+        let remoteSpeakID = UUID(uuidString: "e1000000-0000-0000-0000-000000000001")!
+        let remoteUnlabeledID = UUID(uuidString: "e1000000-0000-0000-0000-000000000002")!
+        let remoteParagraphID = UUID(uuidString: "e1000000-0000-0000-0000-000000000003")!
+        let userLabelID = UUID(uuidString: "e1000000-0000-0000-0000-000000000010")!
+        let bibleBookmarkID = UUID(uuidString: "e1000000-0000-0000-0000-000000000020")!
+        let genericBookmarkID = UUID(uuidString: "e1000000-0000-0000-0000-000000000021")!
+        let studyPadEntryID = UUID(uuidString: "e1000000-0000-0000-0000-000000000030")!
+
+        let databaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: remoteSpeakID, name: Label.speakLabelName, colour: Int(Int32(bitPattern: 0xFFFF9999)), customIcon: "microphone"),
+                .init(id: remoteUnlabeledID, name: Label.unlabeledName, colour: Int(Int32(bitPattern: 0xFFFFFF99))),
+                .init(id: remoteParagraphID, name: Label.paragraphBreakLabelName, colour: Int(Int32(bitPattern: 0xFF99CCFF))),
+                .init(id: userLabelID, name: "Prayer", colour: Int(Int32(bitPattern: 0xFF00FF00)), favourite: true, type: "HIGHLIGHT", customIcon: "heart")
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 15,
+                    kjvOrdinalEnd: 16,
+                    ordinalStart: 15,
+                    ordinalEnd: 16,
+                    playbackSettingsJSON: #"{"bookId":"KJV","speed":125,"speakFootnotes":true}"#,
+                    createdAt: Date(timeIntervalSince1970: 1_700_100_000),
+                    book: "Exodus",
+                    startOffset: 2,
+                    endOffset: 9,
+                    primaryLabelID: remoteSpeakID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_700_100_100),
+                    wholeVerse: false,
+                    type: "EXAMPLE",
+                    customIcon: "star",
+                    editActionMode: "APPEND",
+                    editActionContent: "Amen"
+                )
+            ],
+            bibleNotes: [
+                .init(bookmarkID: bibleBookmarkID, notes: "Bible note")
+            ],
+            bibleLinks: [
+                .init(bookmarkID: bibleBookmarkID, labelID: userLabelID, orderNumber: 3, indentLevel: 1, expandContent: false),
+                .init(bookmarkID: bibleBookmarkID, labelID: remoteParagraphID, orderNumber: 4, indentLevel: 0, expandContent: true)
+            ],
+            genericBookmarks: [
+                .init(
+                    id: genericBookmarkID,
+                    key: "Entry.1",
+                    createdAt: Date(timeIntervalSince1970: 1_700_100_200),
+                    bookInitials: "MHC",
+                    ordinalStart: 4,
+                    ordinalEnd: 4,
+                    primaryLabelID: remoteUnlabeledID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_700_100_300),
+                    wholeVerse: true,
+                    playbackSettingsJSON: #"{"bookId":"MHC","queue":true}"#,
+                    customIcon: "link",
+                    editActionMode: "PREPEND",
+                    editActionContent: "Intro"
+                )
+            ],
+            genericNotes: [
+                .init(bookmarkID: genericBookmarkID, notes: "Generic note")
+            ],
+            genericLinks: [
+                .init(bookmarkID: genericBookmarkID, labelID: userLabelID, orderNumber: 1, indentLevel: 0, expandContent: true)
+            ],
+            studyPadEntries: [
+                .init(id: studyPadEntryID, labelID: userLabelID, orderNumber: 7, indentLevel: 2)
+            ],
+            studyPadTexts: [
+                .init(entryID: studyPadEntryID, text: "Study text")
+            ]
+        )
+
+        let snapshot = try service.readSnapshot(from: databaseURL)
+        let report = try service.replaceLocalBookmarks(
+            from: snapshot,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(
+            report,
+            RemoteSyncBookmarkRestoreReport(
+                restoredLabelCount: 4,
+                restoredBibleBookmarkCount: 1,
+                restoredGenericBookmarkCount: 1,
+                restoredStudyPadEntryCount: 1,
+                preservedPlaybackSettingsCount: 2,
+                preservedSystemLabelAliasCount: 3
+            )
+        )
+
+        let labels = try modelContext.fetch(FetchDescriptor<Label>())
+        XCTAssertEqual(labels.count, 4)
+        XCTAssertNil(labels.first(where: { $0.name == "Legacy" }))
+        XCTAssertEqual(labels.first(where: { $0.name == Label.speakLabelName })?.id, Label.speakLabelId)
+        XCTAssertEqual(labels.first(where: { $0.name == Label.unlabeledName })?.id, Label.unlabeledId)
+        XCTAssertEqual(labels.first(where: { $0.name == Label.paragraphBreakLabelName })?.id, Label.paragraphBreakLabelId)
+        XCTAssertEqual(labels.first(where: { $0.name == "Prayer" })?.id, userLabelID)
+
+        let bibleBookmarks = try modelContext.fetch(FetchDescriptor<BibleBookmark>())
+        XCTAssertEqual(bibleBookmarks.count, 1)
+        XCTAssertEqual(bibleBookmarks[0].id, bibleBookmarkID)
+        XCTAssertEqual(bibleBookmarks[0].book, "Exodus")
+        XCTAssertEqual(bibleBookmarks[0].primaryLabelId, Label.speakLabelId)
+        XCTAssertEqual(bibleBookmarks[0].notes?.notes, "Bible note")
+        XCTAssertEqual(bibleBookmarks[0].playbackSettings?.bookId, "KJV")
+        XCTAssertEqual(bibleBookmarks[0].type, "EXAMPLE")
+        XCTAssertEqual(bibleBookmarks[0].customIcon, "star")
+        XCTAssertEqual(bibleBookmarks[0].editAction, EditAction(mode: .append, content: "Amen"))
+
+        let genericBookmarks = try modelContext.fetch(FetchDescriptor<GenericBookmark>())
+        XCTAssertEqual(genericBookmarks.count, 1)
+        XCTAssertEqual(genericBookmarks[0].id, genericBookmarkID)
+        XCTAssertEqual(genericBookmarks[0].primaryLabelId, Label.unlabeledId)
+        XCTAssertEqual(genericBookmarks[0].notes?.notes, "Generic note")
+        XCTAssertEqual(genericBookmarks[0].playbackSettings?.bookId, "MHC")
+        XCTAssertEqual(genericBookmarks[0].customIcon, "link")
+        XCTAssertEqual(genericBookmarks[0].editAction, EditAction(mode: .prepend, content: "Intro"))
+
+        let bibleLinks = try modelContext.fetch(FetchDescriptor<BibleBookmarkToLabel>())
+        XCTAssertEqual(bibleLinks.count, 2)
+        XCTAssertEqual(
+            Set(bibleLinks.compactMap { $0.label?.id }),
+            Set([userLabelID, Label.paragraphBreakLabelId])
+        )
+        XCTAssertEqual(
+            bibleLinks.first(where: { $0.label?.id == userLabelID })?.orderNumber,
+            3
+        )
+
+        let genericLinks = try modelContext.fetch(FetchDescriptor<GenericBookmarkToLabel>())
+        XCTAssertEqual(genericLinks.count, 1)
+        XCTAssertEqual(genericLinks[0].label?.id, userLabelID)
+
+        let studyPadEntries = try modelContext.fetch(FetchDescriptor<StudyPadTextEntry>())
+        XCTAssertEqual(studyPadEntries.count, 1)
+        XCTAssertEqual(studyPadEntries[0].id, studyPadEntryID)
+        XCTAssertEqual(studyPadEntries[0].label?.id, userLabelID)
+        XCTAssertEqual(studyPadEntries[0].textEntry?.text, "Study text")
+
+        let playbackStore = RemoteSyncBookmarkPlaybackSettingsStore(settingsStore: settingsStore)
+        XCTAssertEqual(
+            playbackStore.allEntries(),
+            [
+                .init(
+                    bookmarkKind: .bible,
+                    bookmarkID: bibleBookmarkID,
+                    playbackSettingsJSON: #"{"bookId":"KJV","speed":125,"speakFootnotes":true}"#
+                ),
+                .init(
+                    bookmarkKind: .generic,
+                    bookmarkID: genericBookmarkID,
+                    playbackSettingsJSON: #"{"bookId":"MHC","queue":true}"#
+                ),
+            ]
+        )
+
+        let aliasStore = RemoteSyncBookmarkLabelAliasStore(settingsStore: settingsStore)
+        XCTAssertEqual(
+            aliasStore.allAliases(),
+            [
+                .init(remoteLabelID: remoteSpeakID, localLabelID: Label.speakLabelId),
+                .init(remoteLabelID: remoteUnlabeledID, localLabelID: Label.unlabeledId),
+                .init(remoteLabelID: remoteParagraphID, localLabelID: Label.paragraphBreakLabelId),
+            ]
+        )
+    }
+
+    func testRemoteSyncBookmarkRestoreRejectsOrphanReferencesWithoutMutation() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let service = RemoteSyncBookmarkRestoreService()
+        let missingLabelID = UUID(uuidString: "f1000000-0000-0000-0000-000000000001")!
+        let bibleBookmarkID = UUID(uuidString: "f1000000-0000-0000-0000-000000000002")!
+        let studyPadEntryID = UUID(uuidString: "f1000000-0000-0000-0000-000000000003")!
+
+        let legacyLabel = Label(name: "Legacy")
+        modelContext.insert(legacyLabel)
+        try modelContext.save()
+
+        let databaseURL = try makeAndroidBookmarksDatabase(
+            labels: [],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 1,
+                    kjvOrdinalEnd: 1,
+                    ordinalStart: 1,
+                    ordinalEnd: 1,
+                    createdAt: Date(timeIntervalSince1970: 1_700_200_000),
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_700_200_100)
+                )
+            ],
+            bibleLinks: [
+                .init(bookmarkID: bibleBookmarkID, labelID: missingLabelID, orderNumber: 1, indentLevel: 0, expandContent: true)
+            ],
+            studyPadEntries: [
+                .init(id: studyPadEntryID, labelID: missingLabelID, orderNumber: 1, indentLevel: 0)
+            ],
+            studyPadTexts: []
+        )
+
+        XCTAssertThrowsError(try service.readSnapshot(from: databaseURL)) { error in
+            XCTAssertEqual(
+                error as? RemoteSyncBookmarkRestoreError,
+                .orphanReferences([
+                    "BibleBookmarkToLabel.labelId=\(missingLabelID.uuidString) missing label",
+                    "StudyPadTextEntry.id=\(studyPadEntryID.uuidString) missing StudyPadTextEntryText",
+                    "StudyPadTextEntry.labelId=\(missingLabelID.uuidString) missing label for entry \(studyPadEntryID.uuidString)",
+                ])
+            )
+        }
+
+        let labels = try modelContext.fetch(FetchDescriptor<Label>())
+        XCTAssertEqual(labels.map(\.name), ["Legacy"])
+    }
+
+    func testRemoteSyncInitialBackupRestoreDispatchesBookmarkBackups() throws {
+        let container = try makeBookmarkRestoreModelContainer()
+        let modelContext = ModelContext(container)
+        let settingsStore = SettingsStore(modelContext: modelContext)
+        let service = RemoteSyncInitialBackupRestoreService()
+        let remoteSpeakID = UUID(uuidString: "ab000000-0000-0000-0000-000000000001")!
+        let bibleBookmarkID = UUID(uuidString: "ab000000-0000-0000-0000-000000000010")!
+
+        let databaseURL = try makeAndroidBookmarksDatabase(
+            labels: [
+                .init(id: remoteSpeakID, name: Label.speakLabelName, colour: Int(Int32(bitPattern: 0xFFFF9999)))
+            ],
+            bibleBookmarks: [
+                .init(
+                    id: bibleBookmarkID,
+                    kjvOrdinalStart: 20,
+                    kjvOrdinalEnd: 20,
+                    ordinalStart: 20,
+                    ordinalEnd: 20,
+                    playbackSettingsJSON: #"{"bookId":"KJV"}"#,
+                    createdAt: Date(timeIntervalSince1970: 1_735_689_600),
+                    primaryLabelID: remoteSpeakID,
+                    lastUpdatedOn: Date(timeIntervalSince1970: 1_735_689_700)
+                )
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        let stagedBackup = RemoteSyncStagedInitialBackup(
+            remoteFile: RemoteSyncFile(
+                id: "/org.andbible.ios-sync-bookmarks/initial.sqlite3.gz",
+                name: "initial.sqlite3.gz",
+                size: 2_048,
+                timestamp: 1_735_689_600_000,
+                parentID: "/org.andbible.ios-sync-bookmarks",
+                mimeType: "application/gzip"
+            ),
+            databaseFileURL: databaseURL,
+            schemaVersion: 1
+        )
+
+        let report = try service.restoreInitialBackup(
+            stagedBackup,
+            category: .bookmarks,
+            modelContext: modelContext,
+            settingsStore: settingsStore
+        )
+
+        XCTAssertEqual(
+            report,
+            .bookmarks(
+                RemoteSyncBookmarkRestoreReport(
+                    restoredLabelCount: 3,
+                    restoredBibleBookmarkCount: 1,
+                    restoredGenericBookmarkCount: 0,
+                    restoredStudyPadEntryCount: 0,
+                    preservedPlaybackSettingsCount: 1,
+                    preservedSystemLabelAliasCount: 1
+                )
+            )
+        )
+
+        let labels = try modelContext.fetch(FetchDescriptor<Label>())
+        XCTAssertEqual(labels.count, 3)
+        XCTAssertEqual(labels.first(where: { $0.name == Label.speakLabelName })?.id, Label.speakLabelId)
+
+        let bibleBookmarks = try modelContext.fetch(FetchDescriptor<BibleBookmark>())
+        XCTAssertEqual(bibleBookmarks.map(\.id), [bibleBookmarkID])
+
+        let aliasStore = RemoteSyncBookmarkLabelAliasStore(settingsStore: settingsStore)
+        XCTAssertEqual(aliasStore.localLabelID(forRemoteLabelID: remoteSpeakID), Label.speakLabelId)
     }
 
     func testWebDAVSearchBuildsSearchRequestBody() async throws {
@@ -2001,10 +2462,208 @@ final class AndBibleTests: XCTestCase {
         let readingStatusJSON: String
     }
 
+    private struct AndroidLabelRow {
+        let id: UUID
+        let name: String
+        let colour: Int
+        let markerStyle: Bool
+        let markerStyleWholeVerse: Bool
+        let underlineStyle: Bool
+        let underlineStyleWholeVerse: Bool
+        let hideStyle: Bool
+        let hideStyleWholeVerse: Bool
+        let favourite: Bool
+        let type: String?
+        let customIcon: String?
+
+        init(
+            id: UUID,
+            name: String,
+            colour: Int = Label.defaultColor,
+            markerStyle: Bool = false,
+            markerStyleWholeVerse: Bool = false,
+            underlineStyle: Bool = false,
+            underlineStyleWholeVerse: Bool = true,
+            hideStyle: Bool = false,
+            hideStyleWholeVerse: Bool = false,
+            favourite: Bool = false,
+            type: String? = nil,
+            customIcon: String? = nil
+        ) {
+            self.id = id
+            self.name = name
+            self.colour = colour
+            self.markerStyle = markerStyle
+            self.markerStyleWholeVerse = markerStyleWholeVerse
+            self.underlineStyle = underlineStyle
+            self.underlineStyleWholeVerse = underlineStyleWholeVerse
+            self.hideStyle = hideStyle
+            self.hideStyleWholeVerse = hideStyleWholeVerse
+            self.favourite = favourite
+            self.type = type
+            self.customIcon = customIcon
+        }
+    }
+
+    private struct AndroidBibleBookmarkRow {
+        let id: UUID
+        let kjvOrdinalStart: Int
+        let kjvOrdinalEnd: Int
+        let ordinalStart: Int
+        let ordinalEnd: Int
+        let v11n: String
+        let playbackSettingsJSON: String?
+        let createdAt: Date
+        let book: String?
+        let startOffset: Int?
+        let endOffset: Int?
+        let primaryLabelID: UUID?
+        let lastUpdatedOn: Date
+        let wholeVerse: Bool
+        let type: String?
+        let customIcon: String?
+        let editActionMode: String?
+        let editActionContent: String?
+
+        init(
+            id: UUID,
+            kjvOrdinalStart: Int,
+            kjvOrdinalEnd: Int,
+            ordinalStart: Int,
+            ordinalEnd: Int,
+            v11n: String = "KJVA",
+            playbackSettingsJSON: String? = nil,
+            createdAt: Date,
+            book: String? = nil,
+            startOffset: Int? = nil,
+            endOffset: Int? = nil,
+            primaryLabelID: UUID? = nil,
+            lastUpdatedOn: Date,
+            wholeVerse: Bool = true,
+            type: String? = nil,
+            customIcon: String? = nil,
+            editActionMode: String? = nil,
+            editActionContent: String? = nil
+        ) {
+            self.id = id
+            self.kjvOrdinalStart = kjvOrdinalStart
+            self.kjvOrdinalEnd = kjvOrdinalEnd
+            self.ordinalStart = ordinalStart
+            self.ordinalEnd = ordinalEnd
+            self.v11n = v11n
+            self.playbackSettingsJSON = playbackSettingsJSON
+            self.createdAt = createdAt
+            self.book = book
+            self.startOffset = startOffset
+            self.endOffset = endOffset
+            self.primaryLabelID = primaryLabelID
+            self.lastUpdatedOn = lastUpdatedOn
+            self.wholeVerse = wholeVerse
+            self.type = type
+            self.customIcon = customIcon
+            self.editActionMode = editActionMode
+            self.editActionContent = editActionContent
+        }
+    }
+
+    private struct AndroidGenericBookmarkRow {
+        let id: UUID
+        let key: String
+        let createdAt: Date
+        let bookInitials: String
+        let ordinalStart: Int
+        let ordinalEnd: Int
+        let startOffset: Int?
+        let endOffset: Int?
+        let primaryLabelID: UUID?
+        let lastUpdatedOn: Date
+        let wholeVerse: Bool
+        let playbackSettingsJSON: String?
+        let customIcon: String?
+        let editActionMode: String?
+        let editActionContent: String?
+
+        init(
+            id: UUID,
+            key: String,
+            createdAt: Date,
+            bookInitials: String,
+            ordinalStart: Int,
+            ordinalEnd: Int,
+            startOffset: Int? = nil,
+            endOffset: Int? = nil,
+            primaryLabelID: UUID? = nil,
+            lastUpdatedOn: Date,
+            wholeVerse: Bool = true,
+            playbackSettingsJSON: String? = nil,
+            customIcon: String? = nil,
+            editActionMode: String? = nil,
+            editActionContent: String? = nil
+        ) {
+            self.id = id
+            self.key = key
+            self.createdAt = createdAt
+            self.bookInitials = bookInitials
+            self.ordinalStart = ordinalStart
+            self.ordinalEnd = ordinalEnd
+            self.startOffset = startOffset
+            self.endOffset = endOffset
+            self.primaryLabelID = primaryLabelID
+            self.lastUpdatedOn = lastUpdatedOn
+            self.wholeVerse = wholeVerse
+            self.playbackSettingsJSON = playbackSettingsJSON
+            self.customIcon = customIcon
+            self.editActionMode = editActionMode
+            self.editActionContent = editActionContent
+        }
+    }
+
+    private struct AndroidBookmarkNoteRow {
+        let bookmarkID: UUID
+        let notes: String
+    }
+
+    private struct AndroidBookmarkLabelLinkRow {
+        let bookmarkID: UUID
+        let labelID: UUID
+        let orderNumber: Int
+        let indentLevel: Int
+        let expandContent: Bool
+    }
+
+    private struct AndroidStudyPadEntryRow {
+        let id: UUID
+        let labelID: UUID
+        let orderNumber: Int
+        let indentLevel: Int
+    }
+
+    private struct AndroidStudyPadTextRow {
+        let entryID: UUID
+        let text: String
+    }
+
     private func makeReadingPlanRestoreModelContainer() throws -> ModelContainer {
         let schema = Schema([
             ReadingPlan.self,
             ReadingPlanDay.self,
+            Setting.self,
+        ])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private func makeBookmarkRestoreModelContainer() throws -> ModelContainer {
+        let schema = Schema([
+            BibleBookmark.self,
+            BibleBookmarkNotes.self,
+            BibleBookmarkToLabel.self,
+            GenericBookmark.self,
+            GenericBookmarkNotes.self,
+            GenericBookmarkToLabel.self,
+            Label.self,
+            StudyPadTextEntry.self,
+            StudyPadTextEntryText.self,
             Setting.self,
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -2098,6 +2757,344 @@ final class AndBibleTests: XCTestCase {
         }
 
         return databaseURL
+    }
+
+    private func makeAndroidBookmarksDatabase(
+        labels: [AndroidLabelRow],
+        bibleBookmarks: [AndroidBibleBookmarkRow] = [],
+        bibleNotes: [AndroidBookmarkNoteRow] = [],
+        bibleLinks: [AndroidBookmarkLabelLinkRow] = [],
+        genericBookmarks: [AndroidGenericBookmarkRow] = [],
+        genericNotes: [AndroidBookmarkNoteRow] = [],
+        genericLinks: [AndroidBookmarkLabelLinkRow] = [],
+        studyPadEntries: [AndroidStudyPadEntryRow] = [],
+        studyPadTexts: [AndroidStudyPadTextRow] = []
+    ) throws -> URL {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("android-bookmarks-\(UUID().uuidString).sqlite3")
+
+        var db: OpaquePointer?
+        guard sqlite3_open(databaseURL.path, &db) == SQLITE_OK, let db else {
+            XCTFail("Failed to open temporary Android bookmark database")
+            throw RemoteSyncBookmarkRestoreError.invalidSQLiteDatabase
+        }
+        defer { sqlite3_close(db) }
+
+        XCTAssertEqual(
+            sqlite3_exec(
+                db,
+                """
+                CREATE TABLE Label (
+                    id BLOB NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    color INTEGER NOT NULL DEFAULT 0,
+                    markerStyle INTEGER NOT NULL DEFAULT 0,
+                    markerStyleWholeVerse INTEGER NOT NULL DEFAULT 0,
+                    underlineStyle INTEGER NOT NULL DEFAULT 0,
+                    underlineStyleWholeVerse INTEGER NOT NULL DEFAULT 0,
+                    hideStyle INTEGER NOT NULL DEFAULT 0,
+                    hideStyleWholeVerse INTEGER NOT NULL DEFAULT 0,
+                    favourite INTEGER NOT NULL DEFAULT 0,
+                    type TEXT DEFAULT NULL,
+                    customIcon TEXT DEFAULT NULL
+                );
+                CREATE TABLE BibleBookmark (
+                    kjvOrdinalStart INTEGER NOT NULL,
+                    kjvOrdinalEnd INTEGER NOT NULL,
+                    ordinalStart INTEGER NOT NULL,
+                    ordinalEnd INTEGER NOT NULL,
+                    v11n TEXT NOT NULL,
+                    playbackSettings TEXT DEFAULT NULL,
+                    id BLOB NOT NULL PRIMARY KEY,
+                    createdAt INTEGER NOT NULL,
+                    book TEXT DEFAULT NULL,
+                    startOffset INTEGER DEFAULT NULL,
+                    endOffset INTEGER DEFAULT NULL,
+                    primaryLabelId BLOB DEFAULT NULL,
+                    lastUpdatedOn INTEGER NOT NULL DEFAULT 0,
+                    wholeVerse INTEGER NOT NULL DEFAULT 0,
+                    type TEXT DEFAULT NULL,
+                    customIcon TEXT DEFAULT NULL,
+                    editAction_mode TEXT DEFAULT NULL,
+                    editAction_content TEXT DEFAULT NULL
+                );
+                CREATE TABLE BibleBookmarkNotes (
+                    bookmarkId BLOB NOT NULL PRIMARY KEY,
+                    notes TEXT NOT NULL
+                );
+                CREATE TABLE BibleBookmarkToLabel (
+                    bookmarkId BLOB NOT NULL,
+                    labelId BLOB NOT NULL,
+                    orderNumber INTEGER NOT NULL DEFAULT -1,
+                    indentLevel INTEGER NOT NULL DEFAULT 0,
+                    expandContent INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (bookmarkId, labelId)
+                );
+                CREATE TABLE GenericBookmark (
+                    id BLOB NOT NULL PRIMARY KEY,
+                    `key` TEXT NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    bookInitials TEXT NOT NULL DEFAULT '',
+                    ordinalStart INTEGER NOT NULL,
+                    ordinalEnd INTEGER NOT NULL,
+                    startOffset INTEGER DEFAULT NULL,
+                    endOffset INTEGER DEFAULT NULL,
+                    primaryLabelId BLOB DEFAULT NULL,
+                    lastUpdatedOn INTEGER NOT NULL DEFAULT 0,
+                    wholeVerse INTEGER NOT NULL DEFAULT 0,
+                    playbackSettings TEXT DEFAULT NULL,
+                    customIcon TEXT DEFAULT NULL,
+                    editAction_mode TEXT DEFAULT NULL,
+                    editAction_content TEXT DEFAULT NULL
+                );
+                CREATE TABLE GenericBookmarkNotes (
+                    bookmarkId BLOB NOT NULL PRIMARY KEY,
+                    notes TEXT NOT NULL
+                );
+                CREATE TABLE GenericBookmarkToLabel (
+                    bookmarkId BLOB NOT NULL,
+                    labelId BLOB NOT NULL,
+                    orderNumber INTEGER NOT NULL DEFAULT -1,
+                    indentLevel INTEGER NOT NULL DEFAULT 0,
+                    expandContent INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (bookmarkId, labelId)
+                );
+                CREATE TABLE StudyPadTextEntry (
+                    id BLOB NOT NULL PRIMARY KEY,
+                    labelId BLOB NOT NULL,
+                    orderNumber INTEGER NOT NULL,
+                    indentLevel INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE StudyPadTextEntryText (
+                    studyPadTextEntryId BLOB NOT NULL PRIMARY KEY,
+                    text TEXT NOT NULL
+                );
+                """,
+                nil,
+                nil,
+                nil
+            ),
+            SQLITE_OK
+        )
+
+        for label in labels {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO Label (id, name, color, markerStyle, markerStyleWholeVerse, underlineStyle, underlineStyleWholeVerse, hideStyle, hideStyleWholeVerse, favourite, type, customIcon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+            bindUUIDBlob(label.id, to: statement, index: 1)
+            sqlite3_bind_text(statement, 2, label.name, -1, sqliteTransient)
+            sqlite3_bind_int(statement, 3, Int32(label.colour))
+            sqlite3_bind_int(statement, 4, label.markerStyle ? 1 : 0)
+            sqlite3_bind_int(statement, 5, label.markerStyleWholeVerse ? 1 : 0)
+            sqlite3_bind_int(statement, 6, label.underlineStyle ? 1 : 0)
+            sqlite3_bind_int(statement, 7, label.underlineStyleWholeVerse ? 1 : 0)
+            sqlite3_bind_int(statement, 8, label.hideStyle ? 1 : 0)
+            sqlite3_bind_int(statement, 9, label.hideStyleWholeVerse ? 1 : 0)
+            sqlite3_bind_int(statement, 10, label.favourite ? 1 : 0)
+            bindOptionalText(label.type, to: statement, index: 11)
+            bindOptionalText(label.customIcon, to: statement, index: 12)
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        for bookmark in bibleBookmarks {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO BibleBookmark (kjvOrdinalStart, kjvOrdinalEnd, ordinalStart, ordinalEnd, v11n, playbackSettings, id, createdAt, book, startOffset, endOffset, primaryLabelId, lastUpdatedOn, wholeVerse, type, customIcon, editAction_mode, editAction_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+            sqlite3_bind_int(statement, 1, Int32(bookmark.kjvOrdinalStart))
+            sqlite3_bind_int(statement, 2, Int32(bookmark.kjvOrdinalEnd))
+            sqlite3_bind_int(statement, 3, Int32(bookmark.ordinalStart))
+            sqlite3_bind_int(statement, 4, Int32(bookmark.ordinalEnd))
+            sqlite3_bind_text(statement, 5, bookmark.v11n, -1, sqliteTransient)
+            bindOptionalText(bookmark.playbackSettingsJSON, to: statement, index: 6)
+            bindUUIDBlob(bookmark.id, to: statement, index: 7)
+            sqlite3_bind_int64(statement, 8, Int64(bookmark.createdAt.timeIntervalSince1970 * 1000))
+            bindOptionalText(bookmark.book, to: statement, index: 9)
+            bindOptionalInt(bookmark.startOffset, to: statement, index: 10)
+            bindOptionalInt(bookmark.endOffset, to: statement, index: 11)
+            bindOptionalUUIDBlob(bookmark.primaryLabelID, to: statement, index: 12)
+            sqlite3_bind_int64(statement, 13, Int64(bookmark.lastUpdatedOn.timeIntervalSince1970 * 1000))
+            sqlite3_bind_int(statement, 14, bookmark.wholeVerse ? 1 : 0)
+            bindOptionalText(bookmark.type, to: statement, index: 15)
+            bindOptionalText(bookmark.customIcon, to: statement, index: 16)
+            bindOptionalText(bookmark.editActionMode, to: statement, index: 17)
+            bindOptionalText(bookmark.editActionContent, to: statement, index: 18)
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        for note in bibleNotes {
+            try insertBookmarkNote(note, tableName: "BibleBookmarkNotes", db: db)
+        }
+
+        for link in bibleLinks {
+            try insertBookmarkLabelLink(link, tableName: "BibleBookmarkToLabel", db: db)
+        }
+
+        for bookmark in genericBookmarks {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO GenericBookmark (id, `key`, createdAt, bookInitials, ordinalStart, ordinalEnd, startOffset, endOffset, primaryLabelId, lastUpdatedOn, wholeVerse, playbackSettings, customIcon, editAction_mode, editAction_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+            bindUUIDBlob(bookmark.id, to: statement, index: 1)
+            sqlite3_bind_text(statement, 2, bookmark.key, -1, sqliteTransient)
+            sqlite3_bind_int64(statement, 3, Int64(bookmark.createdAt.timeIntervalSince1970 * 1000))
+            sqlite3_bind_text(statement, 4, bookmark.bookInitials, -1, sqliteTransient)
+            sqlite3_bind_int(statement, 5, Int32(bookmark.ordinalStart))
+            sqlite3_bind_int(statement, 6, Int32(bookmark.ordinalEnd))
+            bindOptionalInt(bookmark.startOffset, to: statement, index: 7)
+            bindOptionalInt(bookmark.endOffset, to: statement, index: 8)
+            bindOptionalUUIDBlob(bookmark.primaryLabelID, to: statement, index: 9)
+            sqlite3_bind_int64(statement, 10, Int64(bookmark.lastUpdatedOn.timeIntervalSince1970 * 1000))
+            sqlite3_bind_int(statement, 11, bookmark.wholeVerse ? 1 : 0)
+            bindOptionalText(bookmark.playbackSettingsJSON, to: statement, index: 12)
+            bindOptionalText(bookmark.customIcon, to: statement, index: 13)
+            bindOptionalText(bookmark.editActionMode, to: statement, index: 14)
+            bindOptionalText(bookmark.editActionContent, to: statement, index: 15)
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        for note in genericNotes {
+            try insertBookmarkNote(note, tableName: "GenericBookmarkNotes", db: db)
+        }
+
+        for link in genericLinks {
+            try insertBookmarkLabelLink(link, tableName: "GenericBookmarkToLabel", db: db)
+        }
+
+        for entry in studyPadEntries {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO StudyPadTextEntry (id, labelId, orderNumber, indentLevel) VALUES (?, ?, ?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+            bindUUIDBlob(entry.id, to: statement, index: 1)
+            bindUUIDBlob(entry.labelID, to: statement, index: 2)
+            sqlite3_bind_int(statement, 3, Int32(entry.orderNumber))
+            sqlite3_bind_int(statement, 4, Int32(entry.indentLevel))
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        for text in studyPadTexts {
+            var statement: OpaquePointer?
+            XCTAssertEqual(
+                sqlite3_prepare_v2(
+                    db,
+                    "INSERT INTO StudyPadTextEntryText (studyPadTextEntryId, text) VALUES (?, ?)",
+                    -1,
+                    &statement,
+                    nil
+                ),
+                SQLITE_OK
+            )
+            bindUUIDBlob(text.entryID, to: statement, index: 1)
+            sqlite3_bind_text(statement, 2, text.text, -1, sqliteTransient)
+            XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+            sqlite3_finalize(statement)
+        }
+
+        return databaseURL
+    }
+
+    private func insertBookmarkNote(_ note: AndroidBookmarkNoteRow, tableName: String, db: OpaquePointer) throws {
+        var statement: OpaquePointer?
+        XCTAssertEqual(
+            sqlite3_prepare_v2(
+                db,
+                "INSERT INTO \(tableName) (bookmarkId, notes) VALUES (?, ?)",
+                -1,
+                &statement,
+                nil
+            ),
+            SQLITE_OK
+        )
+        bindUUIDBlob(note.bookmarkID, to: statement, index: 1)
+        sqlite3_bind_text(statement, 2, note.notes, -1, sqliteTransient)
+        XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+        sqlite3_finalize(statement)
+    }
+
+    private func insertBookmarkLabelLink(_ link: AndroidBookmarkLabelLinkRow, tableName: String, db: OpaquePointer) throws {
+        var statement: OpaquePointer?
+        XCTAssertEqual(
+            sqlite3_prepare_v2(
+                db,
+                "INSERT INTO \(tableName) (bookmarkId, labelId, orderNumber, indentLevel, expandContent) VALUES (?, ?, ?, ?, ?)",
+                -1,
+                &statement,
+                nil
+            ),
+            SQLITE_OK
+        )
+        bindUUIDBlob(link.bookmarkID, to: statement, index: 1)
+        bindUUIDBlob(link.labelID, to: statement, index: 2)
+        sqlite3_bind_int(statement, 3, Int32(link.orderNumber))
+        sqlite3_bind_int(statement, 4, Int32(link.indentLevel))
+        sqlite3_bind_int(statement, 5, link.expandContent ? 1 : 0)
+        XCTAssertEqual(sqlite3_step(statement), SQLITE_DONE)
+        sqlite3_finalize(statement)
+    }
+
+    private func bindUUIDBlob(_ uuid: UUID, to statement: OpaquePointer?, index: Int32) {
+        let blob = uuidBlob(uuid)
+        _ = blob.withUnsafeBytes { bytes in
+            sqlite3_bind_blob(statement, index, bytes.baseAddress, Int32(blob.count), sqliteTransient)
+        }
+    }
+
+    private func bindOptionalUUIDBlob(_ uuid: UUID?, to statement: OpaquePointer?, index: Int32) {
+        guard let uuid else {
+            sqlite3_bind_null(statement, index)
+            return
+        }
+        bindUUIDBlob(uuid, to: statement, index: index)
+    }
+
+    private func bindOptionalText(_ value: String?, to statement: OpaquePointer?, index: Int32) {
+        guard let value else {
+            sqlite3_bind_null(statement, index)
+            return
+        }
+        sqlite3_bind_text(statement, index, value, -1, sqliteTransient)
+    }
+
+    private func bindOptionalInt(_ value: Int?, to statement: OpaquePointer?, index: Int32) {
+        guard let value else {
+            sqlite3_bind_null(statement, index)
+            return
+        }
+        sqlite3_bind_int(statement, index, Int32(value))
     }
 
     private func uuidBlob(_ uuid: UUID) -> Data {

@@ -223,9 +223,9 @@ public final class RemoteSyncReadingPlanRestoreService {
 
     /**
      Creates a reading-plan restore service.
-     *
-     * - Side effects: none.
-     * - Failure modes: This initializer cannot fail.
+
+     - Side effects: none.
+     - Failure modes: This initializer cannot fail.
      */
     public init() {}
 
@@ -367,6 +367,25 @@ public final class RemoteSyncReadingPlanRestoreService {
         )
     }
 
+    /**
+     Normalizes one staged Android snapshot into validated iOS-ready reading-plan graphs.
+
+     This preflight step resolves bundled iOS plan templates, rejects orphan status rows and
+     unsupported plan codes, computes per-day completion, and preserves the raw Android status rows
+     for later fidelity storage. It performs all semantic validation before any caller mutates
+     SwiftData.
+
+     - Parameter snapshot: Typed Android reading-plan snapshot previously loaded from SQLite.
+     - Returns: Prepared plans ready for insertion into local SwiftData models.
+     - Side effects: none.
+     - Failure modes:
+       - throws `RemoteSyncReadingPlanRestoreError.orphanStatuses` when the snapshot contains status
+         rows whose `planCode` has no corresponding plan row
+       - throws `RemoteSyncReadingPlanRestoreError.unsupportedPlanDefinitions` when bundled iOS
+         templates do not contain one or more staged plan codes
+       - rethrows `RemoteSyncReadingPlanRestoreError.malformedReadingStatus` from completion
+         calculation when Android status JSON cannot be decoded
+     */
     private func preparePlans(from snapshot: RemoteSyncAndroidReadingPlanSnapshot) throws -> [PreparedPlan] {
         if !snapshot.orphanStatuses.isEmpty {
             throw RemoteSyncReadingPlanRestoreError.orphanStatuses(
@@ -433,6 +452,19 @@ public final class RemoteSyncReadingPlanRestoreService {
         }
     }
 
+    /**
+     Verifies that one required Android table exists in the staged SQLite database.
+
+     - Parameters:
+       - tableName: Exact Android table name expected in the staged backup.
+       - db: Open SQLite handle positioned on the staged backup database.
+     - Side effects:
+       - issues one metadata query against SQLite's `sqlite_master` catalog
+     - Failure modes:
+       - throws `RemoteSyncReadingPlanRestoreError.invalidSQLiteDatabase` when SQLite cannot prepare
+         the metadata query
+       - throws `RemoteSyncReadingPlanRestoreError.missingTable` when the required table is absent
+     */
     private func requireTable(named tableName: String, in db: OpaquePointer) throws {
         let sql = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1"
         var statement: OpaquePointer?
@@ -449,6 +481,20 @@ public final class RemoteSyncReadingPlanRestoreService {
         }
     }
 
+    /**
+     Reads raw Android `ReadingPlan` rows from the staged SQLite database.
+
+     - Parameter db: Open SQLite handle positioned on the staged backup database.
+     - Returns: Ordered tuples containing raw Android identifiers, plan codes, start dates, and
+       current-day counters.
+     - Side effects:
+       - performs one SQLite read query against the staged `ReadingPlan` table
+     - Failure modes:
+       - throws `RemoteSyncReadingPlanRestoreError.invalidSQLiteDatabase` when SQLite cannot prepare
+         the select statement
+       - rethrows `RemoteSyncReadingPlanRestoreError.invalidIdentifierBlob` when Android identifier
+         BLOBs are absent, malformed, or not 16 bytes long
+     */
     private func fetchPlans(from db: OpaquePointer) throws -> [(id: UUID, planCode: String, startDate: Date, currentDay: Int)] {
         let sql = """
         SELECT id, planCode, planStartDate, planCurrentDay
@@ -473,6 +519,19 @@ public final class RemoteSyncReadingPlanRestoreService {
         return rows
     }
 
+    /**
+     Reads raw Android `ReadingPlanStatus` rows from the staged SQLite database.
+
+     - Parameter db: Open SQLite handle positioned on the staged backup database.
+     - Returns: Ordered raw status rows grouped later by `planCode` and day number.
+     - Side effects:
+       - performs one SQLite read query against the staged `ReadingPlanStatus` table
+     - Failure modes:
+       - throws `RemoteSyncReadingPlanRestoreError.invalidSQLiteDatabase` when SQLite cannot prepare
+         the select statement
+       - rethrows `RemoteSyncReadingPlanRestoreError.invalidIdentifierBlob` when Android identifier
+         BLOBs are absent, malformed, or not 16 bytes long
+     */
     private func fetchStatuses(from db: OpaquePointer) throws -> [RemoteSyncAndroidReadingPlanStatus] {
         let sql = """
         SELECT id, planCode, planDay, readingStatus
@@ -501,6 +560,24 @@ public final class RemoteSyncReadingPlanRestoreService {
         return rows
     }
 
+    /**
+     Converts one required Android 16-byte identifier BLOB into a Foundation `UUID`.
+
+     Android persists raw 128-bit identifiers as SQLite BLOBs without textual UUID formatting. This
+     helper reconstructs the canonical UUID string representation so higher layers can work with
+     Foundation values consistently.
+
+     - Parameters:
+       - statement: Active SQLite statement positioned on a row.
+       - column: Zero-based column index containing the required BLOB.
+       - table: Android table name used for error reporting.
+       - name: Android column name used for error reporting.
+     - Returns: Converted `UUID` value.
+     - Side effects: none.
+     - Failure modes:
+       - throws `RemoteSyncReadingPlanRestoreError.invalidIdentifierBlob` when the BLOB is absent,
+         not exactly 16 bytes long, or cannot be rendered as a valid UUID string
+     */
     private func uuidFromBlob(statement: OpaquePointer?, column: Int32, table: String, name: String) throws -> UUID {
         guard
             let bytes = sqlite3_column_blob(statement, column),
@@ -535,6 +612,18 @@ public final class RemoteSyncReadingPlanRestoreService {
         return String(cString: raw)
     }
 
+    /**
+     Detects whether one bundled reading-plan template uses Android's date-prefixed reading format.
+
+     Android stores some plans with a leading `Mon-1;`-style prefix before the actual reading list.
+     Completion semantics differ for these plans because earlier days are not auto-completed solely
+     from `currentDay`.
+
+     - Parameter template: Bundled iOS reading-plan template under evaluation.
+     - Returns: `true` when the template's first-day reading string matches Android's date-prefixed format.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
     private static func isDateBasedPlan(_ template: ReadingPlanTemplate) -> Bool {
         let firstDay = template.readingsForDay(1)
         let regex = try! NSRegularExpression(pattern: #"^[A-Za-z]{3}-\d{1,2};"#)
@@ -542,6 +631,19 @@ public final class RemoteSyncReadingPlanRestoreService {
         return regex.firstMatch(in: firstDay, options: [], range: range) != nil
     }
 
+    /**
+     Counts how many logical readings one plan-day string represents.
+
+     Date-based Android plans prefix the reading list with a date token separated by `;`. That prefix
+     does not represent a reading and must be removed before counting comma-delimited readings.
+
+     - Parameters:
+       - readings: Raw reading string from a bundled iOS template.
+       - isDateBasedPlan: Whether the template uses Android's date-prefixed plan format.
+     - Returns: Number of non-empty readings encoded in the supplied day string.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
     private static func expectedReadingCount(for readings: String, isDateBasedPlan: Bool) -> Int {
         let readingsPortion: String
         if isDateBasedPlan, let separatorIndex = readings.firstIndex(of: ";") {
@@ -557,6 +659,26 @@ public final class RemoteSyncReadingPlanRestoreService {
             .count
     }
 
+    /**
+     Resolves whether one restored reading-plan day should be marked complete in iOS.
+
+     Non-date-based Android plans implicitly treat days before `currentDay` as completed even when no
+     per-day JSON status row exists. Date-based plans require explicit status JSON because `currentDay`
+     alone does not imply completion. When a JSON payload is present, completion is derived from the
+     Android `chapterReadArray` structure and the expected number of readings for that day.
+
+     - Parameters:
+       - status: Optional raw Android status row for the day being evaluated.
+       - dayNumber: One-based day number within the plan template.
+       - currentDay: Normalized current-day counter restored from Android metadata.
+       - expectedReadingCount: Number of logical readings expected for this plan day.
+       - isDateBasedPlan: Whether the plan uses Android's date-prefixed format.
+     - Returns: `true` when the restored day should be flagged complete in local SwiftData.
+     - Side effects: none.
+     - Failure modes:
+       - throws `RemoteSyncReadingPlanRestoreError.malformedReadingStatus` when a present Android
+         status payload is not valid JSON or cannot be decoded into the expected schema
+     */
     private static func isDayComplete(
         status: RemoteSyncAndroidReadingPlanStatus?,
         dayNumber: Int,

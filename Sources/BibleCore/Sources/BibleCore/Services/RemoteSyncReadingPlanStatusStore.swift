@@ -175,6 +175,18 @@ public final class RemoteSyncReadingPlanStatusStore {
         )
     }
 
+    /**
+     Encodes one plan-code segment for safe embedding in `Setting.key`.
+
+     Plan codes can contain punctuation that would interfere with the store's dotted composite-key
+     format. This helper uses URL-safe Base64 without padding so later decoding can recover the exact
+     original plan code.
+
+     - Parameter rawValue: Raw Android/iOS reading-plan code to embed in a settings key.
+     - Returns: URL-safe Base64 segment with `+`, `/`, and `=` removed or substituted.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
     private func encodeKeySegment(_ rawValue: String) -> String {
         let data = Data(rawValue.utf8)
         return data.base64EncodedString()
@@ -183,6 +195,16 @@ public final class RemoteSyncReadingPlanStatusStore {
             .replacingOccurrences(of: "=", with: "")
     }
 
+    /**
+     Decodes one URL-safe Base64 settings-key segment back into a plan code.
+
+     - Parameter encodedValue: URL-safe Base64 segment previously produced by `encodeKeySegment(_:)`.
+     - Returns: Original plan code string, or `nil` when the encoded payload is not valid Base64 or
+       not valid UTF-8.
+     - Side effects: none.
+     - Failure modes:
+       - returns `nil` instead of throwing when the stored segment is malformed or undecodable
+     */
     private func decodeKeySegment(_ encodedValue: String) -> String? {
         var base64 = encodedValue
             .replacingOccurrences(of: "-", with: "+")

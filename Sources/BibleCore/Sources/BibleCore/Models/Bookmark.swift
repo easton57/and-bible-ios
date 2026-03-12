@@ -9,7 +9,7 @@ import SwiftData
  The raw values are stored as strings on bookmark entities and interpreted by higher layers.
  This enum currently documents the known cases without adding additional behavior.
  */
-public enum BookmarkType: String, Codable, Sendable {
+public enum BookmarkType: String, Codable, Sendable, Equatable {
     case example = "EXAMPLE"
 }
 
@@ -19,7 +19,7 @@ public enum BookmarkType: String, Codable, Sendable {
  The raw values are stored in `EditAction` and interpreted by UI or import flows when
  appending or prepending generated content.
  */
-public enum EditActionMode: String, Codable, Sendable {
+public enum EditActionMode: String, Codable, Sendable, Equatable {
     case append = "APPEND"
     case prepend = "PREPEND"
 }
@@ -30,7 +30,7 @@ public enum EditActionMode: String, Codable, Sendable {
  The struct is embedded inside bookmark entities. It has no side effects on its own; any note
  mutation occurs when a caller interprets the stored configuration and writes bookmark notes.
  */
-public struct EditAction: Codable, Sendable {
+public struct EditAction: Codable, Sendable, Equatable {
     /// Selected edit mode that determines how new content should be merged into notes.
     public var mode: EditActionMode?
 
@@ -56,7 +56,7 @@ public struct EditAction: Codable, Sendable {
  The struct is serialized into bookmark records so reading/speak flows can resume from the
  correct module context without additional lookup state.
  */
-public struct PlaybackSettings: Codable, Sendable {
+public struct PlaybackSettings: Codable, Sendable, Equatable {
     /// Optional module/book identifier used by TTS playback and resume logic.
     public var bookId: String?
 
