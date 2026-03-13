@@ -94,6 +94,27 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that the workspace selector can be opened from the reader shell.
+     *
+     * - Side effects:
+     *   - launches the app with the calculator gate disabled for test determinism
+     *   - opens the reader overflow menu and pushes the workspace selector
+     * - Failure modes:
+     *   - fails if the workspaces action is missing from the reader menu
+     *   - fails if the workspace selector screen does not render after navigation completes
+     */
+    func testWorkspacesScreenOpensFromReaderMenu() {
+        let app = makeApp()
+        app.launch()
+
+        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        moreMenuButton.tap()
+        requireElement("readerOpenWorkspacesAction", in: app, timeout: 5).tap()
+
+        XCTAssertTrue(requireElement("workspaceSelectorScreen", in: app, timeout: 10).exists)
+    }
+
+    /**
      Builds the configured XCUIApplication instance used by each smoke test.
      *
      * - Returns: App handle configured with deterministic launch arguments for the smoke suite.

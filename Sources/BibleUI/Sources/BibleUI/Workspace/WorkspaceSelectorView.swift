@@ -119,6 +119,7 @@ public struct WorkspaceSelectorView: View {
                 }
             }
         }
+        .accessibilityIdentifier("workspaceSelectorScreen")
         .navigationTitle(String(localized: "workspaces"))
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
