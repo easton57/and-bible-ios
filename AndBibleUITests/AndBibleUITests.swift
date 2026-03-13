@@ -157,6 +157,86 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that the downloads browser can be opened from Settings.
+     *
+     * - Side effects:
+     *   - launches the app with the calculator gate disabled for test determinism
+     *   - navigates from the reader shell into Settings and then into the downloads browser
+     * - Failure modes:
+     *   - fails if the Settings downloads link is missing or cannot be reached by scrolling
+     *   - fails if the downloads browser screen does not render after navigation completes
+     */
+    func testSettingsDownloadsLinkOpensDownloadsBrowser() {
+        let app = makeApp()
+        app.launch()
+
+        openSettings(in: app)
+        tapScrollableElement("settingsDownloadsLink", fallbackLabel: "Downloads", in: app)
+
+        XCTAssertTrue(requireElement("moduleBrowserScreen", in: app, timeout: 10).exists)
+    }
+
+    /**
+     Verifies that the sync settings screen can be opened from Settings.
+     *
+     * - Side effects:
+     *   - launches the app with the calculator gate disabled for test determinism
+     *   - navigates from the reader shell into Settings and then into sync settings
+     * - Failure modes:
+     *   - fails if the Settings sync link is missing or cannot be reached by scrolling
+     *   - fails if the sync settings screen does not render after navigation completes
+     */
+    func testSettingsSyncLinkOpensSyncSettings() {
+        let app = makeApp()
+        app.launch()
+
+        openSettings(in: app)
+        tapScrollableElement("settingsSyncLink", fallbackLabel: "iCloud Sync", in: app)
+
+        XCTAssertTrue(requireElement("syncSettingsScreen", in: app, timeout: 10).exists)
+    }
+
+    /**
+     Verifies that the text-display editor can be opened from Settings.
+     *
+     * - Side effects:
+     *   - launches the app with the calculator gate disabled for test determinism
+     *   - navigates from the reader shell into Settings and then into text-display settings
+     * - Failure modes:
+     *   - fails if the Settings text-display link is missing or cannot be reached by scrolling
+     *   - fails if the text-display settings screen does not render after navigation completes
+     */
+    func testSettingsTextDisplayLinkOpensTextDisplayEditor() {
+        let app = makeApp()
+        app.launch()
+
+        openSettings(in: app)
+        tapScrollableElement("settingsTextDisplayLink", fallbackLabel: "Text Display", in: app)
+
+        XCTAssertTrue(requireElement("textDisplaySettingsScreen", in: app, timeout: 10).exists)
+    }
+
+    /**
+     Verifies that the color editor can be opened from Settings.
+     *
+     * - Side effects:
+     *   - launches the app with the calculator gate disabled for test determinism
+     *   - navigates from the reader shell into Settings and then into color settings
+     * - Failure modes:
+     *   - fails if the Settings colors link is missing or cannot be reached by scrolling
+     *   - fails if the color settings screen does not render after navigation completes
+     */
+    func testSettingsColorsLinkOpensColorEditor() {
+        let app = makeApp()
+        app.launch()
+
+        openSettings(in: app)
+        tapScrollableElement("settingsColorsLink", fallbackLabel: "Colors", in: app)
+
+        XCTAssertTrue(requireElement("colorSettingsScreen", in: app, timeout: 10).exists)
+    }
+
+    /**
      Builds the configured XCUIApplication instance used by each smoke test.
      *
      * - Returns: App handle configured with deterministic launch arguments for the smoke suite.
@@ -168,6 +248,27 @@ final class AndBibleUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["UITEST_DISABLE_CALCULATOR_GATE"]
         return app
+    }
+
+    /**
+     Opens Settings from the reader overflow menu.
+     *
+     * - Parameter app: Running application under test.
+     * - Side effects:
+     *   - opens the reader overflow menu
+     *   - pushes the Settings screen onto the navigation stack
+     * - Failure modes:
+     *   - fails when the reader overflow menu or Settings action cannot be found
+     */
+    private func openSettings(in app: XCUIApplication) {
+        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        moreMenuButton.tap()
+        requireElement("readerOpenSettingsAction", in: app, timeout: 5).tap()
+        XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
+        let okButton = app.buttons["OK"]
+        if okButton.waitForExistence(timeout: 1) {
+            okButton.tap()
+        }
     }
 
     /**
@@ -201,5 +302,74 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
         return element
+    }
+
+    /**
+     Scrolls the Settings form until an identified row becomes tappable, then taps it.
+     *
+     * - Parameters:
+     *   - identifier: Accessibility identifier of the target settings row.
+     *   - fallbackLabel: Visible row label used when SwiftUI does not surface the identifier directly.
+     *   - app: Running application under test.
+     *   - maxSwipes: Maximum number of upward swipes to perform before failing.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - scrolls the settings form upward until the target row becomes hittable
+     *   - falls back to a visible label query when SwiftUI cell wrappers hide custom identifiers
+     *   - taps the target row once it becomes hittable
+     * - Failure modes:
+     *   - records an XCTest failure if the row never appears or never becomes hittable
+     */
+    private func tapScrollableElement(
+        _ identifier: String,
+        fallbackLabel: String,
+        in app: XCUIApplication,
+        maxSwipes: Int = 8,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let settingsForm = requireElement("settingsForm", in: app, timeout: 10, file: file, line: line)
+        let identifierElement = app.descendants(matching: .any)[identifier].firstMatch
+        let buttonElement = app.buttons[fallbackLabel].firstMatch
+        let textElement = app.staticTexts[fallbackLabel].firstMatch
+        let cellElement = app.collectionViews.cells.containing(.staticText, identifier: fallbackLabel).firstMatch
+
+        func currentElement() -> XCUIElement {
+            if identifierElement.exists {
+                return identifierElement
+            }
+            if cellElement.exists {
+                return cellElement
+            }
+            if buttonElement.exists {
+                return buttonElement
+            }
+            return textElement
+        }
+
+        for _ in 0..<maxSwipes {
+            let element = currentElement()
+            if element.exists && element.isHittable {
+                element.tap()
+                return
+            }
+            settingsForm.swipeUp()
+        }
+
+        let element = currentElement()
+        XCTAssertTrue(
+            element.waitForExistence(timeout: 2),
+            "Expected element '\(identifier)' or label '\(fallbackLabel)' to exist after scrolling.",
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            element.isHittable,
+            "Expected element '\(identifier)' or label '\(fallbackLabel)' to become hittable after scrolling.",
+            file: file,
+            line: line
+        )
+        element.tap()
     }
 }

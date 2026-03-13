@@ -836,38 +836,43 @@ public struct SettingsView: View {
                 NavigationLink {
                     ModuleBrowserView()
                 } label: {
-                    Text(String(localized: "downloads"))
+                    settingsNavigationRow(
+                        title: String(localized: "downloads"),
+                        identifier: "settingsDownloadsLink"
+                    )
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("settingsDownloadsLink")
                 NavigationLink {
                     RepositoryManagerView()
                 } label: {
-                    Text(String(localized: "repositories"))
+                    settingsNavigationRow(
+                        title: String(localized: "repositories"),
+                        identifier: "settingsRepositoriesLink"
+                    )
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("settingsRepositoriesLink")
                 NavigationLink {
                     ImportExportView()
                 } label: {
-                    Text(String(localized: "import_export"))
+                    settingsNavigationRow(
+                        title: String(localized: "import_export"),
+                        identifier: "settingsImportExportLink"
+                    )
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("settingsImportExportLink")
                 NavigationLink {
                     SyncSettingsView()
                 } label: {
-                    Text(String(localized: "icloud_sync"))
+                    settingsNavigationRow(
+                        title: String(localized: "icloud_sync"),
+                        identifier: "settingsSyncLink"
+                    )
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("settingsSyncLink")
                 NavigationLink {
                     LabelManagerView()
                 } label: {
-                    Text(String(localized: "labels"))
+                    settingsNavigationRow(
+                        title: String(localized: "labels"),
+                        identifier: "settingsLabelsLink"
+                    )
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("settingsLabelsLink")
             }
 
             Section(String(localized: "settings_about")) {
@@ -1046,17 +1051,19 @@ public struct SettingsView: View {
             NavigationLink {
                 TextDisplaySettingsView(settings: $displaySettings, onChange: onSettingsChanged)
             } label: {
-                Text(String(localized: "settings_text_display"))
+                settingsNavigationRow(
+                    title: String(localized: "settings_text_display"),
+                    identifier: "settingsTextDisplayLink"
+                )
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("settingsTextDisplayLink")
             NavigationLink {
                 ColorSettingsView(settings: $displaySettings, onChange: onSettingsChanged)
             } label: {
-                Text(String(localized: "settings_colors"))
+                settingsNavigationRow(
+                    title: String(localized: "settings_colors"),
+                    identifier: "settingsColorsLink"
+                )
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("settingsColorsLink")
             Picker(
                 String(localized: "prefs_night_mode_title", defaultValue: "Night mode switching"),
                 selection: Binding(
@@ -1361,6 +1368,27 @@ public struct SettingsView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
+    }
+
+    @ViewBuilder
+    /**
+     Builds a single-line navigation row with a stable accessibility identifier for UI automation.
+     *
+     * - Parameters:
+     *   - title: User-visible title shown in the row.
+     *   - identifier: Accessibility identifier attached to the rendered row label.
+     * - Returns: Row content suitable for use as a `NavigationLink` label inside the settings form.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func settingsNavigationRow(title: String, identifier: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
     }
 
     /**

@@ -168,6 +168,7 @@ public struct TextDisplaySettingsView: View {
                 Toggle(String(localized: "show_my_notes"), isOn: boolBinding(\.showMyNotes, default: true))
             }
         }
+        .accessibilityIdentifier("textDisplaySettingsScreen")
         .navigationTitle(String(localized: "text_display"))
     }
 

@@ -173,6 +173,7 @@ public struct SyncSettingsView: View {
                 googleDriveSections
             }
         }
+        .accessibilityIdentifier("syncSettingsScreen")
         .navigationTitle(String(localized: "sync_adapter"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

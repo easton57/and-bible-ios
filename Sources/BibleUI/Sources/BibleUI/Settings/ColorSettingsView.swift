@@ -126,6 +126,7 @@ public struct ColorSettingsView: View {
                 }
             }
         }
+        .accessibilityIdentifier("colorSettingsScreen")
         .navigationTitle(String(localized: "colors"))
     }
 }
