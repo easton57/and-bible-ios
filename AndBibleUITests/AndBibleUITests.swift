@@ -395,7 +395,7 @@ final class AndBibleUITests: XCTestCase {
      * - Side effects:
      *   - when `launchedDirectly` is `false`, opens the reader overflow menu and pushes the
      *     Settings screen onto the navigation stack
-     *   - dismisses the language restart alert when it appears over Settings
+     *   - dismisses the language restart alert only when it is already present after Settings loads
      * - Failure modes:
      *   - fails when the reader overflow menu or Settings action cannot be found for non-direct
      *     launches
@@ -409,10 +409,10 @@ final class AndBibleUITests: XCTestCase {
         }
         XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
         let okButton = app.buttons["OK"]
-        if okButton.waitForExistence(timeout: 1) {
+        if okButton.exists {
             okButton.tap()
+            XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
         }
-        XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
     }
 
     /**

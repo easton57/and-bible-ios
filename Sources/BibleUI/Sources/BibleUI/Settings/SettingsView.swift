@@ -1339,6 +1339,9 @@ public struct SettingsView: View {
                 }
 
                 let store = SettingsStore(modelContext: modelContext)
+                guard shouldPersistLanguageSelection(normalized, using: store) else {
+                    return
+                }
                 store.setString(.localePref, value: normalized)
 
                 if let mapped = Self.appleLanguageCode(forLocalePrefValue: normalized) {
@@ -1401,6 +1404,30 @@ public struct SettingsView: View {
             Spacer()
         }
         .contentShape(Rectangle())
+    }
+
+    /**
+     Returns whether applying a language selection would change persisted locale state.
+
+     This prevents the restart-required alert from appearing when SwiftUI replays the locale picker
+     selection after initial hydration even though both the Android-parity `locale_pref` value and
+     the effective Apple language override already match the selected value.
+
+     - Parameters:
+       - normalized: Candidate locale value normalized against the supported `locale_pref` list.
+       - store: Settings store used to read the persisted Android-parity locale value.
+     - Returns: `true` when persisting the selection would change either stored locale source.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func shouldPersistLanguageSelection(_ normalized: String, using store: SettingsStore) -> Bool {
+        let storedLocale = Self.normalizedLocalePrefValue(store.getString(.localePref))
+        let appleLocale = (
+            (UserDefaults.standard.array(forKey: "AppleLanguages") as? [String])?
+                .first
+                .flatMap(Self.localePrefValue(forAppleLanguage:))
+        ) ?? ""
+        return normalized != storedLocale || normalized != appleLocale
     }
 
     /**
@@ -1638,6 +1665,18 @@ public struct SettingsView: View {
         default:
             return "default"
         }
+    }
+
+    /**
+     Normalizes one persisted locale string against the supported Android parity values.
+
+     - Parameter value: Raw locale value read from persistence.
+     - Returns: The supported locale value when recognized, or the default empty value otherwise.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private static func normalizedLocalePrefValue(_ value: String) -> String {
+        localeOptions.contains(where: { $0.value == value }) ? value : ""
     }
 
     /// Localized title for one night-mode option exposed by the settings picker.
