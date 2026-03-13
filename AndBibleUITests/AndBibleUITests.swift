@@ -115,6 +115,27 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that the bookmark list can be opened from the reader shell.
+     *
+     * - Side effects:
+     *   - launches the app with the calculator gate disabled for test determinism
+     *   - opens the reader overflow menu and pushes the bookmark list
+     * - Failure modes:
+     *   - fails if the bookmarks action is missing from the reader menu
+     *   - fails if the bookmark list screen does not render after navigation completes
+     */
+    func testBookmarksScreenOpensFromReaderMenu() {
+        let app = makeApp()
+        app.launch()
+
+        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        moreMenuButton.tap()
+        requireElement("readerOpenBookmarksAction", in: app, timeout: 5).tap()
+
+        XCTAssertTrue(requireElement("bookmarkListScreen", in: app, timeout: 10).exists)
+    }
+
+    /**
      Builds the configured XCUIApplication instance used by each smoke test.
      *
      * - Returns: App handle configured with deterministic launch arguments for the smoke suite.

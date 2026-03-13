@@ -127,8 +127,10 @@ public struct BookmarkListView: View {
                     systemImage: "bookmark",
                     description: Text(String(localized: "no_bookmarks_description"))
                 )
+                .accessibilityIdentifier("bookmarkListScreen")
             } else {
                 bookmarkList
+                    .accessibilityIdentifier("bookmarkListScreen")
             }
         }
         .searchable(text: $searchText, prompt: String(localized: "search_bookmarks"))
