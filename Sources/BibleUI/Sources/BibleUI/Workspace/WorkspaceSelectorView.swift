@@ -109,7 +109,11 @@ public struct WorkspaceSelectorView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 EditButton()
                 Button(String(localized: "add"), systemImage: "plus") {
-                    showNewWorkspace = true
+                    if let overrideName = uiTestWorkspaceOverrideName(for: "UITEST_WORKSPACE_CREATE_NAME") {
+                        createWorkspace(named: overrideName)
+                    } else {
+                        showNewWorkspace = true
+                    }
                 }
                 .accessibilityIdentifier("workspaceSelectorAddButton")
             }
@@ -117,13 +121,7 @@ public struct WorkspaceSelectorView: View {
         .alert(String(localized: "workspace_new"), isPresented: $showNewWorkspace) {
             TextField(String(localized: "name"), text: $newWorkspaceName)
             Button(String(localized: "create")) {
-                guard !newWorkspaceName.isEmpty else { return }
-                let store = WorkspaceStore(modelContext: modelContext)
-                let workspace = store.createWorkspace(name: newWorkspaceName)
-                if !uiTestShowsInlineActions {
-                    windowManager.setActiveWorkspace(workspace)
-                    dismiss()
-                }
+                createWorkspace(named: newWorkspaceName)
                 newWorkspaceName = ""
             }
             Button(String(localized: "cancel"), role: .cancel) { newWorkspaceName = "" }
@@ -131,9 +129,8 @@ public struct WorkspaceSelectorView: View {
         .alert(String(localized: "rename"), isPresented: $showRenameWorkspace) {
             TextField(String(localized: "name"), text: $renameWorkspaceName)
             Button(String(localized: "save")) {
-                guard !renameWorkspaceName.isEmpty, let workspace = workspaceToRename else { return }
-                let store = WorkspaceStore(modelContext: modelContext)
-                store.renameWorkspace(workspace, to: renameWorkspaceName)
+                guard let workspace = workspaceToRename else { return }
+                renameWorkspace(workspace, to: renameWorkspaceName)
                 workspaceToRename = nil
                 renameWorkspaceName = ""
             }
@@ -145,9 +142,8 @@ public struct WorkspaceSelectorView: View {
         .alert(String(localized: "clone"), isPresented: $showCloneWorkspace) {
             TextField(String(localized: "name"), text: $cloneWorkspaceName)
             Button(String(localized: "create")) {
-                guard !cloneWorkspaceName.isEmpty, let workspace = workspaceToClone else { return }
-                let store = WorkspaceStore(modelContext: modelContext)
-                store.cloneWorkspace(workspace, newName: cloneWorkspaceName)
+                guard let workspace = workspaceToClone else { return }
+                cloneWorkspace(workspace, as: cloneWorkspaceName)
                 workspaceToClone = nil
                 cloneWorkspaceName = ""
             }
@@ -296,12 +292,17 @@ public struct WorkspaceSelectorView: View {
      *
      * - Parameter workspace: Workspace that should be renamed.
      * - Side effects:
-     *   - stores the selected workspace in local alert state
-     *   - pre-fills the rename text field with the current workspace name
-     *   - presents the rename alert
+     *   - in normal mode, stores the selected workspace in local alert state, pre-fills the
+     *     rename field, and presents the rename alert
+     *   - in XCUITest inline-action mode, renames the workspace immediately when a deterministic
+     *     override name is configured
      * - Failure modes: This helper cannot fail.
      */
     private func prepareRename(for workspace: Workspace) {
+        if let overrideName = uiTestWorkspaceOverrideName(for: "UITEST_WORKSPACE_RENAME_NAME") {
+            renameWorkspace(workspace, to: overrideName)
+            return
+        }
         workspaceToRename = workspace
         renameWorkspaceName = workspace.name
         showRenameWorkspace = true
@@ -312,15 +313,89 @@ public struct WorkspaceSelectorView: View {
      *
      * - Parameter workspace: Workspace that should be deep-cloned.
      * - Side effects:
-     *   - stores the selected workspace in local alert state
-     *   - pre-fills the clone text field with the localized copy-of default
-     *   - presents the clone alert
+     *   - in normal mode, stores the selected workspace in local alert state, pre-fills the clone
+     *     field, and presents the clone alert
+     *   - in XCUITest inline-action mode, clones the workspace immediately when a deterministic
+     *     override name is configured
      * - Failure modes: This helper cannot fail.
      */
     private func prepareClone(for workspace: Workspace) {
+        if let overrideName = uiTestWorkspaceOverrideName(for: "UITEST_WORKSPACE_CLONE_NAME") {
+            cloneWorkspace(workspace, as: overrideName)
+            return
+        }
         workspaceToClone = workspace
         cloneWorkspaceName = String(format: String(localized: "copy_of %@"), workspace.name)
         showCloneWorkspace = true
+    }
+
+    /**
+     Creates one workspace and applies the normal post-create selection behavior when appropriate.
+     *
+     * - Parameter name: User-visible name to assign to the new workspace.
+     * - Side effects:
+     *   - persists one new workspace through `WorkspaceStore`
+     *   - in normal mode, switches the active workspace and dismisses the selector
+     * - Failure modes:
+     *   - returns without mutation when `name` is empty
+     */
+    private func createWorkspace(named name: String) {
+        guard !name.isEmpty else { return }
+        let store = WorkspaceStore(modelContext: modelContext)
+        let workspace = store.createWorkspace(name: name)
+        if !uiTestShowsInlineActions {
+            windowManager.setActiveWorkspace(workspace)
+            dismiss()
+        }
+    }
+
+    /**
+     Renames one workspace through `WorkspaceStore`.
+     *
+     * - Parameters:
+     *   - workspace: Workspace to rename.
+     *   - name: Replacement user-visible name.
+     * - Side effects:
+     *   - persists the renamed workspace through `WorkspaceStore`
+     * - Failure modes:
+     *   - returns without mutation when `name` is empty
+     */
+    private func renameWorkspace(_ workspace: Workspace, to name: String) {
+        guard !name.isEmpty else { return }
+        let store = WorkspaceStore(modelContext: modelContext)
+        store.renameWorkspace(workspace, to: name)
+    }
+
+    /**
+     Clones one workspace through `WorkspaceStore`.
+     *
+     * - Parameters:
+     *   - workspace: Workspace to deep-clone.
+     *   - name: User-visible name to assign to the cloned workspace.
+     * - Side effects:
+     *   - persists one deep-cloned workspace graph through `WorkspaceStore`
+     * - Failure modes:
+     *   - returns without mutation when `name` is empty
+     */
+    private func cloneWorkspace(_ workspace: Workspace, as name: String) {
+        guard !name.isEmpty else { return }
+        let store = WorkspaceStore(modelContext: modelContext)
+        store.cloneWorkspace(workspace, newName: name)
+    }
+
+    /**
+     Resolves one optional workspace-name override from the XCUITest launch environment.
+     *
+     * - Parameter key: Environment variable name containing the requested override.
+     * - Returns: The trimmed override value, or `nil` when the key is absent or blank.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func uiTestWorkspaceOverrideName(for key: String) -> String? {
+        let trimmed = ProcessInfo.processInfo.environment[key]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 
     /**

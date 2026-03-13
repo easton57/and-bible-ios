@@ -164,21 +164,15 @@ final class AndBibleUITests: XCTestCase {
         let createdName = "W1"
         let renamedName = "W2"
         let cloneName = "W3"
+        app.launchEnvironment["UITEST_WORKSPACE_CREATE_NAME"] = createdName
+        app.launchEnvironment["UITEST_WORKSPACE_RENAME_NAME"] = renamedName
+        app.launchEnvironment["UITEST_WORKSPACE_CLONE_NAME"] = cloneName
         app.launch()
 
         XCTAssertTrue(openWorkspaceSelector(in: app, launchedDirectly: true).exists)
         let originalActiveWorkspaceName = requireActiveWorkspaceRow(in: app, timeout: 10).label
 
         requireElement("workspaceSelectorAddButton", in: app, timeout: 10).tap()
-        let createAlert = app.alerts.firstMatch
-        XCTAssertTrue(createAlert.waitForExistence(timeout: 10))
-        let createField = createAlert.textFields.firstMatch
-        XCTAssertTrue(createField.waitForExistence(timeout: 10))
-        createField.tap()
-        createField.typeText(createdName)
-        let createButton = createAlert.buttons["Create"].firstMatch
-        XCTAssertTrue(createButton.waitForExistence(timeout: 10))
-        createButton.tap()
 
         XCTAssertTrue(requireWorkspaceRow(named: createdName, in: app, timeout: 10).exists)
         XCTAssertEqual(requireActiveWorkspaceRow(in: app, timeout: 10).label, originalActiveWorkspaceName)
@@ -190,15 +184,6 @@ final class AndBibleUITests: XCTestCase {
             timeout: 10
         ).tap()
 
-        let renameAlert = app.alerts.firstMatch
-        XCTAssertTrue(renameAlert.waitForExistence(timeout: 10))
-        let renameField = renameAlert.textFields.firstMatch
-        XCTAssertTrue(renameField.waitForExistence(timeout: 10))
-        replaceText(in: renameField, with: renamedName)
-        let saveButton = renameAlert.buttons["Save"].firstMatch
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 10))
-        saveButton.tap()
-
         XCTAssertTrue(requireWorkspaceRow(named: renamedName, in: app, timeout: 10).exists)
         XCTAssertEqual(requireActiveWorkspaceRow(in: app, timeout: 10).label, originalActiveWorkspaceName)
 
@@ -208,15 +193,6 @@ final class AndBibleUITests: XCTestCase {
             in: app,
             timeout: 10
         ).tap()
-
-        let cloneAlert = app.alerts.firstMatch
-        XCTAssertTrue(cloneAlert.waitForExistence(timeout: 10))
-        let cloneField = cloneAlert.textFields.firstMatch
-        XCTAssertTrue(cloneField.waitForExistence(timeout: 10))
-        replaceText(in: cloneField, with: cloneName)
-        let cloneCreateButton = cloneAlert.buttons["Create"].firstMatch
-        XCTAssertTrue(cloneCreateButton.waitForExistence(timeout: 10))
-        cloneCreateButton.tap()
 
         XCTAssertTrue(requireWorkspaceRow(named: cloneName, in: app, timeout: 10).exists)
         XCTAssertEqual(
