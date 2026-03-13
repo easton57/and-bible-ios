@@ -136,6 +136,27 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that the about screen can be opened from the reader shell.
+     *
+     * - Side effects:
+     *   - launches the app with the calculator gate disabled for test determinism
+     *   - opens the reader overflow menu and pushes the about screen
+     * - Failure modes:
+     *   - fails if the about action is missing from the reader menu
+     *   - fails if the about screen does not render after navigation completes
+     */
+    func testAboutScreenOpensFromReaderMenu() {
+        let app = makeApp()
+        app.launch()
+
+        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        moreMenuButton.tap()
+        requireElement("readerOpenAboutAction", in: app, timeout: 5).tap()
+
+        XCTAssertTrue(requireElement("aboutScreen", in: app, timeout: 10).exists)
+    }
+
+    /**
      Builds the configured XCUIApplication instance used by each smoke test.
      *
      * - Returns: App handle configured with deterministic launch arguments for the smoke suite.

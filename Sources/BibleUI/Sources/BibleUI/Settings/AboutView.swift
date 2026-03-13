@@ -101,6 +101,7 @@ public struct AboutView: View {
                 Spacer(minLength: 40)
             }
         }
+        .accessibilityIdentifier("aboutScreen")
         .navigationTitle(String(localized: "about"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
