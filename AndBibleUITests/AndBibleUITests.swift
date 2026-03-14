@@ -411,6 +411,35 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+    Verifies that toggling justify text mutates the exported control state.
+     *
+     * - Side effects:
+     *   - launches the app directly into the text-display editor
+     *   - toggles the justify-text control and waits for its accessibility value to change
+     * - Failure modes:
+     *   - fails if the direct-launch text-display editor never appears
+     *   - fails if the justify-text toggle is missing or if its exported state never changes after
+     *     the toggle
+     */
+    func testTextDisplayJustifyToggleMutatesControlState() {
+        let app = makeApp(openTextDisplayOnLaunch: true)
+        app.launch()
+
+        _ = openTextDisplaySettings(in: app, launchedDirectly: true)
+
+        let justifyToggle = requireElement("textDisplayJustifyTextToggle", in: app, timeout: 10)
+        let justifyState = app.staticTexts["textDisplayJustifyTextState"].firstMatch
+        XCTAssertTrue(justifyState.waitForExistence(timeout: 10), "Expected justify text state label to exist.")
+        let initialValue = justifyState.label
+        let expectedValue = initialValue == "justifyTextOn" ? "justifyTextOff" : "justifyTextOn"
+        justifyToggle.tap()
+
+        let valuePredicate = NSPredicate(format: "label == %@", expectedValue)
+        expectation(for: valuePredicate, evaluatedWith: justifyState)
+        waitForExpectations(timeout: 10)
+    }
+
+    /**
      Verifies that the font-family control presents the native font picker from Text Display.
      *
      * - Side effects:

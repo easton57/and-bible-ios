@@ -27,6 +27,9 @@ public struct TextDisplaySettingsView: View {
     /// Callback invoked after any user-visible settings mutation.
     var onChange: (() -> Void)?
 
+    /// Whether the view is running under the deterministic in-memory XCUITest harness.
+    private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
+
     #if os(iOS)
     /// Whether the native iOS font picker sheet is currently presented.
     @State private var showFontPicker = false
@@ -103,6 +106,21 @@ public struct TextDisplaySettingsView: View {
         #endif
     }
 
+    /// Rendered justify-text state string exposed only in the XCUITest harness.
+    private var uiTestJustifyStateLabel: String {
+        (settings.justifyText ?? false) ? "justifyTextOn" : "justifyTextOff"
+    }
+
+    /**
+     Flips the justify-text preference in the deterministic XCUITest harness.
+
+     - Side effects: Mutates `settings.justifyText` and forwards the change through `onChange`.
+     */
+    private func toggleJustifyText() {
+        settings.justifyText = !(settings.justifyText ?? false)
+        onChange?()
+    }
+
     /**
      Builds the grouped typography, layout, content, and annotation settings form.
      */
@@ -150,8 +168,28 @@ public struct TextDisplaySettingsView: View {
                     Text("\(settings.lineSpacing ?? 10)")
                         .monospacedDigit()
                 }
-                Toggle(String(localized: "justify_text"), isOn: boolBinding(\.justifyText, default: false))
+                if uiTestUsesInMemoryStores {
+                    Button(action: toggleJustifyText) {
+                        HStack {
+                            Text(String(localized: "justify_text"))
+                            Spacer()
+                            Image(systemName: (settings.justifyText ?? false) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle((settings.justifyText ?? false) ? Color.accentColor : Color.secondary)
+                        }
+                    }
                     .accessibilityIdentifier("textDisplayJustifyTextToggle")
+                    .accessibilityValue(uiTestJustifyStateLabel)
+                } else {
+                    Toggle(String(localized: "justify_text"), isOn: boolBinding(\.justifyText, default: false))
+                        .accessibilityIdentifier("textDisplayJustifyTextToggle")
+                        .accessibilityValue((settings.justifyText ?? false) ? "justifyTextOn" : "justifyTextOff")
+                }
+                if uiTestUsesInMemoryStores {
+                    Text(uiTestJustifyStateLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("textDisplayJustifyTextState")
+                }
                 Toggle(String(localized: "verse_per_line"), isOn: boolBinding(\.showVersePerLine, default: false))
                 Toggle(String(localized: "hyphenation"), isOn: boolBinding(\.hyphenation, default: true))
             }
