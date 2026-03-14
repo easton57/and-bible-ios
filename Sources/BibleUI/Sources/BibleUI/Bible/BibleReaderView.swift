@@ -89,10 +89,10 @@ func presentCompareView(book: String, chapter: Int, currentModuleName: String, s
  Side effects:
  - `onAppear` loads persisted preferences, wires TTS callbacks, restores speech settings, and
    registers synchronized-scrolling callbacks on `WindowManager`
- - XCUITest launch arguments can seed bookmark/label data or present the settings, text-display
-   editor, color editor, sync editor, import/export sheet, label manager, or a seeded bookmark
-   label-assignment sheet immediately after initial state hydration so automation can target
-   nested flows without menu traversal
+ - XCUITest launch arguments can seed bookmark/label or history data or present the settings,
+   text-display editor, color editor, sync editor, import/export sheet, label manager, or a
+   seeded bookmark label-assignment sheet immediately after initial state hydration so automation
+   can target nested flows without menu traversal
  - iOS `onAppear` and `onDisappear` start and stop tilt-to-scroll based on workspace settings
  - sheet dismissals reload behavior preferences or refresh installed-module lists where needed
  - toolbar toggles and helper actions mutate SwiftData-backed workspace/settings state and push
@@ -164,6 +164,9 @@ public struct BibleReaderView: View {
 
     /// Test-only seeded daily-reading route used to launch directly into `DailyReadingView`.
     @State private var uiTestDailyReadingRoute: UITestDailyReadingRoute?
+
+    /// Exported XCUITest-only history workflow state used to diagnose jump-back navigation.
+    @State private var uiTestHistoryNavigationState = "idle"
 
     /// Presents the expanded speech controls sheet.
     @State private var showSpeakControls = false
@@ -244,6 +247,10 @@ public struct BibleReaderView: View {
     /// Launch-argument override used by XCUITests to seed bookmark/label data without opening a sheet.
     private let uiTestSeedsBookmarkLabelWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_LABEL_WORKFLOW")
+
+    /// Launch-argument override used by XCUITests to seed one persisted history target on launch.
+    private let uiTestSeedsHistoryWorkflowOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_HISTORY_WORKFLOW")
 
     /// Launch-argument override used by XCUITests to present Reading Plans immediately on launch.
     private let uiTestOpensReadingPlansOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_READING_PLANS")
@@ -595,6 +602,19 @@ public struct BibleReaderView: View {
         }
         #endif
         .preferredColorScheme(preferredColorSchemeOverride)
+        .overlay(alignment: .topTrailing) {
+            if uiTestUsesInMemoryStores {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(currentReference)
+                        .accessibilityIdentifier("readerCurrentReferenceState")
+                    Text(uiTestHistoryNavigationState)
+                        .accessibilityIdentifier("uiTestHistoryNavigationState")
+                }
+                .font(.caption2)
+                .foregroundStyle(.clear)
+                .allowsHitTesting(false)
+            }
+        }
         .sheet(isPresented: $showBookChooser) {
             NavigationStack {
                 BookChooserView(
@@ -728,9 +748,15 @@ public struct BibleReaderView: View {
                     bookNameResolver: { [weak ctrl = focusedController] osisId in
                         ctrl?.bookName(forOsisId: osisId)
                     }
-                ) { book, chapter in
+                ) { key in
+                    uiTestHistoryNavigationState = "selected:\(key)"
+                    let controller = focusedController
                     showHistory = false
-                    focusedController?.navigateTo(book: book, chapter: chapter)
+                    Task { @MainActor in
+                        await Task.yield()
+                        let didNavigate = controller?.navigateToRef(key) ?? false
+                        uiTestHistoryNavigationState = didNavigate ? "navigated:\(key)" : "failed:\(key)"
+                    }
                 }
             }
         }
@@ -1390,6 +1416,7 @@ public struct BibleReaderView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("bookChooserButton")
+                    .accessibilityValue(currentReference)
 
                     // Next chapter
                     Button(action: { controller?.navigateNext() }) {
@@ -1586,6 +1613,7 @@ public struct BibleReaderView: View {
                                     showHistory = true
                                 }
                             }
+                            .accessibilityIdentifier("readerOpenHistoryAction")
                             Button(String(localized: "compare"), systemImage: "rectangle.split.2x1") {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                     showCompare = true
@@ -2245,6 +2273,51 @@ public struct BibleReaderView: View {
     }
 
     /**
+     Clears persisted history rows for the active window before a seeded XCUITest jump-back flow.
+     *
+     * Side effects:
+     * - fetches all persisted `HistoryItem` rows from SwiftData
+     * - deletes only the rows owned by the currently active window so other window fixtures stay
+     *   untouched
+     * - saves the cleared history state back to SwiftData
+     *
+     * Failure modes:
+     * - returns without mutation when there is no active window or the history fetch fails
+     * - silently discards save failures because the reset is only used for test setup
+     */
+    private func resetHistoryForUITests() {
+        guard let activeWindowID = windowManager.activeWindow?.id else { return }
+        let descriptor = FetchDescriptor<HistoryItem>()
+        guard let historyItems = try? modelContext.fetch(descriptor) else { return }
+        for item in historyItems where item.window?.id == activeWindowID {
+            modelContext.delete(item)
+        }
+        try? modelContext.save()
+    }
+
+    /**
+     Seeds one deterministic history destination for XCUITest reader jump-back workflows.
+     *
+     * Side effects:
+     * - appends one `HistoryItem` row to the active window's persisted history through
+     *   `WorkspaceStore`
+     * - records `Exod.2.1` against the focused module so the history list has one deterministic
+     *   row to open
+     *
+     * Failure modes:
+     * - returns without mutation when there is no active window to own the seeded history row
+     */
+    private func seedHistoryForUITests() {
+        guard let activeWindow = windowManager.activeWindow else { return }
+        let workspaceStore = WorkspaceStore(modelContext: modelContext)
+        workspaceStore.addHistoryItem(
+            to: activeWindow,
+            document: focusedController?.activeModuleName ?? "KJV",
+            key: "Exod.2.1"
+        )
+    }
+
+    /**
      Seeds one deterministic Bible bookmark for direct XCUITest label-assignment workflows.
      *
      * - Returns: Identifier of the seeded bookmark, or `nil` when the insert/save path fails.
@@ -2410,6 +2483,9 @@ public struct BibleReaderView: View {
             resetLabelsForUITests()
             resetBookmarksForUITests()
             _ = seedLabelAssignmentBookmarkForUITests()
+        } else if uiTestSeedsHistoryWorkflowOnLaunch {
+            resetHistoryForUITests()
+            seedHistoryForUITests()
         } else if uiTestOpensReadingPlansOnLaunch {
             resetReadingPlansForUITests()
             showReadingPlans = true

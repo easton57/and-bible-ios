@@ -16,7 +16,7 @@ import BibleCore
  - `bookNameResolver` can translate OSIS book IDs using the active module's dynamic canon
 
  Side effects:
- - selecting a row dismisses the sheet and invokes `onNavigate`
+ - selecting a row dismisses the sheet and forwards the stored history key through `onNavigate`
  - swipe deletion and clear-all actions remove persisted history items from SwiftData
  */
 public struct HistoryView: View {
@@ -33,7 +33,7 @@ public struct HistoryView: View {
     @Query(sort: \HistoryItem.createdAt, order: .reverse) private var allHistory: [HistoryItem]
 
     /// Callback invoked when the user chooses a history item to navigate back to.
-    var onNavigate: ((String, Int) -> Void)?
+    var onNavigate: ((String) -> Void)?
 
     /// Resolves an OSIS book ID to a human-readable name using the active controller's dynamic book list.
     var bookNameResolver: ((String) -> String?)?
@@ -43,9 +43,9 @@ public struct HistoryView: View {
 
      - Parameters:
        - bookNameResolver: Optional resolver that maps OSIS IDs to dynamic, module-aware book names.
-       - onNavigate: Optional callback invoked with `(bookName, chapter)` when a row is selected.
+       - onNavigate: Optional callback invoked with the stored history key when a row is selected.
      */
-    public init(bookNameResolver: ((String) -> String?)? = nil, onNavigate: ((String, Int) -> Void)? = nil) {
+    public init(bookNameResolver: ((String) -> String?)? = nil, onNavigate: ((String) -> Void)? = nil) {
         self.bookNameResolver = bookNameResolver
         self.onNavigate = onNavigate
     }
@@ -86,13 +86,17 @@ public struct HistoryView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier(historyRowIdentifier(for: item))
                     }
                     .onDelete(perform: deleteItems)
                 }
             }
         }
+        .accessibilityIdentifier("historyScreen")
         .navigationTitle(String(localized: "history"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -124,16 +128,28 @@ public struct HistoryView: View {
     }
 
     /**
-     Dismisses the history view and forwards the selected location to the navigation callback.
+     Dismisses the history view and forwards the selected stored key to the navigation callback.
      */
     private func navigateTo(_ item: HistoryItem) {
-        let parts = item.key.split(separator: ".")
-        guard parts.count >= 2 else { return }
-        let osisId = String(parts[0])
-        let chapter = Int(parts[1]) ?? 1
-        let bookName = bookNameResolver?(osisId) ?? BibleReaderController.bookName(forOsisId: osisId) ?? osisId
+        onNavigate?(item.key)
         dismiss()
-        onNavigate?(bookName, chapter)
+    }
+
+    /**
+     Resolves the deterministic accessibility identifier for one persisted history row.
+     *
+     * - Parameter item: History row whose durable key should back the identifier.
+     * - Returns: Accessibility identifier stable across row reordering for the same history key.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func historyRowIdentifier(for item: HistoryItem) -> String {
+        let sanitizedKey = item.key.replacingOccurrences(
+            of: #"[^A-Za-z0-9]+"#,
+            with: "_",
+            options: .regularExpression
+        )
+        return "historyRow::\(sanitizedKey)"
     }
 
     /**

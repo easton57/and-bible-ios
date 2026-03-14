@@ -245,6 +245,46 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that selecting a seeded history row jumps the active reader to that prior location.
+     *
+     * - Side effects:
+     *   - launches the app with one deterministic persisted history row while staying on the real
+     *     reader shell
+     *   - opens History from the actual reader overflow menu
+     *   - selects the seeded history row and waits for the reader's exported current-reference
+     *     state to change from `Genesis 1` to `Exodus 2`
+     * - Failure modes:
+     *   - fails if the reader shell, History action, or seeded history row never appears
+     *   - fails if selecting the history row does not update the reader's exported current
+     *     reference state to `Exodus 2`
+     */
+    func testHistorySelectionNavigatesReaderToSeededReference() {
+        let app = makeApp(seedHistoryWorkflowOnLaunch: true)
+        app.launch()
+
+        let currentReferenceState = requireElement("readerCurrentReferenceState", in: app, timeout: 10)
+        let historyNavigationState = requireElement("uiTestHistoryNavigationState", in: app, timeout: 10)
+        XCTAssertEqual(currentReferenceState.label, "Genesis 1")
+        XCTAssertEqual(historyNavigationState.label, "idle")
+
+        let moreMenuButton = requireReaderMoreMenuButton(in: app)
+        moreMenuButton.tap()
+        requireElement("readerOpenHistoryAction", in: app, timeout: 5).tap()
+
+        XCTAssertTrue(requireElement("historyScreen", in: app, timeout: 10).exists)
+        let historyRow = app.buttons["historyRow::Exod_2_1"].firstMatch
+        XCTAssertTrue(historyRow.waitForExistence(timeout: 10), "Expected seeded history row button to exist.")
+        historyRow.tap()
+
+        let navigationPredicate = NSPredicate(format: "label == %@", "navigated:Exod.2.1")
+        expectation(for: navigationPredicate, evaluatedWith: historyNavigationState)
+
+        let valuePredicate = NSPredicate(format: "label == %@", "Exodus 2")
+        expectation(for: valuePredicate, evaluatedWith: currentReferenceState)
+        waitForExpectations(timeout: 10)
+    }
+
+    /**
      Verifies that label assignment can be reached from the real bookmark-list path and still
      toggle the seeded label state.
      *
@@ -757,6 +797,8 @@ final class AndBibleUITests: XCTestCase {
      *     sheet immediately on launch.
      *   - seedBookmarkLabelWorkflowOnLaunch: Whether the app should seed one deterministic
      *     bookmark-plus-label workflow while still landing on the reader shell.
+     *   - seedHistoryWorkflowOnLaunch: Whether the app should seed one deterministic history row
+     *     while still landing on the reader shell.
      *   - openReadingPlansOnLaunch: Whether the app should present Reading Plans immediately on
      *     launch.
      *   - openDailyReadingOnLaunch: Whether the app should present one seeded daily-reading view
@@ -791,6 +833,8 @@ final class AndBibleUITests: XCTestCase {
      *     plus labels and present Label Assignment immediately after the reader hydrates
      *   - when `seedBookmarkLabelWorkflowOnLaunch` is `true`, configures the app to seed one
      *     bookmark plus labels while leaving navigation at the reader shell
+     *   - when `seedHistoryWorkflowOnLaunch` is `true`, configures the app to seed one persisted
+     *     history row while leaving navigation at the reader shell
      *   - when `openReadingPlansOnLaunch` is `true`, configures the app to present Reading Plans
      *     immediately after the reader hydrates
      *   - when `openDailyReadingOnLaunch` is `true`, configures the app to seed one reading plan
@@ -812,6 +856,7 @@ final class AndBibleUITests: XCTestCase {
         openLabelManagerOnLaunch: Bool = false,
         openLabelAssignmentOnLaunch: Bool = false,
         seedBookmarkLabelWorkflowOnLaunch: Bool = false,
+        seedHistoryWorkflowOnLaunch: Bool = false,
         openReadingPlansOnLaunch: Bool = false,
         openDailyReadingOnLaunch: Bool = false,
         openWorkspacesOnLaunch: Bool = false
@@ -858,6 +903,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if seedBookmarkLabelWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_BOOKMARK_LABEL_WORKFLOW"]
+        }
+        if seedHistoryWorkflowOnLaunch {
+            app.launchArguments += ["UITEST_SEED_HISTORY_WORKFLOW"]
         }
         if openReadingPlansOnLaunch {
             app.launchArguments += ["UITEST_OPEN_READING_PLANS"]
