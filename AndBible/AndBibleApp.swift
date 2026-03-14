@@ -163,6 +163,8 @@ struct AndBibleApp: App {
     @State private var isUnlocked = false
     /// Launch-argument override used by XCUITests to bypass the calculator gate.
     private let uiTestDisablesCalculatorGate = ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_CALCULATOR_GATE")
+    /// Launch-argument override used by XCUITests to keep persistence and lifecycle services ephemeral.
+    private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
 
     /**
      UserDefaults key for the iCloud sync toggle.
@@ -174,8 +176,12 @@ struct AndBibleApp: App {
         let networkMonitor = RemoteSyncNetworkMonitor()
         self.remoteSyncNetworkMonitor = networkMonitor
 
-        // Repair any stale migration state before creating the ModelContainer
-        DataMigration.migrateIfNeeded()
+        // UI tests use an in-memory container and should not spend startup time mutating on-disk
+        // stores left behind by prior manual runs.
+        if !uiTestUsesInMemoryStores {
+            // Repair any stale migration state before creating the ModelContainer
+            DataMigration.migrateIfNeeded()
+        }
 
         // Read iCloud sync preference from UserDefaults (before container creation)
         let iCloudEnabled = UserDefaults.standard.bool(forKey: Self.iCloudSyncEnabledKey)
@@ -214,14 +220,14 @@ struct AndBibleApp: App {
         let cloudConfig = ModelConfiguration(
             "AndBible",
             schema: Schema(cloudModels),
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: iCloudEnabled ? .private("iCloud.org.andbible.ios") : .none
+            isStoredInMemoryOnly: uiTestUsesInMemoryStores,
+            cloudKitDatabase: uiTestUsesInMemoryStores ? .none : (iCloudEnabled ? .private("iCloud.org.andbible.ios") : .none)
         )
 
         let localConfig = ModelConfiguration(
             "LocalStore",
             schema: Schema(localModels),
-            isStoredInMemoryOnly: false,
+            isStoredInMemoryOnly: uiTestUsesInMemoryStores,
             cloudKitDatabase: .none
         )
 
@@ -275,7 +281,9 @@ struct AndBibleApp: App {
                     await remoteSyncLifecycleService.synchronizeIfNeeded(force: force)
                 }
             )
-            remoteSyncBackgroundRefreshCoordinator.register()
+            if !uiTestUsesInMemoryStores {
+                remoteSyncBackgroundRefreshCoordinator.register()
+            }
             self.remoteSyncBackgroundRefreshCoordinator = remoteSyncBackgroundRefreshCoordinator
             #endif
 
@@ -295,7 +303,9 @@ struct AndBibleApp: App {
             bookmarkService.ensureSystemLabels()
 
             // Start monitoring iCloud account status
-            sync.startMonitoring(container: container)
+            if !uiTestUsesInMemoryStores {
+                sync.startMonitoring(container: container)
+            }
         } catch {
             fatalError("Failed to initialize SwiftData: \(error)")
         }
@@ -319,6 +329,9 @@ struct AndBibleApp: App {
                 }
             }
             .task {
+                guard !uiTestUsesInMemoryStores else {
+                    return
+                }
                 configureRemoteSyncLifecycleCallbacks()
                 #if os(iOS)
                 remoteSyncBackgroundRefreshCoordinator.scheduleNextRefreshIfNeeded()
@@ -326,6 +339,9 @@ struct AndBibleApp: App {
                 await googleDriveAuthService.restorePreviousSignInIfNeeded()
             }
             .onChange(of: scenePhase) { _, newPhase in
+                guard !uiTestUsesInMemoryStores else {
+                    return
+                }
                 if newPhase == .active {
                     // Reconcile icon state when app becomes active
                     // (setAlternateIconName fails if called before app is fully active)

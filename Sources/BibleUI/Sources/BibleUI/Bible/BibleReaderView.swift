@@ -536,44 +536,9 @@ public struct BibleReaderView: View {
             }
 
             if !hasAppliedUITestInitialPresentation {
-                if uiTestOpensTextDisplayOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    showTextDisplaySettings = true
-                } else if uiTestOpensImportExportOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    showImportExport = true
-                } else if uiTestOpensLabelManagerOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    resetLabelsForUITests()
-                    DispatchQueue.main.async {
-                        showLabelManager = true
-                    }
-                } else if uiTestOpensLabelAssignmentOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    resetLabelsForUITests()
-                    resetBookmarksForUITests()
-                    uiTestLabelAssignmentBookmarkID = seedLabelAssignmentBookmarkForUITests()
-                } else if uiTestSeedsBookmarkLabelWorkflowOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    resetLabelsForUITests()
-                    resetBookmarksForUITests()
-                    _ = seedLabelAssignmentBookmarkForUITests()
-                } else if uiTestOpensReadingPlansOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    resetReadingPlansForUITests()
-                    showReadingPlans = true
-                } else if uiTestOpensDailyReadingOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    resetReadingPlansForUITests()
-                    uiTestDailyReadingPlanID = seedReadingPlanForUITests()
-                    showReadingPlans = uiTestDailyReadingPlanID != nil
-                } else if uiTestOpensWorkspacesOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    resetWorkspacesForUITests()
-                    showWorkspaces = true
-                } else if uiTestOpensSettingsOnLaunch {
-                    hasAppliedUITestInitialPresentation = true
-                    showSettings = true
+                hasAppliedUITestInitialPresentation = true
+                Task { @MainActor in
+                    await applyUITestInitialPresentationIfNeeded()
                 }
             }
         }
@@ -2243,6 +2208,57 @@ public struct BibleReaderView: View {
         modelContext.insert(bookmark)
         guard (try? modelContext.save()) != nil else { return nil }
         return bookmark.id
+    }
+
+    /**
+     Applies the requested XCUITest initial presentation only after the reader shell finishes its
+     first render pass.
+     *
+     * - Side effects:
+     *   - yields twice on the main actor so SwiftUI finishes mounting the reader shell before any
+     *     modal or navigation state changes are applied
+     *   - resets seeded SwiftData content for label, bookmark, reading-plan, or workspace tests as
+     *     required by the active launch arguments
+     *   - toggles the requested test-only presentation state or seeded navigation route
+     * - Failure modes:
+     *   - when no XCUITest route launch arguments are present, this helper returns without
+     *     mutation
+     *   - seed helpers still swallow save failures in the same way as their dedicated reset/seed
+     *     helpers because the route is only used for UI automation setup
+     */
+    @MainActor
+    private func applyUITestInitialPresentationIfNeeded() async {
+        await Task.yield()
+        await Task.yield()
+
+        if uiTestOpensTextDisplayOnLaunch {
+            showTextDisplaySettings = true
+        } else if uiTestOpensImportExportOnLaunch {
+            showImportExport = true
+        } else if uiTestOpensLabelManagerOnLaunch {
+            resetLabelsForUITests()
+            showLabelManager = true
+        } else if uiTestOpensLabelAssignmentOnLaunch {
+            resetLabelsForUITests()
+            resetBookmarksForUITests()
+            uiTestLabelAssignmentBookmarkID = seedLabelAssignmentBookmarkForUITests()
+        } else if uiTestSeedsBookmarkLabelWorkflowOnLaunch {
+            resetLabelsForUITests()
+            resetBookmarksForUITests()
+            _ = seedLabelAssignmentBookmarkForUITests()
+        } else if uiTestOpensReadingPlansOnLaunch {
+            resetReadingPlansForUITests()
+            showReadingPlans = true
+        } else if uiTestOpensDailyReadingOnLaunch {
+            resetReadingPlansForUITests()
+            uiTestDailyReadingPlanID = seedReadingPlanForUITests()
+            showReadingPlans = uiTestDailyReadingPlanID != nil
+        } else if uiTestOpensWorkspacesOnLaunch {
+            resetWorkspacesForUITests()
+            showWorkspaces = true
+        } else if uiTestOpensSettingsOnLaunch {
+            showSettings = true
+        }
     }
 
     /**

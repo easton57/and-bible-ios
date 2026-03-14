@@ -19,6 +19,9 @@ import XCTest
  - runs on XCTest's serialized UI automation thread
  */
 final class AndBibleUITests: XCTestCase {
+    /// Tracks the currently launched app so each test can end with a deterministic teardown.
+    private var trackedApp: XCUIApplication?
+
     /**
      Configures each UI test for fail-fast execution.
      *
@@ -31,11 +34,28 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Tears down the currently running UI-test app process after each test method.
+     *
+     * - Side effects:
+     *   - terminates the tracked app when it is still running so the next test gets a clean launch
+     *   - clears the stored app handle for the completed test method
+     * - Failure modes:
+     *   - silently ignores already-stopped app processes because termination is only cleanup
+     */
+    override func tearDownWithError() throws {
+        if let trackedApp, trackedApp.state != .notRunning {
+            trackedApp.terminate()
+        }
+        trackedApp = nil
+    }
+
+    /**
      Verifies that the reader overflow menu exposes its primary actions and that Settings can be
      opened from the reader shell.
      *
      * - Side effects:
-     *   - launches the app with the calculator gate disabled for test determinism
+     *   - launches the app with the calculator gate disabled, in-memory persistence, and one
+     *     deterministic seeded bookmark-label pair for stable reader-shell startup
      *   - opens the reader overflow menu, validates the primary action rows, and pushes the
      *     settings screen
      * - Failure modes:
@@ -44,10 +64,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the settings form does not render after navigation completes
      */
     func testSettingsScreenShowsPrimaryNavigationRows() {
-        let app = makeApp()
+        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
         app.launch()
 
-        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        let moreMenuButton = requireReaderMoreMenuButton(in: app)
         moreMenuButton.tap()
         XCTAssertTrue(requireElement("readerOpenReadingPlansAction", in: app, timeout: 5).exists)
         XCTAssertTrue(requireElement("readerOpenDownloadsAction", in: app, timeout: 5).exists)
@@ -91,17 +111,18 @@ final class AndBibleUITests: XCTestCase {
      Verifies that the downloads browser can be opened from the reader shell.
      *
      * - Side effects:
-     *   - launches the app with the calculator gate disabled for test determinism
+     *   - launches the app with the calculator gate disabled, in-memory persistence, and one
+     *     deterministic seeded bookmark-label pair for stable reader-shell startup
      *   - opens the reader overflow menu and pushes the downloads browser
      * - Failure modes:
      *   - fails if the downloads action is missing from the reader menu
      *   - fails if the downloads browser screen does not render after navigation completes
      */
     func testDownloadsScreenOpensFromReaderMenu() {
-        let app = makeApp()
+        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
         app.launch()
 
-        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        let moreMenuButton = requireReaderMoreMenuButton(in: app)
         moreMenuButton.tap()
         requireElement("readerOpenDownloadsAction", in: app, timeout: 5).tap()
 
@@ -181,17 +202,18 @@ final class AndBibleUITests: XCTestCase {
      Verifies that the bookmark list can be opened from the reader shell.
      *
      * - Side effects:
-     *   - launches the app with the calculator gate disabled for test determinism
+     *   - launches the app with the calculator gate disabled, in-memory persistence, and one
+     *     deterministic seeded bookmark-label pair for stable reader-shell startup
      *   - opens the reader overflow menu and pushes the bookmark list
      * - Failure modes:
      *   - fails if the bookmarks action is missing from the reader menu
      *   - fails if the bookmark list screen does not render after navigation completes
      */
     func testBookmarksScreenOpensFromReaderMenu() {
-        let app = makeApp()
+        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
         app.launch()
 
-        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        let moreMenuButton = requireReaderMoreMenuButton(in: app)
         moreMenuButton.tap()
         requireElement("readerOpenBookmarksAction", in: app, timeout: 5).tap()
 
@@ -226,17 +248,18 @@ final class AndBibleUITests: XCTestCase {
      Verifies that the about screen can be opened from the reader shell.
      *
      * - Side effects:
-     *   - launches the app with the calculator gate disabled for test determinism
+     *   - launches the app with the calculator gate disabled, in-memory persistence, and one
+     *     deterministic seeded bookmark-label pair for stable reader-shell startup
      *   - opens the reader overflow menu and pushes the about screen
      * - Failure modes:
      *   - fails if the about action is missing from the reader menu
      *   - fails if the about screen does not render after navigation completes
      */
     func testAboutScreenOpensFromReaderMenu() {
-        let app = makeApp()
+        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
         app.launch()
 
-        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        let moreMenuButton = requireReaderMoreMenuButton(in: app)
         moreMenuButton.tap()
         requireElement("readerOpenAboutAction", in: app, timeout: 5).tap()
 
@@ -410,8 +433,6 @@ final class AndBibleUITests: XCTestCase {
         let valuePredicate = NSPredicate(format: "value CONTAINS %@", "fontPickerPresented")
         expectation(for: valuePredicate, evaluatedWith: textDisplayScreen)
         waitForExpectations(timeout: 10)
-
-        app.terminate()
     }
 
     /**
@@ -458,6 +479,8 @@ final class AndBibleUITests: XCTestCase {
      * - Returns: App handle configured with deterministic launch arguments for the smoke suite.
      * - Side effects:
      *   - appends a launch argument that disables the discrete-mode calculator gate during UI tests
+     *   - appends a launch argument that forces SwiftData-backed app state into an in-memory test
+     *     container for deterministic launches
      *   - when `settingsTarget` is supplied, configures the app to present Settings immediately and
      *     scroll the requested row into view
      *   - when `openTextDisplayOnLaunch` is `true`, configures the app to present Text Display
@@ -489,8 +512,12 @@ final class AndBibleUITests: XCTestCase {
         openDailyReadingOnLaunch: Bool = false,
         openWorkspacesOnLaunch: Bool = false
     ) -> XCUIApplication {
+        if let trackedApp, trackedApp.state != .notRunning {
+            trackedApp.terminate()
+        }
         let app = XCUIApplication()
-        app.launchArguments += ["UITEST_DISABLE_CALCULATOR_GATE"]
+        trackedApp = app
+        app.launchArguments += ["UITEST_DISABLE_CALCULATOR_GATE", "UITEST_USE_IN_MEMORY_STORES"]
         if let settingsTarget {
             app.launchArguments += ["UITEST_OPEN_SETTINGS"]
             app.launchEnvironment["UITEST_SETTINGS_SCROLL_TARGET"] = settingsTarget
@@ -522,6 +549,7 @@ final class AndBibleUITests: XCTestCase {
         return app
     }
 
+
     /**
      Opens the workspace selector either from the reader overflow menu or from a direct test-only
      launch path.
@@ -544,7 +572,7 @@ final class AndBibleUITests: XCTestCase {
         launchedDirectly: Bool = false
     ) -> XCUIElement {
         if !launchedDirectly {
-            let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+            let moreMenuButton = requireReaderMoreMenuButton(in: app)
             moreMenuButton.tap()
             requireElement("readerOpenWorkspacesAction", in: app, timeout: 5).tap()
         }
@@ -616,7 +644,7 @@ final class AndBibleUITests: XCTestCase {
      *   - fails when the bookmark list or seeded bookmark edit-labels action never appears
      */
     private func openLabelAssignmentFromBookmarkList(in app: XCUIApplication) -> XCUIElement {
-        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        let moreMenuButton = requireReaderMoreMenuButton(in: app)
         moreMenuButton.tap()
         requireElement("readerOpenBookmarksAction", in: app, timeout: 5).tap()
         _ = requireElement("bookmarkListScreen", in: app, timeout: 10)
@@ -694,7 +722,7 @@ final class AndBibleUITests: XCTestCase {
      */
     private func openSettings(in app: XCUIApplication, launchedDirectly: Bool = false) {
         if !launchedDirectly {
-            let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+            let moreMenuButton = requireReaderMoreMenuButton(in: app)
             moreMenuButton.tap()
             requireElement("readerOpenSettingsAction", in: app, timeout: 5).tap()
         }
@@ -737,6 +765,37 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
         return element
+    }
+
+    /**
+     Waits for the reader shell's overflow-menu button, allowing extra time for the first cold app
+     launch in the UI bundle.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to wait for the reader shell to become interactive.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: The reader overflow-menu button once the reader shell has rendered it.
+     * - Side effects:
+     *   - repeatedly queries the live XCUI hierarchy while the reader shell finishes bootstrapping
+     * - Failure modes:
+     *   - records an XCTest failure if the reader shell never reaches a state where the overflow
+     *     menu button exists within the allotted timeout
+     */
+    private func requireReaderMoreMenuButton(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 30,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        requireElement(
+            "readerMoreMenuButton",
+            in: app,
+            timeout: timeout,
+            file: file,
+            line: line
+        )
     }
 
     /**
