@@ -90,9 +90,9 @@ func presentCompareView(book: String, chapter: Int, currentModuleName: String, s
  - `onAppear` loads persisted preferences, wires TTS callbacks, restores speech settings, and
    registers synchronized-scrolling callbacks on `WindowManager`
  - XCUITest launch arguments can seed bookmark/label data or present the settings, text-display
-   editor, import/export sheet, label manager, or a seeded bookmark label-assignment sheet
-   immediately after initial state hydration so automation can target nested flows without menu
-   traversal
+   editor, color editor, import/export sheet, label manager, or a seeded bookmark
+   label-assignment sheet immediately after initial state hydration so automation can target
+   nested flows without menu traversal
  - iOS `onAppear` and `onDisappear` start and stop tilt-to-scroll based on workspace settings
  - sheet dismissals reload behavior preferences or refresh installed-module lists where needed
  - toolbar toggles and helper actions mutate SwiftData-backed workspace/settings state and push
@@ -134,6 +134,9 @@ public struct BibleReaderView: View {
 
     /// Presents the text-display editor directly for focused workflow testing.
     @State private var showTextDisplaySettings = false
+
+    /// Presents the color-settings editor directly for focused workflow testing.
+    @State private var showColorSettings = false
 
     /// Presents import and export management UI.
     @State private var showImportExport = false
@@ -213,6 +216,9 @@ public struct BibleReaderView: View {
 
     /// Launch-argument override used by XCUITests to present Text Display immediately on launch.
     private let uiTestOpensTextDisplayOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_TEXT_DISPLAY")
+
+    /// Launch-argument override used by XCUITests to present Colors immediately on launch.
+    private let uiTestOpensColorsOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_COLORS")
 
     /// Launch-argument override used by XCUITests to present Import and Export immediately on launch.
     private let uiTestOpensImportExportOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_IMPORT_EXPORT")
@@ -627,6 +633,16 @@ public struct BibleReaderView: View {
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(String(localized: "done")) { showTextDisplaySettings = false }
+                        }
+                }
+            }
+        }
+        .sheet(isPresented: $showColorSettings) {
+            NavigationStack {
+                ColorSettingsView(settings: $displaySettings, onChange: applyDisplaySettingsChange)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(String(localized: "done")) { showColorSettings = false }
                         }
                     }
             }
@@ -2223,14 +2239,34 @@ public struct BibleReaderView: View {
     }
 
     /**
+     Seeds non-default theme colors for direct XCUITest color-reset workflows.
+
+     Side effects:
+     - overwrites the in-memory `displaySettings` color tuple with non-default ARGB values so the
+       Colors screen starts in a known custom state
+     - does not persist any settings because the route is only used with the in-memory UI-test
+       container
+
+     Failure modes: This helper cannot fail.
+     */
+    private func seedColorsForUITests() {
+        displaySettings.dayTextColor = -1
+        displaySettings.dayBackground = -16777216
+        displaySettings.dayNoise = 7
+        displaySettings.nightTextColor = -16777216
+        displaySettings.nightBackground = -1
+        displaySettings.nightNoise = 7
+    }
+
+    /**
      Applies the requested XCUITest initial presentation only after the reader shell finishes its
      first render pass.
      *
      * - Side effects:
      *   - yields twice on the main actor so SwiftUI finishes mounting the reader shell before any
      *     modal or navigation state changes are applied
-     *   - resets seeded SwiftData content for label, bookmark, reading-plan, or workspace tests as
-     *     required by the active launch arguments
+     *   - resets or seeds deterministic state for color, label, bookmark, reading-plan, or
+     *     workspace tests as required by the active launch arguments
      *   - toggles the requested test-only presentation state or seeded navigation route
      * - Failure modes:
      *   - when no XCUITest route launch arguments are present, this helper returns without
@@ -2245,6 +2281,9 @@ public struct BibleReaderView: View {
 
         if uiTestOpensTextDisplayOnLaunch {
             showTextDisplaySettings = true
+        } else if uiTestOpensColorsOnLaunch {
+            seedColorsForUITests()
+            showColorSettings = true
         } else if uiTestOpensImportExportOnLaunch {
             showImportExport = true
         } else if uiTestOpensLabelManagerOnLaunch {

@@ -485,6 +485,34 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that the Colors reset action restores the seeded theme tuple to defaults.
+     *
+     * - Side effects:
+     *   - launches the app directly into the Colors editor with a seeded non-default theme tuple
+     *   - triggers the reset-to-defaults action and waits for the exported color state to return
+     *     to the default marker
+     * - Failure modes:
+     *   - fails if the direct-launch Colors editor never appears
+     *   - fails if the reset action is missing or if the exported color state never changes back
+     *     to `colorDefaults`
+     */
+    func testColorSettingsResetRestoresDefaultThemeColors() {
+        let app = makeApp(openColorsOnLaunch: true)
+        app.launch()
+
+        _ = openColorSettings(in: app, launchedDirectly: true)
+        let colorState = app.staticTexts["colorSettingsState"].firstMatch
+        XCTAssertTrue(colorState.waitForExistence(timeout: 10), "Expected color settings state label to exist.")
+        XCTAssertEqual(colorState.label, "colorCustom")
+
+        requireElement("colorSettingsResetButton", in: app, timeout: 10).tap()
+
+        let valuePredicate = NSPredicate(format: "label == %@", "colorDefaults")
+        expectation(for: valuePredicate, evaluatedWith: colorState)
+        waitForExpectations(timeout: 10)
+    }
+
+    /**
      Builds the configured XCUIApplication instance used by each smoke test.
      *
      * - Parameters:
@@ -494,6 +522,7 @@ final class AndBibleUITests: XCTestCase {
      *     launch.
      *   - openImportExportOnLaunch: Whether the app should present Import and Export immediately on
      *     launch.
+     *   - openColorsOnLaunch: Whether the app should present Colors immediately on launch.
      *   - openLabelManagerOnLaunch: Whether the app should present Label Manager immediately on
      *     launch.
      *   - openLabelAssignmentOnLaunch: Whether the app should present one seeded label-assignment
@@ -516,6 +545,8 @@ final class AndBibleUITests: XCTestCase {
      *     immediately after the reader hydrates
      *   - when `openImportExportOnLaunch` is `true`, configures the app to present Import and
      *     Export immediately after the reader hydrates
+     *   - when `openColorsOnLaunch` is `true`, configures the app to present Colors immediately
+     *     after the reader hydrates with one seeded non-default color tuple
      *   - when `openLabelManagerOnLaunch` is `true`, configures the app to present Label Manager
      *     immediately after the reader hydrates
      *   - when `openLabelAssignmentOnLaunch` is `true`, configures the app to seed one bookmark
@@ -534,6 +565,7 @@ final class AndBibleUITests: XCTestCase {
         settingsTarget: String? = nil,
         openTextDisplayOnLaunch: Bool = false,
         openImportExportOnLaunch: Bool = false,
+        openColorsOnLaunch: Bool = false,
         openLabelManagerOnLaunch: Bool = false,
         openLabelAssignmentOnLaunch: Bool = false,
         seedBookmarkLabelWorkflowOnLaunch: Bool = false,
@@ -556,6 +588,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if openImportExportOnLaunch {
             app.launchArguments += ["UITEST_OPEN_IMPORT_EXPORT"]
+        }
+        if openColorsOnLaunch {
+            app.launchArguments += ["UITEST_OPEN_COLORS"]
         }
         if openLabelManagerOnLaunch {
             app.launchArguments += ["UITEST_OPEN_LABEL_MANAGER"]
@@ -704,6 +739,33 @@ final class AndBibleUITests: XCTestCase {
             tapSettingsElement("settingsImportExportLink", in: app)
         }
         return requireElement("importExportScreen", in: app, timeout: 10)
+    }
+
+    /**
+     Opens Colors either from Settings navigation or from a direct test-only launch path.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - launchedDirectly: Whether the app was launched straight into the Colors sheet.
+     * - Returns: The root accessibility-identified Colors screen element.
+     * - Side effects:
+     *   - when `launchedDirectly` is `false`, opens Settings and pushes the Colors screen
+     *   - when `launchedDirectly` is `true`, waits for the direct-launch Colors sheet to render
+     * - Failure modes:
+     *   - fails when the Colors screen never appears
+     */
+    private func openColorSettings(
+        in app: XCUIApplication,
+        launchedDirectly: Bool = false
+    ) -> XCUIElement {
+        if !launchedDirectly {
+            openSettings(
+                in: app,
+                launchedDirectly: app.launchArguments.contains("UITEST_OPEN_SETTINGS")
+            )
+            tapSettingsElement("settingsColorsLink", in: app)
+        }
+        return requireElement("colorSettingsScreen", in: app, timeout: 10)
     }
 
     /**

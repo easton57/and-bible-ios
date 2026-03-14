@@ -72,6 +72,9 @@ public struct ColorSettingsView: View {
     /// Callback invoked after any theme-color mutation.
     var onChange: (() -> Void)?
 
+    /// Enables deterministic accessibility state for the in-memory XCUITest harness.
+    private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
+
     /**
      Creates a color settings editor bound to a shared display-settings model.
 
@@ -82,6 +85,40 @@ public struct ColorSettingsView: View {
     public init(settings: Binding<TextDisplaySettings>, onChange: (() -> Void)? = nil) {
         self._settings = settings
         self.onChange = onChange
+    }
+
+    /// Whether the currently edited color tuple matches the standard light/dark defaults.
+    private var usesDefaultThemeColors: Bool {
+        settings.dayTextColor == -16777216 &&
+        settings.dayBackground == -1 &&
+        settings.nightTextColor == -1 &&
+        settings.nightBackground == -16777216 &&
+        settings.dayNoise == 0 &&
+        settings.nightNoise == 0
+    }
+
+    /// Accessibility-exported state label used by XCUITests to detect reset completion.
+    private var uiTestColorStateLabel: String {
+        usesDefaultThemeColors ? "colorDefaults" : "colorCustom"
+    }
+
+    /**
+     Restores the standard day and night color defaults.
+
+     Side effects:
+     - writes the default ARGB values and noise levels back into `settings`
+     - invokes `onChange` so the parent can re-emit the updated display settings
+
+     Failure modes: This helper cannot fail.
+     */
+    private func resetThemeColorsToDefaults() {
+        settings.dayTextColor = -16777216
+        settings.dayBackground = -1
+        settings.dayNoise = 0
+        settings.nightTextColor = -1
+        settings.nightBackground = -16777216
+        settings.nightNoise = 0
+        onChange?()
     }
 
     /**
@@ -115,18 +152,21 @@ public struct ColorSettingsView: View {
             }
 
             Section {
-                Button(String(localized: "reset_to_defaults")) {
-                    settings.dayTextColor = -16777216
-                    settings.dayBackground = -1
-                    settings.dayNoise = 0
-                    settings.nightTextColor = -1
-                    settings.nightBackground = -16777216
-                    settings.nightNoise = 0
-                    onChange?()
+                Button(String(localized: "reset_to_defaults"), action: resetThemeColorsToDefaults)
+                    .accessibilityIdentifier("colorSettingsResetButton")
+            }
+
+            if uiTestUsesInMemoryStores {
+                Section {
+                    Text(uiTestColorStateLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("colorSettingsState")
                 }
             }
         }
         .accessibilityIdentifier("colorSettingsScreen")
+        .accessibilityValue(uiTestColorStateLabel)
         .navigationTitle(String(localized: "colors"))
     }
 }
