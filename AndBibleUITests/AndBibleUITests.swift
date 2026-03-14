@@ -320,6 +320,46 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that deleting one history row leaves other history rows intact across reopen.
+     *
+     * - Side effects:
+     *   - launches the app with two deterministic persisted history rows while staying on the real
+     *     reader shell
+     *   - opens History from the actual reader overflow menu
+     *   - deletes only the Exodus row through the row-level swipe action, dismisses the screen, and
+     *     reopens History to confirm the Matthew row persists
+     * - Failure modes:
+     *   - fails if the reader shell, History action, seeded rows, or row-level delete action never
+     *     appears
+     *   - fails if deleting the Exodus row also removes the Matthew row or if the Exodus row
+     *     returns after reopening History
+     */
+    func testHistoryRowDeletePreservesOtherRowsAcrossReopen() {
+        let app = makeApp(seedHistoryMultiRowWorkflowOnLaunch: true)
+        app.launch()
+
+        openHistoryFromReaderMenu(in: app)
+        let exodusRow = app.buttons["historyRow::Exod_2_1"].firstMatch
+        let matthewRow = app.buttons["historyRow::Matt_3_1"].firstMatch
+        XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus history row button to exist.")
+        XCTAssertTrue(matthewRow.waitForExistence(timeout: 10), "Expected Matthew history row button to exist.")
+
+        exodusRow.swipeLeft()
+        requireElement("historyDeleteButton::Exod_2_1", in: app, timeout: 10).tap()
+
+        let deletedPredicate = NSPredicate(format: "exists == false")
+        expectation(for: deletedPredicate, evaluatedWith: exodusRow)
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(matthewRow.exists, "Expected Matthew history row to remain after deleting Exodus.")
+
+        requireElement("historyDoneButton", in: app, timeout: 10).tap()
+        openHistoryFromReaderMenu(in: app)
+
+        XCTAssertFalse(app.buttons["historyRow::Exod_2_1"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["historyRow::Matt_3_1"].firstMatch.exists)
+    }
+
+    /**
      Verifies that label assignment can be reached from the real bookmark-list path and still
      toggle the seeded label state.
      *
@@ -870,6 +910,8 @@ final class AndBibleUITests: XCTestCase {
      *     bookmark plus labels while leaving navigation at the reader shell
      *   - when `seedHistoryWorkflowOnLaunch` is `true`, configures the app to seed one persisted
      *     history row while leaving navigation at the reader shell
+     *   - when `seedHistoryMultiRowWorkflowOnLaunch` is `true`, configures the app to seed two
+     *     persisted history rows while leaving navigation at the reader shell
      *   - when `openReadingPlansOnLaunch` is `true`, configures the app to present Reading Plans
      *     immediately after the reader hydrates
      *   - when `openDailyReadingOnLaunch` is `true`, configures the app to seed one reading plan
@@ -892,6 +934,7 @@ final class AndBibleUITests: XCTestCase {
         openLabelAssignmentOnLaunch: Bool = false,
         seedBookmarkLabelWorkflowOnLaunch: Bool = false,
         seedHistoryWorkflowOnLaunch: Bool = false,
+        seedHistoryMultiRowWorkflowOnLaunch: Bool = false,
         openReadingPlansOnLaunch: Bool = false,
         openDailyReadingOnLaunch: Bool = false,
         openWorkspacesOnLaunch: Bool = false
@@ -941,6 +984,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if seedHistoryWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_HISTORY_WORKFLOW"]
+        }
+        if seedHistoryMultiRowWorkflowOnLaunch {
+            app.launchArguments += ["UITEST_SEED_HISTORY_MULTIROW_WORKFLOW"]
         }
         if openReadingPlansOnLaunch {
             app.launchArguments += ["UITEST_OPEN_READING_PLANS"]

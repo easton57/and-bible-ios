@@ -252,6 +252,10 @@ public struct BibleReaderView: View {
     private let uiTestSeedsHistoryWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_HISTORY_WORKFLOW")
 
+    /// Launch-argument override used by XCUITests to seed two persisted history targets on launch.
+    private let uiTestSeedsHistoryMultiRowWorkflowOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_HISTORY_MULTIROW_WORKFLOW")
+
     /// Launch-argument override used by XCUITests to present Reading Plans immediately on launch.
     private let uiTestOpensReadingPlansOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_READING_PLANS")
 
@@ -2296,25 +2300,28 @@ public struct BibleReaderView: View {
     }
 
     /**
-     Seeds one deterministic history destination for XCUITest reader jump-back workflows.
+     Seeds deterministic history destinations for XCUITest reader workflows.
      *
-     * Side effects:
-     * - appends one `HistoryItem` row to the active window's persisted history through
-     *   `WorkspaceStore`
-     * - records `Exod.2.1` against the focused module so the history list has one deterministic
-     *   row to open
-     *
-     * Failure modes:
-     * - returns without mutation when there is no active window to own the seeded history row
+     * - Parameter keys: Stored history keys that should be appended newest-last for the active window.
+     * - Side effects:
+     *   - appends one `HistoryItem` row per provided key to the active window's persisted history
+     *     through `WorkspaceStore`
+     *   - records each key against the focused module so History can render stable rows for jump-back
+     *     and row-deletion workflows
+     * - Failure modes:
+     *   - returns without mutation when there is no active window to own the seeded history rows
      */
-    private func seedHistoryForUITests() {
+    private func seedHistoryForUITests(keys: [String]) {
         guard let activeWindow = windowManager.activeWindow else { return }
         let workspaceStore = WorkspaceStore(modelContext: modelContext)
-        workspaceStore.addHistoryItem(
-            to: activeWindow,
-            document: focusedController?.activeModuleName ?? "KJV",
-            key: "Exod.2.1"
-        )
+        let document = focusedController?.activeModuleName ?? "KJV"
+        for key in keys {
+            workspaceStore.addHistoryItem(
+                to: activeWindow,
+                document: document,
+                key: key
+            )
+        }
     }
 
     /**
@@ -2483,9 +2490,12 @@ public struct BibleReaderView: View {
             resetLabelsForUITests()
             resetBookmarksForUITests()
             _ = seedLabelAssignmentBookmarkForUITests()
+        } else if uiTestSeedsHistoryMultiRowWorkflowOnLaunch {
+            resetHistoryForUITests()
+            seedHistoryForUITests(keys: ["Exod.2.1", "Matt.3.1"])
         } else if uiTestSeedsHistoryWorkflowOnLaunch {
             resetHistoryForUITests()
-            seedHistoryForUITests()
+            seedHistoryForUITests(keys: ["Exod.2.1"])
         } else if uiTestOpensReadingPlansOnLaunch {
             resetReadingPlansForUITests()
             showReadingPlans = true

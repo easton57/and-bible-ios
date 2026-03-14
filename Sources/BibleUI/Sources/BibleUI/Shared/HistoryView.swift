@@ -70,7 +70,7 @@ public struct HistoryView: View {
                 .accessibilityIdentifier("historyEmptyState")
             } else {
                 List {
-                    ForEach(history) { item in
+                    ForEach(Array(history.enumerated()), id: \.element.id) { index, item in
                         Button {
                             navigateTo(item)
                         } label: {
@@ -92,8 +92,15 @@ public struct HistoryView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier(historyRowIdentifier(for: item))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                deleteItem(at: index)
+                            } label: {
+                                SwiftUI.Label(String(localized: "delete"), systemImage: "trash")
+                            }
+                            .accessibilityIdentifier(historyDeleteButtonIdentifier(for: item))
+                        }
                     }
-                    .onDelete(perform: deleteItems)
                 }
             }
         }
@@ -147,22 +154,52 @@ public struct HistoryView: View {
      * - Failure modes: This helper cannot fail.
      */
     private func historyRowIdentifier(for item: HistoryItem) -> String {
-        let sanitizedKey = item.key.replacingOccurrences(
+        "historyRow::\(sanitizedHistoryKey(for: item))"
+    }
+
+    /**
+     Resolves the deterministic accessibility identifier for one history row's delete action.
+     *
+     * - Parameter item: History row whose durable key should back the delete-action identifier.
+     * - Returns: Accessibility identifier stable across row reordering for the same history key.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func historyDeleteButtonIdentifier(for item: HistoryItem) -> String {
+        "historyDeleteButton::\(sanitizedHistoryKey(for: item))"
+    }
+
+    /**
+     Sanitizes one stored history key for reuse in accessibility identifiers.
+     *
+     * - Parameter item: History row whose stored key should be transformed into an identifier-safe token.
+     * - Returns: Key token containing only ASCII letters, digits, and underscores.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func sanitizedHistoryKey(for item: HistoryItem) -> String {
+        item.key.replacingOccurrences(
             of: #"[^A-Za-z0-9]+"#,
             with: "_",
             options: .regularExpression
         )
-        return "historyRow::\(sanitizedKey)"
     }
 
     /**
-     Deletes the rows referenced by the given list offsets from the filtered history list.
+     Deletes one visible history row by index from the filtered active-window history list.
+     *
+     * - Parameter index: Position of the row in the current `history` snapshot.
+     * - Side effects:
+     *   - deletes the referenced `HistoryItem` from SwiftData
+     *   - saves the mutated history state back to persistence
+     * - Failure modes:
+     *   - returns without mutation when the index is outside the current filtered history bounds
+     *   - silently discards save failures because row deletion is a user-driven destructive action
+     *     with no dedicated retry surface in this view
      */
-    private func deleteItems(at offsets: IndexSet) {
-        let toDelete = offsets.map { history[$0] }
-        for item in toDelete {
-            modelContext.delete(item)
-        }
+    private func deleteItem(at index: Int) {
+        guard history.indices.contains(index) else { return }
+        modelContext.delete(history[index])
         try? modelContext.save()
     }
 
