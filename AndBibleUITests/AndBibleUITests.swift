@@ -81,6 +81,30 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that the direct-launch Search route preserves a seeded initial query.
+     *
+     * - Side effects:
+     *   - launches the app directly into Search with the initial query `earth`
+     *   - waits for the search sheet to hydrate and settle its exported state
+     * - Failure modes:
+     *   - fails if the direct-launch Search sheet never appears
+     *   - fails if the seeded query is dropped before the Search screen reaches its settled state
+     */
+    func testSearchDirectLaunchRetainsSeededQuery() {
+        let app = makeApp(openSearchOnLaunch: true, searchQuery: "earth")
+        app.launch()
+
+        let searchScreen = openSearch(in: app, launchedDirectly: true)
+        waitForSearchToFinish(on: searchScreen, timeout: 20)
+
+        let searchState = searchScreen.value as? String ?? ""
+        XCTAssertTrue(
+            searchState.contains("query=earth"),
+            "Expected search state to retain the seeded query, got '\(searchState)'."
+        )
+    }
+
+    /**
      Verifies that an active reading plan can advance from day one to day two.
      *
      * - Side effects:
@@ -717,6 +741,8 @@ final class AndBibleUITests: XCTestCase {
      *   - settingsTarget: Optional settings-row identifier that the app should open and pre-scroll
      *     into view on launch.
      *   - openSyncOnLaunch: Whether the app should present Sync Settings immediately on launch.
+     *   - openSearchOnLaunch: Whether the app should present Search immediately on launch.
+     *   - searchQuery: Optional search query to seed before a direct Search launch.
      *   - syncBackend: Optional remote backend raw value to seed before a direct Sync launch.
      *   - syncEnabledCategories: Optional comma-separated remote category raw values to seed as
      *     enabled before a direct Sync launch.
@@ -743,6 +769,10 @@ final class AndBibleUITests: XCTestCase {
      *     container for deterministic launches
      *   - when `settingsTarget` is supplied, configures the app to present Settings immediately and
      *     scroll the requested row into view
+     *   - when `openSearchOnLaunch` is `true`, configures the app to present Search immediately
+     *     after the reader hydrates
+     *   - when `searchQuery` is supplied, exports the requested initial query for the direct
+     *     Search harness
      *   - when `openSyncOnLaunch` is `true`, configures the app to present Sync Settings
      *     immediately after the reader hydrates
      *   - when `syncBackend` is supplied, exports the requested backend raw value for the direct
@@ -771,6 +801,8 @@ final class AndBibleUITests: XCTestCase {
      */
     private func makeApp(
         settingsTarget: String? = nil,
+        openSearchOnLaunch: Bool = false,
+        searchQuery: String? = nil,
         openSyncOnLaunch: Bool = false,
         syncBackend: String? = nil,
         syncEnabledCategories: String? = nil,
@@ -793,6 +825,12 @@ final class AndBibleUITests: XCTestCase {
         if let settingsTarget {
             app.launchArguments += ["UITEST_OPEN_SETTINGS"]
             app.launchEnvironment["UITEST_SETTINGS_SCROLL_TARGET"] = settingsTarget
+        }
+        if openSearchOnLaunch {
+            app.launchArguments += ["UITEST_OPEN_SEARCH"]
+        }
+        if let searchQuery {
+            app.launchEnvironment["UITEST_SEARCH_QUERY"] = searchQuery
         }
         if openSyncOnLaunch {
             app.launchArguments += ["UITEST_OPEN_SYNC"]
@@ -831,6 +869,54 @@ final class AndBibleUITests: XCTestCase {
             app.launchArguments += ["UITEST_OPEN_WORKSPACES"]
         }
         return app
+    }
+
+    /**
+     Opens Search either from the reader toolbar or from a direct test-only launch path.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - launchedDirectly: Whether the app was launched straight into the Search sheet.
+     * - Returns: The root accessibility-identified Search screen element.
+     * - Side effects:
+     *   - when `launchedDirectly` is `false`, taps the reader toolbar search button
+     *   - when `launchedDirectly` is `true`, waits for the direct-launch Search sheet to render
+     * - Failure modes:
+     *   - fails when the Search screen never appears
+     */
+    private func openSearch(
+        in app: XCUIApplication,
+        launchedDirectly: Bool = false
+    ) -> XCUIElement {
+        if !launchedDirectly {
+            requireElement("readerSearchButton", in: app, timeout: 10).tap()
+        }
+        return requireElement("searchScreen", in: app, timeout: 10)
+    }
+
+    /**
+     Waits for the Search screen to report that its current query is no longer in flight.
+     *
+     * - Parameters:
+     *   - searchScreen: Search root element exporting deterministic state in its accessibility
+     *     value.
+     *   - timeout: Maximum time to wait for the `searching=false` state token.
+     * - Side effects:
+     *   - blocks the current XCTest method until the search state reports completion or times out
+     * - Failure modes:
+     *   - fails the test if the Search screen never reports `searching=false` before the timeout
+     */
+    private func waitForSearchToFinish(on searchScreen: XCUIElement, timeout: TimeInterval) {
+        let predicate = NSPredicate { evaluated, _ in
+            guard let element = evaluated as? XCUIElement,
+                  let value = element.value as? String else {
+                return false
+            }
+            return value.contains("searching=false")
+        }
+
+        expectation(for: predicate, evaluatedWith: searchScreen)
+        waitForExpectations(timeout: timeout)
     }
 
 

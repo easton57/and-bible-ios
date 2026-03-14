@@ -226,6 +226,9 @@ public struct BibleReaderView: View {
     /// Launch-argument override enabling the in-memory XCUITest reader-shell harness.
     private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
 
+    /// Launch-argument override used by XCUITests to present Search immediately on launch.
+    private let uiTestOpensSearchOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_SEARCH")
+
     /// Launch-argument override used by XCUITests to present Colors immediately on launch.
     private let uiTestOpensColorsOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_COLORS")
 
@@ -603,12 +606,12 @@ public struct BibleReaderView: View {
                 }
             }
         }
-        .sheet(isPresented: $showSearch) {
+        .sheet(isPresented: $showSearch, onDismiss: { searchInitialQuery = "" }) {
             NavigationStack {
                 SearchView(
                     swordModule: focusedController?.activeModule,
                     swordManager: focusedController?.swordManager,
-                    searchIndexService: searchIndexService,
+                    searchIndexService: uiTestUsesInMemoryStores && uiTestOpensSearchOnLaunch ? nil : searchIndexService,
                     installedBibleModules: focusedController?.installedBibleModules ?? [],
                     currentBook: focusedController?.currentBook ?? "Genesis",
                     currentOsisBookId: focusedController?.osisBookId(for: focusedController?.currentBook ?? "Genesis") ?? BibleReaderController.osisBookId(for: focusedController?.currentBook ?? "Genesis"),
@@ -619,7 +622,6 @@ public struct BibleReaderView: View {
                     }
                 )
             }
-            .onDisappear { searchInitialQuery = "" }
         }
         .sheet(isPresented: $showBookmarks) {
             NavigationStack {
@@ -921,7 +923,7 @@ public struct BibleReaderView: View {
         // MARK: - Keyboard Shortcuts (iPad/Mac)
         .background {
             Group {
-                Button("") { showSearch = true }
+                Button("") { presentSearch() }
                     .keyboardShortcut("f", modifiers: .command)
                 Button("") { showBookChooser = true }
                     .keyboardShortcut("g", modifiers: .command)
@@ -1022,7 +1024,7 @@ public struct BibleReaderView: View {
             hideWindowButtons: hideWindowButtonsPref,
             speakService: speakService,
             onShowBookChooser: { showBookChooser = true },
-            onShowSearch: { showSearch = true },
+            onShowSearch: { presentSearch() },
             onShowBookmarks: { showBookmarks = true },
             onShowSettings: { showSettings = true },
             onShowDownloads: { showDownloads = true },
@@ -1056,10 +1058,7 @@ public struct BibleReaderView: View {
                 }
                 resetAutoFullscreenTracking()
             },
-            onSearchForStrongs: { strongsNum in
-                searchInitialQuery = strongsNum
-                showSearch = true
-            },
+            onSearchForStrongs: { strongsNum in presentSearch(initialQuery: strongsNum) },
             onShowStrongsSheet: { json, config in
                 #if os(iOS)
                 if let ctrl = focusedController {
@@ -1072,10 +1071,7 @@ public struct BibleReaderView: View {
                         configJSON: config,
                         backgroundColorInt: bgInt,
                         controller: ctrl,
-                        onFindAll: { strongsNum in
-                            searchInitialQuery = strongsNum
-                            showSearch = true
-                        }
+                        onFindAll: { strongsNum in presentSearch(initialQuery: strongsNum) }
                     )
                 }
                 #endif
@@ -1409,10 +1405,11 @@ public struct BibleReaderView: View {
                     // Action buttons — matching Android toolbar order
                     HStack(spacing: 14) {
                         // Search
-                        Button(action: { showSearch = true }) {
+                        Button(action: { presentSearch() }) {
                             Image(systemName: "magnifyingglass")
                                 .font(.body)
                         }
+                        .accessibilityIdentifier("readerSearchButton")
 
                         // Strong's toggle — shown when module has Strong's data
                         // (matching Android MainBibleActivity.kt:1134).
@@ -2326,14 +2323,57 @@ public struct BibleReaderView: View {
     }
 
     /**
+     Presents Search after first staging the latest initial-query state.
+
+     Side effects:
+     - mutates `searchInitialQuery` so the sheet can seed its query field from the latest caller
+     - schedules `showSearch = true` for the next main-actor turn so the staged query wins over
+       the current render pass
+
+     Failure modes:
+     - uses an asynchronous handoff, so callers should not assume the sheet is visible until the
+       next render pass completes
+     */
+    @MainActor
+    private func presentSearch(initialQuery: String? = nil) {
+        searchInitialQuery = initialQuery ?? ""
+        Task { @MainActor in
+            await Task.yield()
+            showSearch = true
+        }
+    }
+
+    /**
+     Waits briefly for the focused reader controller to expose an active module before Search opens.
+
+     Side effects:
+     - yields on the main actor while SwiftUI and the reader controller finish initialization
+
+     Failure modes:
+     - returns after the bounded wait even if the controller still has no active module so UI tests
+       can fail on the real missing-module condition instead of hanging indefinitely
+     */
+    @MainActor
+    private func waitForUITestSearchDependencies() async {
+        for _ in 0..<40 {
+            if focusedController?.activeModule != nil {
+                return
+            }
+            await Task.yield()
+        }
+    }
+
+    /**
      Applies the requested XCUITest initial presentation only after the reader shell finishes its
      first render pass.
      *
      * - Side effects:
      *   - yields twice on the main actor so SwiftUI finishes mounting the reader shell before any
      *     modal or navigation state changes are applied
-     *   - resets or seeds deterministic state for color, sync, label, bookmark, reading-plan, or
-     *     workspace tests as required by the active launch arguments
+     *   - waits for the focused reader controller before direct Search launch so the real module
+     *     search path is available to the sheet
+     *   - resets or seeds deterministic state for search, color, sync, label, bookmark,
+     *     reading-plan, or workspace tests as required by the active launch arguments
      *   - toggles the requested test-only presentation state or seeded navigation route
      * - Failure modes:
      *   - when no XCUITest route launch arguments are present, this helper returns without
@@ -2346,7 +2386,10 @@ public struct BibleReaderView: View {
         await Task.yield()
         await Task.yield()
 
-        if uiTestOpensTextDisplayOnLaunch {
+        if uiTestOpensSearchOnLaunch {
+            await waitForUITestSearchDependencies()
+            presentSearch(initialQuery: ProcessInfo.processInfo.environment["UITEST_SEARCH_QUERY"] ?? "earth")
+        } else if uiTestOpensTextDisplayOnLaunch {
             showTextDisplaySettings = true
         } else if uiTestOpensSyncSettingsOnLaunch {
             seedSyncSettingsForUITests()

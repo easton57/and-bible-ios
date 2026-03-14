@@ -217,6 +217,8 @@ public struct SearchView: View {
                 searchContent
             }
         }
+        .accessibilityIdentifier("searchScreen")
+        .accessibilityValue(searchAccessibilityValue)
         .navigationTitle(navigationTitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -242,10 +244,17 @@ public struct SearchView: View {
             if selectedModules.isEmpty, let mod = swordModule {
                 selectedModules = [mod.info.name]
             }
-            if !initialQuery.isEmpty {
-                query = initialQuery
+            _ = applyInitialQueryIfNeeded(initialQuery)
+            if query.isEmpty, let uiTestQuery = uiTestInitialQueryOverride {
+                _ = applyInitialQueryIfNeeded(uiTestQuery)
             }
             checkIndex()
+        }
+        .onChange(of: initialQuery) { _, newValue in
+            let didApply = applyInitialQueryIfNeeded(newValue)
+            if didApply, case .ready = viewState {
+                performSearch()
+            }
         }
     }
 
@@ -265,6 +274,17 @@ public struct SearchView: View {
         case .checkingIndex:
             return String(localized: "search")
         }
+    }
+
+    /// Deterministic XCUITest summary of the current search screen state.
+    private var searchAccessibilityValue: String {
+        let stateToken: String = switch viewState {
+        case .checkingIndex: "checkingIndex"
+        case .needsIndex: "needsIndex"
+        case .creatingIndex: "creatingIndex"
+        case .ready: "ready"
+        }
+        return "state=\(stateToken);query=\(query);searching=\(isSearching);results=\(results.count)"
     }
 
     // MARK: - Index Prompt
@@ -386,6 +406,7 @@ public struct SearchView: View {
                     )
                 }
             }
+            .accessibilityIdentifier("searchResultsList")
         }
         .searchable(text: $query, prompt: String(localized: "search_bible_text"))
         .onSubmit(of: .search) {
@@ -473,6 +494,7 @@ public struct SearchView: View {
                     searchHitRow(hit)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(searchResultIdentifier(for: hit))
             }
         }
     }
@@ -509,6 +531,7 @@ public struct SearchView: View {
                         searchHitRow(hit)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier(searchResultIdentifier(for: hit))
                 }
             }
         }
@@ -534,6 +557,31 @@ public struct SearchView: View {
                 .lineLimit(3)
         }
         .padding(.vertical, 2)
+    }
+
+    /**
+     Returns the stable accessibility identifier for one result row.
+
+     - Parameter hit: Search hit whose verse reference should back the identifier.
+     - Returns: Identifier formatted as `searchResultRow::<sanitized reference>`.
+     */
+    private func searchResultIdentifier(for hit: SearchHit) -> String {
+        "searchResultRow::\(sanitizedAccessibilitySegment(hit.reference))"
+    }
+
+    /**
+     Returns an accessibility-safe token derived from user-visible text.
+
+     - Parameter value: Raw string that may contain spaces or punctuation.
+     - Returns: Alphanumeric identifier segment with non-word runs normalized to underscores.
+     */
+    private func sanitizedAccessibilitySegment(_ value: String) -> String {
+        let collapsed = value.replacingOccurrences(
+            of: "[^A-Za-z0-9]+",
+            with: "_",
+            options: .regularExpression
+        )
+        return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
     }
 
     /**
@@ -747,6 +795,42 @@ public struct SearchView: View {
         if !initialQuery.isEmpty && !query.isEmpty {
             performSearch()
         }
+    }
+
+    /**
+     Seeds the query field from an externally provided initial query when it changes meaningfully.
+
+     - Parameter value: Proposed initial query passed in from the presenting screen.
+     - Returns: `true` when the helper updated the visible query field, otherwise `false`.
+     - Side effects:
+     *   - mutates `query` when `value` is non-empty and differs from the current field content
+     - Failure modes:
+     *   - ignores empty values and duplicate assignments so repeated parent re-renders do not
+     *     restart the search loop unnecessarily
+     */
+    private func applyInitialQueryIfNeeded(_ value: String) -> Bool {
+        guard !value.isEmpty, query != value else { return false }
+        query = value
+        return true
+    }
+
+    /**
+     Provides a deterministic direct-launch query for the XCUITest search harness only.
+
+     - Returns: Seed query from the UI-test launch environment when the dedicated Search launch
+       route is active, otherwise `nil`.
+     - Side effects: none.
+     - Failure modes:
+     *   - ignores missing launch arguments or empty environment values so production launches never
+     *     pick up a test-only query
+     */
+    private var uiTestInitialQueryOverride: String? {
+        guard ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_SEARCH") else { return nil }
+        guard let query = ProcessInfo.processInfo.environment["UITEST_SEARCH_QUERY"],
+              !query.isEmpty else {
+            return nil
+        }
+        return query
     }
 
     /**
