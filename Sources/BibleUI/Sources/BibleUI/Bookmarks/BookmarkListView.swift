@@ -327,6 +327,10 @@ private struct BookmarkRow: View {
     /// Callback used to open label editing for the bookmark.
     var onEditLabels: (() -> Void)?
 
+    /// Whether XCUITests should expose a dedicated inline label-edit action for this row.
+    private let uiTestShowsInlineEditAction =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_LABEL_WORKFLOW")
+
     /// Labels currently assigned to the bookmark, sorted by name.
     private var assignedLabels: [BibleCore.Label] {
         bookmark.bookmarkToLabels?.compactMap { $0.label }.sorted { $0.name < $1.name } ?? []
@@ -334,6 +338,25 @@ private struct BookmarkRow: View {
 
     /// Builds the tappable bookmark row.
     var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            selectionButton
+
+            if uiTestShowsInlineEditAction {
+                inlineEditLabelsButton
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+    /**
+     Builds the main row button that navigates back into the reader for the bookmark passage.
+
+     - Returns: Row button containing the bookmark summary content.
+     - Side effects:
+       - invokes `onNavigate` with the bookmark's book/chapter when tapped
+     - Failure modes: This helper cannot fail.
+     */
+    private var selectionButton: some View {
         Button {
             let chapter = bookmark.ordinalStart / 40 + 1
             let bookName = bookmark.book ?? "Genesis"
@@ -347,6 +370,29 @@ private struct BookmarkRow: View {
             .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(bookmarkRowIdentifier())
+    }
+
+    /**
+     Builds the XCUITest-only inline edit-labels control for one bookmark row.
+
+     - Returns: Inline button that opens `LabelAssignmentView` for the bookmark.
+     - Side effects:
+       - invokes `onEditLabels` when tapped
+     - Failure modes: This helper cannot fail.
+     */
+    private var inlineEditLabelsButton: some View {
+        Button {
+            onEditLabels?()
+        } label: {
+            Image(systemName: "tag.circle")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(bookmarkInlineActionIdentifier("bookmarkListEditLabelsButton"))
+        .accessibilityLabel(BookmarkListView.verseReference(for: bookmark))
     }
 
     /// Header row containing label dots, icon, reference, and created-at date.
@@ -403,21 +449,20 @@ private struct BookmarkRow: View {
                         .background(Color(argbInt: label.color).opacity(0.2))
                         .clipShape(Capsule())
                 }
-                // Tap area to edit labels
-                Button {
-                    onEditLabels?()
-                } label: {
-                    Image(systemName: "pencil.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if !uiTestShowsInlineEditAction {
+                    // Tap area to edit labels
+                    Button {
+                        onEditLabels?()
+                    } label: {
+                        Image(systemName: "pencil.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         } else {
-            // No labels — show a button to add some
-            Button {
-                onEditLabels?()
-            } label: {
+            if uiTestShowsInlineEditAction {
                 HStack(spacing: 4) {
                     Image(systemName: "tag")
                         .font(.caption2)
@@ -425,9 +470,64 @@ private struct BookmarkRow: View {
                         .font(.caption2)
                 }
                 .foregroundStyle(.secondary)
+            } else {
+                // No labels — show a button to add some
+                Button {
+                    onEditLabels?()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "tag")
+                            .font(.caption2)
+                        Text(String(localized: "add_labels"))
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
+    }
+
+    /**
+     Resolves the deterministic XCUITest accessibility identifier for the row's primary button.
+
+     - Returns: Stable identifier derived from the bookmark reference string.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func bookmarkRowIdentifier() -> String {
+        "bookmarkListRowButton::\(sanitizedAccessibilitySegment(BookmarkListView.verseReference(for: bookmark)))"
+    }
+
+    /**
+     Resolves the deterministic XCUITest accessibility identifier for one inline row action.
+
+     - Parameter prefix: Fixed action prefix naming the control role.
+     - Returns: Stable identifier derived from the action prefix and bookmark reference string.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func bookmarkInlineActionIdentifier(_ prefix: String) -> String {
+        "\(prefix)::\(sanitizedAccessibilitySegment(BookmarkListView.verseReference(for: bookmark)))"
+    }
+
+    /**
+     Sanitizes one free-form bookmark reference for deterministic accessibility identifiers.
+
+     - Parameter value: Raw user-visible reference string.
+     - Returns: Identifier-safe string containing only ASCII letters, digits, and underscores.
+     - Side effects: none.
+     - Failure modes: This helper cannot fail.
+     */
+    private func sanitizedAccessibilitySegment(_ value: String) -> String {
+        let mapped = value.unicodeScalars.map { scalar -> String in
+            if CharacterSet.alphanumerics.contains(scalar) {
+                return String(scalar)
+            }
+            return "_"
+        }
+        let collapsed = mapped.joined().replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
+        return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
     }
 }
 

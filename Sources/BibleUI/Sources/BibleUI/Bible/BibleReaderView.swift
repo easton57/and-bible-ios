@@ -89,9 +89,10 @@ func presentCompareView(book: String, chapter: Int, currentModuleName: String, s
  Side effects:
  - `onAppear` loads persisted preferences, wires TTS callbacks, restores speech settings, and
    registers synchronized-scrolling callbacks on `WindowManager`
- - XCUITest launch arguments can present the settings, text-display editor, import/export sheet,
-   label manager, or a seeded bookmark label-assignment sheet immediately after initial state
-   hydration so automation can target nested flows without menu traversal
+ - XCUITest launch arguments can seed bookmark/label data or present the settings, text-display
+   editor, import/export sheet, label manager, or a seeded bookmark label-assignment sheet
+   immediately after initial state hydration so automation can target nested flows without menu
+   traversal
  - iOS `onAppear` and `onDisappear` start and stop tilt-to-scroll based on workspace settings
  - sheet dismissals reload behavior preferences or refresh installed-module lists where needed
  - toolbar toggles and helper actions mutate SwiftData-backed workspace/settings state and push
@@ -212,6 +213,10 @@ public struct BibleReaderView: View {
 
     /// Launch-argument override used by XCUITests to present one seeded label-assignment sheet.
     private let uiTestOpensLabelAssignmentOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_LABEL_ASSIGNMENT")
+
+    /// Launch-argument override used by XCUITests to seed bookmark/label data without opening a sheet.
+    private let uiTestSeedsBookmarkLabelWorkflowOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_LABEL_WORKFLOW")
 
     /// Launch-argument override used by XCUITests to present Reading Plans immediately on launch.
     private let uiTestOpensReadingPlansOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_READING_PLANS")
@@ -548,6 +553,11 @@ public struct BibleReaderView: View {
                     resetLabelsForUITests()
                     resetBookmarksForUITests()
                     uiTestLabelAssignmentBookmarkID = seedLabelAssignmentBookmarkForUITests()
+                } else if uiTestSeedsBookmarkLabelWorkflowOnLaunch {
+                    hasAppliedUITestInitialPresentation = true
+                    resetLabelsForUITests()
+                    resetBookmarksForUITests()
+                    _ = seedLabelAssignmentBookmarkForUITests()
                 } else if uiTestOpensReadingPlansOnLaunch {
                     hasAppliedUITestInitialPresentation = true
                     resetReadingPlansForUITests()

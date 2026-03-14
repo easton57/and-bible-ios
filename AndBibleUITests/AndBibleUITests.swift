@@ -199,6 +199,30 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that label assignment can be reached from the real bookmark-list path and still
+     toggle the seeded label state.
+     *
+     * - Side effects:
+     *   - launches the reader shell with one deterministic bookmark and seed label preloaded
+     *   - opens the bookmark list from the reader overflow menu
+     *   - opens label assignment from the seeded bookmark row and toggles favourite plus assignment
+     * - Failure modes:
+     *   - fails if the bookmark list cannot be reached from the reader menu
+     *   - fails if the seeded bookmark row or inline edit-labels action is missing
+     *   - fails if the label-assignment screen never appears or the seeded row state does not
+     *     update after the toggles
+     */
+    func testBookmarkListOpensLabelAssignmentForSeededBookmark() {
+        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
+        app.launch()
+
+        let labelAssignmentScreen = openLabelAssignmentFromBookmarkList(in: app)
+        XCTAssertTrue(labelAssignmentScreen.exists)
+
+        assertSeedLabelAssignmentCanToggle(in: app)
+    }
+
+    /**
      Verifies that the about screen can be opened from the reader shell.
      *
      * - Side effects:
@@ -291,23 +315,7 @@ final class AndBibleUITests: XCTestCase {
         let labelAssignmentScreen = openLabelAssignment(in: app, launchedDirectly: true)
         XCTAssertTrue(labelAssignmentScreen.exists)
 
-        let seedRow = requireElement("labelAssignmentRow::UI_Test_Seed", in: app, timeout: 10)
-        XCTAssertEqual(seedRow.value as? String, "unassigned,notFavourite")
-
-        requireElement(
-            "labelAssignmentFavouriteButton::UI_Test_Seed",
-            in: app,
-            timeout: 10
-        ).tap()
-        requireElement(
-            "labelAssignmentToggleButton::UI_Test_Seed",
-            in: app,
-            timeout: 10
-        ).tap()
-
-        let updatedPredicate = NSPredicate(format: "value == %@", "assigned,favourite")
-        expectation(for: updatedPredicate, evaluatedWith: seedRow)
-        waitForExpectations(timeout: 10)
+        assertSeedLabelAssignmentCanToggle(in: app)
     }
 
     /**
@@ -440,6 +448,8 @@ final class AndBibleUITests: XCTestCase {
      *     launch.
      *   - openLabelAssignmentOnLaunch: Whether the app should present one seeded label-assignment
      *     sheet immediately on launch.
+     *   - seedBookmarkLabelWorkflowOnLaunch: Whether the app should seed one deterministic
+     *     bookmark-plus-label workflow while still landing on the reader shell.
      *   - openReadingPlansOnLaunch: Whether the app should present Reading Plans immediately on
      *     launch.
      *   - openDailyReadingOnLaunch: Whether the app should present one seeded daily-reading view
@@ -458,6 +468,8 @@ final class AndBibleUITests: XCTestCase {
      *     immediately after the reader hydrates
      *   - when `openLabelAssignmentOnLaunch` is `true`, configures the app to seed one bookmark
      *     plus labels and present Label Assignment immediately after the reader hydrates
+     *   - when `seedBookmarkLabelWorkflowOnLaunch` is `true`, configures the app to seed one
+     *     bookmark plus labels while leaving navigation at the reader shell
      *   - when `openReadingPlansOnLaunch` is `true`, configures the app to present Reading Plans
      *     immediately after the reader hydrates
      *   - when `openDailyReadingOnLaunch` is `true`, configures the app to seed one reading plan
@@ -472,6 +484,7 @@ final class AndBibleUITests: XCTestCase {
         openImportExportOnLaunch: Bool = false,
         openLabelManagerOnLaunch: Bool = false,
         openLabelAssignmentOnLaunch: Bool = false,
+        seedBookmarkLabelWorkflowOnLaunch: Bool = false,
         openReadingPlansOnLaunch: Bool = false,
         openDailyReadingOnLaunch: Bool = false,
         openWorkspacesOnLaunch: Bool = false
@@ -493,6 +506,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if openLabelAssignmentOnLaunch {
             app.launchArguments += ["UITEST_OPEN_LABEL_ASSIGNMENT"]
+        }
+        if seedBookmarkLabelWorkflowOnLaunch {
+            app.launchArguments += ["UITEST_SEED_BOOKMARK_LABEL_WORKFLOW"]
         }
         if openReadingPlansOnLaunch {
             app.launchArguments += ["UITEST_OPEN_READING_PLANS"]
@@ -585,6 +601,26 @@ final class AndBibleUITests: XCTestCase {
         if !launchedDirectly {
             XCTFail("Non-direct label-assignment launch is not implemented in this smoke suite")
         }
+        return requireElement("labelAssignmentScreen", in: app, timeout: 10)
+    }
+
+    /**
+     Opens Label Assignment from the actual bookmark-list flow.
+     *
+     * - Parameter app: Running application under test.
+     * - Returns: The root accessibility-identified Label Assignment screen element.
+     * - Side effects:
+     *   - opens the reader overflow menu and pushes the bookmark list
+     *   - taps the seeded bookmark row's inline edit-labels action
+     * - Failure modes:
+     *   - fails when the bookmark list or seeded bookmark edit-labels action never appears
+     */
+    private func openLabelAssignmentFromBookmarkList(in app: XCUIApplication) -> XCUIElement {
+        let moreMenuButton = requireElement("readerMoreMenuButton", in: app)
+        moreMenuButton.tap()
+        requireElement("readerOpenBookmarksAction", in: app, timeout: 5).tap()
+        _ = requireElement("bookmarkListScreen", in: app, timeout: 10)
+        requireElement("bookmarkListEditLabelsButton::Genesis_1_1", in: app, timeout: 10).tap()
         return requireElement("labelAssignmentScreen", in: app, timeout: 10)
     }
 
@@ -738,6 +774,37 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
         element.tap()
+    }
+
+    /**
+     Toggles the seeded label row inside Label Assignment and verifies the combined state change.
+     *
+     * - Parameter app: Running application under test.
+     * - Side effects:
+     *   - taps the seeded label's favourite and assignment controls
+     *   - waits for the row accessibility value to update to the combined assigned/favourite state
+     * - Failure modes:
+     *   - fails if the seed row or either inline control is missing
+     *   - fails if the row accessibility value never reaches `assigned,favourite`
+     */
+    private func assertSeedLabelAssignmentCanToggle(in app: XCUIApplication) {
+        let seedRow = requireElement("labelAssignmentRow::UI_Test_Seed", in: app, timeout: 10)
+        XCTAssertEqual(seedRow.value as? String, "unassigned,notFavourite")
+
+        requireElement(
+            "labelAssignmentFavouriteButton::UI_Test_Seed",
+            in: app,
+            timeout: 10
+        ).tap()
+        requireElement(
+            "labelAssignmentToggleButton::UI_Test_Seed",
+            in: app,
+            timeout: 10
+        ).tap()
+
+        let updatedPredicate = NSPredicate(format: "value == %@", "assigned,favourite")
+        expectation(for: updatedPredicate, evaluatedWith: seedRow)
+        waitForExpectations(timeout: 10)
     }
 
     /**
