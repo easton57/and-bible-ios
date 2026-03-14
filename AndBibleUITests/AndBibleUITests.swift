@@ -481,6 +481,53 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that disabling a seeded NextCloud sync category persists across a direct dismiss and
+     reopen of Sync Settings.
+     *
+     * - Side effects:
+     *   - launches the app directly into Sync Settings with NextCloud selected and bookmarks
+     *     pre-enabled in the in-memory settings store
+     *   - disables the bookmarks category through the XCUITest-only inline action
+     *   - dismisses the Sync sheet, reopens it through the test-only reader-shell control, and
+     *     rehydrates the screen from persisted settings state
+     * - Failure modes:
+     *   - fails if the seeded Sync screen does not start with `backend=NEXT_CLOUD;enabled=bookmarks`
+     *   - fails if the direct dismiss or reopen controls never appear
+     *   - fails if reopening the sheet does not preserve the exported `enabled=none` state token
+     */
+    func testSyncSettingsCategoryDisablePersistsAcrossDirectReopen() {
+        let app = makeApp(
+            openSyncOnLaunch: true,
+            syncBackend: "NEXT_CLOUD",
+            syncEnabledCategories: "bookmarks"
+        )
+        app.launch()
+
+        let syncScreen = openSyncSettings(in: app, launchedDirectly: true)
+        XCTAssertEqual(
+            syncScreen.value as? String,
+            "backend=NEXT_CLOUD;enabled=bookmarks"
+        )
+
+        requireElement("syncCategoryDisableButton::bookmarks", in: app, timeout: 10).tap()
+        waitForElementValue(
+            "syncSettingsScreen",
+            toEqual: "backend=NEXT_CLOUD;enabled=none",
+            in: app,
+            timeout: 10
+        )
+
+        requireElement("syncSettingsDoneButton", in: app, timeout: 10).tap()
+        requireElement("uiTestReopenSyncSettingsButton", in: app, timeout: 10).tap()
+
+        let reopenedSyncScreen = requireElement("syncSettingsScreen", in: app, timeout: 10)
+        XCTAssertEqual(
+            reopenedSyncScreen.value as? String,
+            "backend=NEXT_CLOUD;enabled=none"
+        )
+    }
+
+    /**
      Verifies that switching the active sync backend swaps the visible Sync section and exported
      backend state.
      *

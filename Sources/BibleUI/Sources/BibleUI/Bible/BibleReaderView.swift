@@ -223,6 +223,9 @@ public struct BibleReaderView: View {
     /// Launch-argument override used by XCUITests to present Sync Settings immediately on launch.
     private let uiTestOpensSyncSettingsOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_SYNC")
 
+    /// Launch-argument override enabling the in-memory XCUITest reader-shell harness.
+    private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
+
     /// Launch-argument override used by XCUITests to present Colors immediately on launch.
     private let uiTestOpensColorsOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_COLORS")
 
@@ -463,6 +466,20 @@ public struct BibleReaderView: View {
                     .allowsHitTesting(false)
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if uiTestUsesInMemoryStores && uiTestOpensSyncSettingsOnLaunch && !showSyncSettings {
+                Button("Open Sync") {
+                    showSyncSettings = true
+                }
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.top, 12)
+                .padding(.trailing, 12)
+                .accessibilityIdentifier("uiTestReopenSyncSettingsButton")
+            }
+        }
         .animation(.easeInOut(duration: 0.25), value: toastMessage)
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
@@ -649,6 +666,7 @@ public struct BibleReaderView: View {
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(String(localized: "done")) { showSyncSettings = false }
+                                .accessibilityIdentifier("syncSettingsDoneButton")
                         }
                     }
             }
