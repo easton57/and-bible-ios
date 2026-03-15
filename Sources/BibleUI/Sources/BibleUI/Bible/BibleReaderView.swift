@@ -168,6 +168,9 @@ public struct BibleReaderView: View {
     /// Exported XCUITest-only history workflow state used to diagnose jump-back navigation.
     @State private var uiTestHistoryNavigationState = "idle"
 
+    /// Exported XCUITest-only bookmark workflow state used to diagnose reader navigation.
+    @State private var uiTestBookmarkNavigationState = "idle"
+
     /// Presents the expanded speech controls sheet.
     @State private var showSpeakControls = false
 
@@ -247,6 +250,10 @@ public struct BibleReaderView: View {
     /// Launch-argument override used by XCUITests to seed bookmark/label data without opening a sheet.
     private let uiTestSeedsBookmarkLabelWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_LABEL_WORKFLOW")
+
+    /// Launch-argument override used by XCUITests to seed one bookmark-navigation target.
+    private let uiTestSeedsBookmarkNavigationWorkflowOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_NAVIGATION_WORKFLOW")
 
     /// Launch-argument override used by XCUITests to seed one persisted history target on launch.
     private let uiTestSeedsHistoryWorkflowOnLaunch =
@@ -613,6 +620,9 @@ public struct BibleReaderView: View {
                         .accessibilityIdentifier("readerCurrentReferenceState")
                     Text(uiTestHistoryNavigationState)
                         .accessibilityIdentifier("uiTestHistoryNavigationState")
+                    Text("bookmarkNavigationState")
+                        .accessibilityIdentifier("uiTestBookmarkNavigationState")
+                        .accessibilityValue(uiTestBookmarkNavigationState)
                 }
                 .font(.caption2)
                 .foregroundStyle(.clear)
@@ -651,8 +661,13 @@ public struct BibleReaderView: View {
             NavigationStack {
                 BookmarkListView(
                     onNavigate: { book, chapter in
+                        let controller = focusedController
                         showBookmarks = false
-                        focusedController?.navigateTo(book: book, chapter: chapter)
+                        trackBookmarkNavigationForUITests(
+                            book: book,
+                            chapter: chapter,
+                            controller: controller
+                        )
                     },
                     onOpenStudyPad: { labelId in
                         showBookmarks = false
@@ -2325,6 +2340,35 @@ public struct BibleReaderView: View {
     }
 
     /**
+     Seeds one deterministic whole-verse Bible bookmark for XCUITest workflows.
+
+     - Parameters:
+       - book: User-visible book name that the bookmark list and reader navigation should resolve.
+       - ordinalStart: Start ordinal whose chapter/verse encoding matches the bookmark list's
+         simplified rendering logic.
+     - Returns: Identifier of the seeded bookmark, or `nil` when the insert/save path fails.
+     - Side effects:
+       - inserts one whole-verse `BibleBookmark` into SwiftData
+       - persists the bookmark so bookmark-list and label-assignment workflows can fetch it later
+     - Failure modes:
+       - returns `nil` when the save fails after insertion because the seeded workflow would be
+         unable to resolve its target bookmark
+     */
+    private func seedBookmarkForUITests(book: String, ordinalStart: Int) -> UUID? {
+        let bookmark = BibleBookmark(
+            kjvOrdinalStart: ordinalStart,
+            kjvOrdinalEnd: ordinalStart,
+            ordinalStart: ordinalStart,
+            ordinalEnd: ordinalStart,
+            v11n: "KJVA"
+        )
+        bookmark.book = book
+        modelContext.insert(bookmark)
+        guard (try? modelContext.save()) != nil else { return nil }
+        return bookmark.id
+    }
+
+    /**
      Seeds one deterministic Bible bookmark for direct XCUITest label-assignment workflows.
      *
      * - Returns: Identifier of the seeded bookmark, or `nil` when the insert/save path fails.
@@ -2332,21 +2376,24 @@ public struct BibleReaderView: View {
      *   - inserts one whole-verse `BibleBookmark` into SwiftData
      *   - persists the bookmark so `LabelAssignmentView` can fetch it by identifier
      * - Failure modes:
-     *   - returns `nil` when the save fails after insertion because the seeded sheet would be
-     *     unable to resolve its target bookmark
+     *   - forwards the save failure semantics from `seedBookmarkForUITests(book:ordinalStart:)`
      */
     private func seedLabelAssignmentBookmarkForUITests() -> UUID? {
-        let bookmark = BibleBookmark(
-            kjvOrdinalStart: 1,
-            kjvOrdinalEnd: 1,
-            ordinalStart: 1,
-            ordinalEnd: 1,
-            v11n: "KJVA"
-        )
-        bookmark.book = "Genesis"
-        modelContext.insert(bookmark)
-        guard (try? modelContext.save()) != nil else { return nil }
-        return bookmark.id
+        seedBookmarkForUITests(book: "Genesis", ordinalStart: 1)
+    }
+
+    /**
+     Seeds one deterministic bookmark-navigation target for XCUITests.
+     *
+     * - Returns: Identifier of the seeded bookmark, or `nil` when the insert/save path fails.
+     * - Side effects:
+     *   - inserts one `Exodus 2:1` bookmark into SwiftData while the reader shell remains on its
+     *     default `Genesis 1` position
+     * - Failure modes:
+     *   - forwards the save failure semantics from `seedBookmarkForUITests(book:ordinalStart:)`
+     */
+    private func seedBookmarkNavigationTargetForUITests() -> UUID? {
+        seedBookmarkForUITests(book: "Exodus", ordinalStart: 41)
     }
 
     /**
@@ -2490,6 +2537,9 @@ public struct BibleReaderView: View {
             resetLabelsForUITests()
             resetBookmarksForUITests()
             _ = seedLabelAssignmentBookmarkForUITests()
+        } else if uiTestSeedsBookmarkNavigationWorkflowOnLaunch {
+            resetBookmarksForUITests()
+            _ = seedBookmarkNavigationTargetForUITests()
         } else if uiTestSeedsHistoryMultiRowWorkflowOnLaunch {
             resetHistoryForUITests()
             seedHistoryForUITests(keys: ["Exod.2.1", "Matt.3.1"])
@@ -2511,6 +2561,53 @@ public struct BibleReaderView: View {
             showWorkspaces = true
         } else if uiTestOpensSettingsOnLaunch {
             showSettings = true
+        }
+    }
+
+    /**
+     Tracks bookmark-list navigation completion for XCUITests.
+     *
+     * - Parameters:
+     *   - book: Book name passed into the bookmark navigation callback.
+     *   - chapter: Chapter number passed into the bookmark navigation callback.
+     *   - controller: Focused reader controller that should receive the navigation after the
+     *     bookmark sheet dismisses.
+     * - Side effects:
+     *   - yields once on the main actor so sheet dismissal completes before reader navigation runs
+     *   - calls `navigateTo(book:chapter:)` on the captured reader controller
+     *   - updates `uiTestBookmarkNavigationState` as the focused controller accepts or fails the
+     *     requested navigation
+     *   - forces a SwiftUI state change so hidden reader diagnostics stay current under automation
+     * - Failure modes:
+     *   - records a `failed:` token when no focused controller is available for bookmark
+     *     navigation
+     *   - records a `failed:` token after the bounded wait if the focused controller never reports
+     *     the requested book and chapter
+     */
+    @MainActor
+    private func trackBookmarkNavigationForUITests(
+        book: String,
+        chapter: Int,
+        controller: BibleReaderController?
+    ) {
+        guard uiTestUsesInMemoryStores else { return }
+        let target = "\(book).\(chapter)"
+        uiTestBookmarkNavigationState = "selected:\(target)"
+        Task { @MainActor in
+            guard let controller else {
+                uiTestBookmarkNavigationState = "failed:\(target)"
+                return
+            }
+            await Task.yield()
+            controller.navigateTo(book: book, chapter: chapter)
+            for _ in 0..<40 {
+                if controller.currentBook == book, controller.currentChapter == chapter {
+                    uiTestBookmarkNavigationState = "navigated:\(target)"
+                    return
+                }
+                await Task.yield()
+            }
+            uiTestBookmarkNavigationState = "failed:\(target)"
         }
     }
 

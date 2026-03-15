@@ -237,11 +237,38 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
         app.launch()
 
-        let moreMenuButton = requireReaderMoreMenuButton(in: app)
-        moreMenuButton.tap()
-        requireElement("readerOpenBookmarksAction", in: app, timeout: 5).tap()
+        XCTAssertTrue(openBookmarkListFromReaderMenu(in: app).exists)
+    }
 
-        XCTAssertTrue(requireElement("bookmarkListScreen", in: app, timeout: 10).exists)
+    /**
+     Verifies that selecting a seeded bookmark row dismisses the list and navigates the reader to
+     that bookmark's chapter.
+     *
+     * - Side effects:
+     *   - launches the reader shell with one deterministic `Exodus 2:1` bookmark while the reader
+     *     itself stays on `Genesis 1`
+     *   - opens the bookmark list from the actual reader overflow menu
+     *   - taps the seeded bookmark row and waits for the exported bookmark-navigation state to
+     *     confirm that the reader reached `Exodus 2`
+     * - Failure modes:
+     *   - fails if the bookmark list or seeded bookmark row never appears
+     *   - fails if tapping the seeded bookmark row does not drive the reader to `Exodus 2`
+     */
+    func testBookmarkSelectionNavigatesReaderToSeededReference() {
+        let app = makeApp(seedBookmarkNavigationWorkflowOnLaunch: true)
+        app.launch()
+
+        let currentReferenceState = requireElement("readerCurrentReferenceState", in: app, timeout: 10)
+        _ = requireElement("uiTestBookmarkNavigationState", in: app, timeout: 10)
+        XCTAssertEqual(currentReferenceState.label, "Genesis 1")
+
+        _ = openBookmarkListFromReaderMenu(in: app)
+        let bookmarkRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
+        XCTAssertTrue(bookmarkRow.waitForExistence(timeout: 10), "Expected seeded bookmark row button to exist.")
+        bookmarkRow.tap()
+
+        waitForElementValue("uiTestBookmarkNavigationState", toEqual: "navigated:Exodus.2", in: app)
+        XCTAssertEqual(currentReferenceState.label, "Exodus 2")
     }
 
     /**
@@ -872,6 +899,8 @@ final class AndBibleUITests: XCTestCase {
      *     sheet immediately on launch.
      *   - seedBookmarkLabelWorkflowOnLaunch: Whether the app should seed one deterministic
      *     bookmark-plus-label workflow while still landing on the reader shell.
+     *   - seedBookmarkNavigationWorkflowOnLaunch: Whether the app should seed one deterministic
+     *     bookmark-navigation target while still landing on the reader shell.
      *   - seedHistoryWorkflowOnLaunch: Whether the app should seed one deterministic history row
      *     while still landing on the reader shell.
      *   - openReadingPlansOnLaunch: Whether the app should present Reading Plans immediately on
@@ -908,6 +937,8 @@ final class AndBibleUITests: XCTestCase {
      *     plus labels and present Label Assignment immediately after the reader hydrates
      *   - when `seedBookmarkLabelWorkflowOnLaunch` is `true`, configures the app to seed one
      *     bookmark plus labels while leaving navigation at the reader shell
+     *   - when `seedBookmarkNavigationWorkflowOnLaunch` is `true`, configures the app to seed one
+     *     bookmark-navigation target while leaving navigation at the reader shell
      *   - when `seedHistoryWorkflowOnLaunch` is `true`, configures the app to seed one persisted
      *     history row while leaving navigation at the reader shell
      *   - when `seedHistoryMultiRowWorkflowOnLaunch` is `true`, configures the app to seed two
@@ -933,6 +964,7 @@ final class AndBibleUITests: XCTestCase {
         openLabelManagerOnLaunch: Bool = false,
         openLabelAssignmentOnLaunch: Bool = false,
         seedBookmarkLabelWorkflowOnLaunch: Bool = false,
+        seedBookmarkNavigationWorkflowOnLaunch: Bool = false,
         seedHistoryWorkflowOnLaunch: Bool = false,
         seedHistoryMultiRowWorkflowOnLaunch: Bool = false,
         openReadingPlansOnLaunch: Bool = false,
@@ -981,6 +1013,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if seedBookmarkLabelWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_BOOKMARK_LABEL_WORKFLOW"]
+        }
+        if seedBookmarkNavigationWorkflowOnLaunch {
+            app.launchArguments += ["UITEST_SEED_BOOKMARK_NAVIGATION_WORKFLOW"]
         }
         if seedHistoryWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_HISTORY_WORKFLOW"]
@@ -1143,12 +1178,29 @@ final class AndBibleUITests: XCTestCase {
      *   - fails when the bookmark list or seeded bookmark edit-labels action never appears
      */
     private func openLabelAssignmentFromBookmarkList(in app: XCUIApplication) -> XCUIElement {
+        _ = openBookmarkListFromReaderMenu(in: app)
+        requireElement("bookmarkListEditLabelsButton::Genesis_1_1", in: app, timeout: 10).tap()
+        return requireElement("labelAssignmentScreen", in: app, timeout: 10)
+    }
+
+    /**
+     Opens the bookmark list from the real reader overflow menu and waits for the list root to
+     render.
+     *
+     * - Parameter app: Running application whose reader shell should present the bookmark list.
+     * - Returns: The root accessibility-identified bookmark list element.
+     * - Side effects:
+     *   - opens the reader overflow menu
+     *   - presents the bookmark list from the actual reader action surface
+     * - Failure modes:
+     *   - fails if the reader menu button, bookmark action, or bookmark list root never appears
+     */
+    @discardableResult
+    private func openBookmarkListFromReaderMenu(in app: XCUIApplication) -> XCUIElement {
         let moreMenuButton = requireReaderMoreMenuButton(in: app)
         moreMenuButton.tap()
         requireElement("readerOpenBookmarksAction", in: app, timeout: 5).tap()
-        _ = requireElement("bookmarkListScreen", in: app, timeout: 10)
-        requireElement("bookmarkListEditLabelsButton::Genesis_1_1", in: app, timeout: 10).tap()
-        return requireElement("labelAssignmentScreen", in: app, timeout: 10)
+        return requireElement("bookmarkListScreen", in: app, timeout: 10)
     }
 
     /**

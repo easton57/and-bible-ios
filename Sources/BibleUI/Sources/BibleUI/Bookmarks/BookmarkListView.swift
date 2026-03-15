@@ -367,9 +367,12 @@ private struct BookmarkRow: View {
                 notePreview
                 labelTags
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
         .accessibilityIdentifier(bookmarkRowIdentifier())
     }
 
