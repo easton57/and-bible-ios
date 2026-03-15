@@ -312,6 +312,53 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that bookmark-list label chips narrow the visible rows and that clearing the filter
+     restores the full row set.
+     *
+     * - Side effects:
+     *   - launches the reader shell with deterministic `Genesis 1:1` and `Exodus 2:1` bookmarks,
+     *     each assigned to a different user label
+     *   - opens the real bookmark list from the reader overflow menu
+     *   - selects the seeded `UI Test Seed` label chip, verifies the list narrows to the matching
+     *     bookmark row, then clears the filter through the real `All` chip
+     * - Failure modes:
+     *   - fails if the bookmark list, seeded filter chip, or either seeded bookmark row never
+     *     appears
+     *   - fails if the label filter does not hide the non-matching bookmark row
+     *   - fails if clearing the filter does not restore the full bookmark row set
+     */
+    func testBookmarkListLabelFilterNarrowsAndClearsVisibleRows() {
+        let app = makeApp(seedBookmarkFilterWorkflowOnLaunch: true)
+        app.launch()
+
+        _ = openBookmarkListFromReaderMenu(in: app)
+        let genesisRow = app.buttons["bookmarkListRowButton::Genesis_1_1"].firstMatch
+        let exodusRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
+        XCTAssertTrue(genesisRow.waitForExistence(timeout: 10), "Expected Genesis bookmark row button to exist.")
+        XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row button to exist.")
+
+        requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
+
+        let hiddenPredicate = NSPredicate(format: "exists == false")
+        expectation(for: hiddenPredicate, evaluatedWith: exodusRow)
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(genesisRow.exists, "Expected Genesis bookmark row to remain visible for the selected label.")
+        XCTAssertTrue(
+            requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10).exists,
+            "Expected the seeded label StudyPad handoff to appear while the filter is active."
+        )
+
+        requireElement("bookmarkListFilterChip::all", in: app, timeout: 10).tap()
+
+        XCTAssertTrue(genesisRow.waitForExistence(timeout: 10), "Expected Genesis bookmark row to remain visible after clearing the filter.")
+        XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row to return after clearing the filter.")
+        XCTAssertFalse(
+            app.buttons["bookmarkListOpenStudyPadButton::UI_Test_Seed"].firstMatch.exists,
+            "Expected the StudyPad handoff to disappear once the label filter is cleared."
+        )
+    }
+
+    /**
      Verifies that selecting a seeded bookmark label filter exposes the StudyPad handoff and opens
      the matching StudyPad document in the reader shell.
      *
@@ -1009,6 +1056,8 @@ final class AndBibleUITests: XCTestCase {
      *     bookmark-navigation target while still landing on the reader shell.
      *   - seedBookmarkMultiRowWorkflowOnLaunch: Whether the app should seed two deterministic
      *     bookmark rows while still landing on the reader shell.
+     *   - seedBookmarkFilterWorkflowOnLaunch: Whether the app should seed two deterministic
+     *     labeled bookmark rows while still landing on the reader shell.
      *   - seedHistoryWorkflowOnLaunch: Whether the app should seed one deterministic history row
      *     while still landing on the reader shell.
      *   - openReadingPlansOnLaunch: Whether the app should present Reading Plans immediately on
@@ -1054,6 +1103,8 @@ final class AndBibleUITests: XCTestCase {
      *     bookmark-navigation target while leaving navigation at the reader shell
      *   - when `seedBookmarkMultiRowWorkflowOnLaunch` is `true`, configures the app to seed two
      *     bookmark rows while leaving navigation at the reader shell
+     *   - when `seedBookmarkFilterWorkflowOnLaunch` is `true`, configures the app to seed two
+     *     labeled bookmark rows while leaving navigation at the reader shell
      *   - when `seedHistoryWorkflowOnLaunch` is `true`, configures the app to seed one persisted
      *     history row while leaving navigation at the reader shell
      *   - when `seedHistoryMultiRowWorkflowOnLaunch` is `true`, configures the app to seed two
@@ -1083,6 +1134,7 @@ final class AndBibleUITests: XCTestCase {
         seedBookmarkStudyPadWorkflowOnLaunch: Bool = false,
         seedBookmarkNavigationWorkflowOnLaunch: Bool = false,
         seedBookmarkMultiRowWorkflowOnLaunch: Bool = false,
+        seedBookmarkFilterWorkflowOnLaunch: Bool = false,
         seedHistoryWorkflowOnLaunch: Bool = false,
         seedHistoryMultiRowWorkflowOnLaunch: Bool = false,
         openReadingPlansOnLaunch: Bool = false,
@@ -1143,6 +1195,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if seedBookmarkMultiRowWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_BOOKMARK_MULTIROW_WORKFLOW"]
+        }
+        if seedBookmarkFilterWorkflowOnLaunch {
+            app.launchArguments += ["UITEST_SEED_BOOKMARK_FILTER_WORKFLOW"]
         }
         if seedHistoryWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_HISTORY_WORKFLOW"]

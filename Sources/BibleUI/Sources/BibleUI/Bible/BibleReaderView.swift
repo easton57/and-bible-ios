@@ -270,6 +270,10 @@ public struct BibleReaderView: View {
     private let uiTestSeedsBookmarkMultiRowWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_MULTIROW_WORKFLOW")
 
+    /// Launch-argument override used by XCUITests to seed labeled bookmark rows for filter workflows.
+    private let uiTestSeedsBookmarkFilterWorkflowOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_FILTER_WORKFLOW")
+
     /// Launch-argument override used by XCUITests to seed one persisted history target on launch.
     private let uiTestSeedsHistoryWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_HISTORY_WORKFLOW")
@@ -2540,6 +2544,44 @@ public struct BibleReaderView: View {
     }
 
     /**
+     Seeds two labeled bookmark rows for bookmark-list filter workflows.
+
+     - Returns: Identifiers of the seeded bookmarks, ordered as `[Genesis 1:1, Exodus 2:1]`.
+     - Side effects:
+       - inserts one `Genesis 1:1` bookmark and one `Exodus 2:1` bookmark into SwiftData
+       - inserts one secondary user label alongside the default `UI Test Seed` label
+       - assigns each bookmark to a different label so bookmark-list filter chips can narrow the
+         visible row set deterministically
+     - Failure modes:
+       - returns an empty array when either bookmark insert/save path fails
+       - returns the seeded bookmarks without one or both label assignments when label resolution
+         or link persistence fails because the filter workflow can still render the base rows
+     */
+    private func seedBookmarkFilterWorkflowForUITests() -> [UUID] {
+        guard let genesisID = seedBookmarkForUITests(book: "Genesis", ordinalStart: 1),
+              let exodusID = seedBookmarkForUITests(book: "Exodus", ordinalStart: 41) else {
+            return []
+        }
+
+        let secondaryLabel = BibleCore.Label(name: "UI Test Other")
+        modelContext.insert(secondaryLabel)
+        guard (try? modelContext.save()) != nil else {
+            return [genesisID, exodusID]
+        }
+
+        let store = BookmarkStore(modelContext: modelContext)
+        let service = BookmarkService(store: store)
+        guard let primaryLabelID = store.labels().first(where: { $0.name == "UI Test Seed" })?.id,
+              let secondaryLabelID = store.labels().first(where: { $0.name == "UI Test Other" })?.id else {
+            return [genesisID, exodusID]
+        }
+
+        _ = service.toggleLabel(bookmarkId: genesisID, labelId: primaryLabelID)
+        _ = service.toggleLabel(bookmarkId: exodusID, labelId: secondaryLabelID)
+        return [genesisID, exodusID]
+    }
+
+    /**
      Seeds non-default theme colors for direct XCUITest color-reset workflows.
 
      Side effects:
@@ -2694,6 +2736,10 @@ public struct BibleReaderView: View {
         } else if uiTestSeedsBookmarkMultiRowWorkflowOnLaunch {
             resetBookmarksForUITests()
             _ = seedBookmarkMultiRowWorkflowForUITests()
+        } else if uiTestSeedsBookmarkFilterWorkflowOnLaunch {
+            resetLabelsForUITests()
+            resetBookmarksForUITests()
+            _ = seedBookmarkFilterWorkflowForUITests()
         } else if uiTestSeedsHistoryMultiRowWorkflowOnLaunch {
             resetHistoryForUITests()
             seedHistoryForUITests(keys: ["Exod.2.1", "Matt.3.1"])
