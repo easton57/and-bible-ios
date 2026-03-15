@@ -492,6 +492,7 @@ private struct BookmarkRow: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier(bookmarkInlineActionIdentifier("bookmarkListEditLabelsButton"))
                 }
             }
         } else {
@@ -517,6 +518,7 @@ private struct BookmarkRow: View {
                     .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(bookmarkInlineActionIdentifier("bookmarkListEditLabelsButton"))
             }
         }
     }

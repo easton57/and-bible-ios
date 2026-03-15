@@ -254,6 +254,10 @@ public struct BibleReaderView: View {
     private let uiTestSeedsBookmarkLabelWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_LABEL_WORKFLOW")
 
+    /// Launch-argument override used by XCUITests to seed bookmark/label data for the real row edit path.
+    private let uiTestSeedsBookmarkRowLabelWorkflowOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_ROW_LABEL_WORKFLOW")
+
     /// Launch-argument override used by XCUITests to seed one labeled bookmark for StudyPad handoff.
     private let uiTestSeedsBookmarkStudyPadWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_STUDYPAD_WORKFLOW")
@@ -2673,6 +2677,10 @@ public struct BibleReaderView: View {
             resetBookmarksForUITests()
             uiTestLabelAssignmentBookmarkID = seedLabelAssignmentBookmarkForUITests()
         } else if uiTestSeedsBookmarkLabelWorkflowOnLaunch {
+            resetLabelsForUITests()
+            resetBookmarksForUITests()
+            _ = seedLabelAssignmentBookmarkForUITests()
+        } else if uiTestSeedsBookmarkRowLabelWorkflowOnLaunch {
             resetLabelsForUITests()
             resetBookmarksForUITests()
             _ = seedLabelAssignmentBookmarkForUITests()

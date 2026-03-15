@@ -501,7 +501,7 @@ final class AndBibleUITests: XCTestCase {
      *     update after the toggles
      */
     func testBookmarkListOpensLabelAssignmentForSeededBookmark() {
-        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
+        let app = makeApp(seedBookmarkRowLabelWorkflowOnLaunch: true)
         app.launch()
 
         let labelAssignmentScreen = openLabelAssignmentFromBookmarkList(in: app)
@@ -999,6 +999,9 @@ final class AndBibleUITests: XCTestCase {
      *     sheet immediately on launch.
      *   - seedBookmarkLabelWorkflowOnLaunch: Whether the app should seed one deterministic
      *     bookmark-plus-label workflow while still landing on the reader shell.
+     *   - seedBookmarkRowLabelWorkflowOnLaunch: Whether the app should seed one deterministic
+     *     bookmark-plus-label workflow while still landing on the reader shell and expose the real
+     *     bookmark-row edit-label affordance.
      *   - seedBookmarkStudyPadWorkflowOnLaunch: Whether the app should seed one deterministic
      *     bookmark-plus-label workflow that can hand off into StudyPad from the real bookmark
      *     list.
@@ -1042,6 +1045,9 @@ final class AndBibleUITests: XCTestCase {
      *     plus labels and present Label Assignment immediately after the reader hydrates
      *   - when `seedBookmarkLabelWorkflowOnLaunch` is `true`, configures the app to seed one
      *     bookmark plus labels while leaving navigation at the reader shell
+     *   - when `seedBookmarkRowLabelWorkflowOnLaunch` is `true`, configures the app to seed one
+     *     bookmark plus labels while leaving navigation at the reader shell and keeps the
+     *     production bookmark-row edit-label control active
      *   - when `seedBookmarkStudyPadWorkflowOnLaunch` is `true`, configures the app to seed one
      *     bookmark plus label pair that exposes the StudyPad handoff from the real bookmark list
      *   - when `seedBookmarkNavigationWorkflowOnLaunch` is `true`, configures the app to seed one
@@ -1073,6 +1079,7 @@ final class AndBibleUITests: XCTestCase {
         openLabelManagerOnLaunch: Bool = false,
         openLabelAssignmentOnLaunch: Bool = false,
         seedBookmarkLabelWorkflowOnLaunch: Bool = false,
+        seedBookmarkRowLabelWorkflowOnLaunch: Bool = false,
         seedBookmarkStudyPadWorkflowOnLaunch: Bool = false,
         seedBookmarkNavigationWorkflowOnLaunch: Bool = false,
         seedBookmarkMultiRowWorkflowOnLaunch: Bool = false,
@@ -1124,6 +1131,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if seedBookmarkLabelWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_BOOKMARK_LABEL_WORKFLOW"]
+        }
+        if seedBookmarkRowLabelWorkflowOnLaunch {
+            app.launchArguments += ["UITEST_SEED_BOOKMARK_ROW_LABEL_WORKFLOW"]
         }
         if seedBookmarkStudyPadWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_BOOKMARK_STUDYPAD_WORKFLOW"]
@@ -1290,7 +1300,7 @@ final class AndBibleUITests: XCTestCase {
      * - Returns: The root accessibility-identified Label Assignment screen element.
      * - Side effects:
      *   - opens the reader overflow menu and pushes the bookmark list
-     *   - taps the seeded bookmark row's inline edit-labels action
+     *   - taps the seeded bookmark row's real edit-label affordance
      * - Failure modes:
      *   - fails when the bookmark list or seeded bookmark edit-labels action never appears
      */
