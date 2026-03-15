@@ -312,6 +312,40 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that changing the bookmark-list sort menu reorders the visible rows.
+     *
+     * - Side effects:
+     *   - launches the reader shell with deterministic `Exodus 2:1` and `Matthew 3:1` bookmarks
+     *   - opens the real bookmark list from the reader overflow menu
+     *   - verifies the default `Date created` ordering, opens the real sort menu, selects `Bible
+     *     order`, and waits for the visible row order to update
+     * - Failure modes:
+     *   - fails if the bookmark list, sort menu, or `Bible order` option never appears
+     *   - fails if the default row order does not match the seeded creation order
+     *   - fails if selecting `Bible order` does not move the Exodus row above the Matthew row
+     */
+    func testBookmarkListSortMenuReordersRows() {
+        let app = makeApp(seedBookmarkMultiRowWorkflowOnLaunch: true)
+        app.launch()
+
+        _ = openBookmarkListFromReaderMenu(in: app)
+        waitForElement(
+            "bookmarkListRowButton::Matthew_3_1",
+            toAppearAbove: "bookmarkListRowButton::Exodus_2_1",
+            in: app
+        )
+
+        requireElement("bookmarkListSortMenu", in: app, timeout: 10).tap()
+        requireElement("bookmarkListSortOption::bibleOrder", in: app, timeout: 10).tap()
+
+        waitForElement(
+            "bookmarkListRowButton::Exodus_2_1",
+            toAppearAbove: "bookmarkListRowButton::Matthew_3_1",
+            in: app
+        )
+    }
+
+    /**
      Verifies that bookmark-list text search narrows the visible rows and that clearing the query
      restores the full row set.
      *
@@ -2038,6 +2072,55 @@ final class AndBibleUITests: XCTestCase {
         } else {
             element.typeText(text)
         }
+    }
+
+    /**
+     Polls until one accessibility-identified element appears above another in the visible UI.
+     *
+     * - Parameters:
+     *   - upperIdentifier: Accessibility identifier expected to resolve to the higher row.
+     *   - lowerIdentifier: Accessibility identifier expected to resolve to the lower row.
+     *   - app: Running application under test.
+     *   - timeout: Maximum time to keep polling before failing.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - repeatedly re-queries the live XCUI hierarchy for both identifiers until their visible
+     *     frames settle into the requested vertical order
+     *   - records an XCTest failure when the requested order never appears before timeout
+     * - Failure modes:
+     *   - fails when either element disappears or when the requested vertical ordering never
+     *     materializes within the timeout window
+     */
+    private func waitForElement(
+        _ upperIdentifier: String,
+        toAppearAbove lowerIdentifier: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let upperElement = app.descendants(matching: .any)[upperIdentifier].firstMatch
+            let lowerElement = app.descendants(matching: .any)[lowerIdentifier].firstMatch
+            if upperElement.exists,
+               lowerElement.exists,
+               upperElement.frame.minY < lowerElement.frame.minY {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        let finalUpperElement = app.descendants(matching: .any)[upperIdentifier].firstMatch
+        let finalLowerElement = app.descendants(matching: .any)[lowerIdentifier].firstMatch
+        XCTAssertTrue(
+            finalUpperElement.exists && finalLowerElement.exists &&
+                finalUpperElement.frame.minY < finalLowerElement.frame.minY,
+            "Expected '\(upperIdentifier)' to appear above '\(lowerIdentifier)' within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
     }
 
 }

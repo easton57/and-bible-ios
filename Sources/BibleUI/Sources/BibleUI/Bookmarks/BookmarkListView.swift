@@ -223,13 +223,20 @@ public struct BookmarkListView: View {
     private var sortMenu: some View {
         Menu {
             Picker(String(localized: "sort"), selection: $sortOrder) {
-                Text(String(localized: "sort_bible_order")).tag(BookmarkSortOrder.bibleOrder)
-                Text(String(localized: "sort_date_created")).tag(BookmarkSortOrder.createdAtDesc)
-                Text(String(localized: "sort_last_updated")).tag(BookmarkSortOrder.lastUpdated)
+                Text(String(localized: "sort_bible_order"))
+                    .tag(BookmarkSortOrder.bibleOrder)
+                    .accessibilityIdentifier("bookmarkListSortOption::bibleOrder")
+                Text(String(localized: "sort_date_created"))
+                    .tag(BookmarkSortOrder.createdAtDesc)
+                    .accessibilityIdentifier("bookmarkListSortOption::createdAtDesc")
+                Text(String(localized: "sort_last_updated"))
+                    .tag(BookmarkSortOrder.lastUpdated)
+                    .accessibilityIdentifier("bookmarkListSortOption::lastUpdated")
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
+        .accessibilityIdentifier("bookmarkListSortMenu")
     }
 
     /// Horizontal label-filter chips plus the selected-label study-pad action.
