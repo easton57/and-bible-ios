@@ -230,7 +230,8 @@ public struct BookmarkListView: View {
                     FilterChip(
                         title: String(localized: "all"),
                         chipColor: .secondary,
-                        isSelected: selectedLabelId == nil
+                        isSelected: selectedLabelId == nil,
+                        accessibilityIdentifier: "bookmarkListFilterChip::all"
                     ) {
                         selectedLabelId = nil
                     }
@@ -239,7 +240,8 @@ public struct BookmarkListView: View {
                         FilterChip(
                             title: label.name,
                             chipColor: Color(argbInt: label.color),
-                            isSelected: selectedLabelId == label.id
+                            isSelected: selectedLabelId == label.id,
+                            accessibilityIdentifier: "bookmarkListFilterChip::\(bookmarkListAccessibilitySegment(label.name))"
                         ) {
                             selectedLabelId = (selectedLabelId == label.id) ? nil : label.id
                         }
@@ -262,6 +264,9 @@ public struct BookmarkListView: View {
                     .font(.subheadline)
                     .foregroundStyle(Color(argbInt: label.color))
                 }
+                .accessibilityIdentifier(
+                    "bookmarkListOpenStudyPadButton::\(bookmarkListAccessibilitySegment(label.name))"
+                )
             }
         }
     }
@@ -499,7 +504,7 @@ private struct BookmarkRow: View {
      - Failure modes: This helper cannot fail.
      */
     private func bookmarkRowIdentifier() -> String {
-        "bookmarkListRowButton::\(sanitizedAccessibilitySegment(BookmarkListView.verseReference(for: bookmark)))"
+        "bookmarkListRowButton::\(bookmarkListAccessibilitySegment(BookmarkListView.verseReference(for: bookmark)))"
     }
 
     /**
@@ -511,26 +516,7 @@ private struct BookmarkRow: View {
      - Failure modes: This helper cannot fail.
      */
     private func bookmarkInlineActionIdentifier(_ prefix: String) -> String {
-        "\(prefix)::\(sanitizedAccessibilitySegment(BookmarkListView.verseReference(for: bookmark)))"
-    }
-
-    /**
-     Sanitizes one free-form bookmark reference for deterministic accessibility identifiers.
-
-     - Parameter value: Raw user-visible reference string.
-     - Returns: Identifier-safe string containing only ASCII letters, digits, and underscores.
-     - Side effects: none.
-     - Failure modes: This helper cannot fail.
-     */
-    private func sanitizedAccessibilitySegment(_ value: String) -> String {
-        let mapped = value.unicodeScalars.map { scalar -> String in
-            if CharacterSet.alphanumerics.contains(scalar) {
-                return String(scalar)
-            }
-            return "_"
-        }
-        let collapsed = mapped.joined().replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
-        return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        "\(prefix)::\(bookmarkListAccessibilitySegment(BookmarkListView.verseReference(for: bookmark)))"
     }
 }
 
@@ -547,6 +533,9 @@ private struct FilterChip: View {
     /// Whether this chip currently represents the active filter.
     let isSelected: Bool
 
+    /// Stable accessibility identifier for UI automation.
+    let accessibilityIdentifier: String
+
     /// Action invoked when the chip is tapped.
     let action: () -> Void
 
@@ -562,5 +551,25 @@ private struct FilterChip: View {
                 .overlay(Capsule().stroke(chipColor, lineWidth: 1))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
+}
+
+/**
+ Sanitizes bookmark-list text for deterministic accessibility identifiers.
+
+ - Parameter value: Raw user-visible label or reference string.
+ - Returns: Identifier-safe text containing only ASCII letters, digits, and underscores.
+ - Side effects: none.
+ - Failure modes: This helper cannot fail.
+ */
+private func bookmarkListAccessibilitySegment(_ value: String) -> String {
+    let mapped = value.unicodeScalars.map { scalar -> String in
+        if CharacterSet.alphanumerics.contains(scalar) {
+            return String(scalar)
+        }
+        return "_"
+    }
+    let collapsed = mapped.joined().replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
+    return collapsed.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
 }

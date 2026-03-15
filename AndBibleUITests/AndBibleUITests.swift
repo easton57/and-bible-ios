@@ -272,6 +272,31 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that selecting a seeded bookmark label filter exposes the StudyPad handoff and opens
+     the matching StudyPad document in the reader shell.
+     *
+     * - Side effects:
+     *   - launches the reader shell with one deterministic `Genesis 1:1` bookmark assigned to the
+     *     seeded `UI Test Seed` label
+     *   - opens the bookmark list from the actual reader overflow menu
+     *   - selects the seeded label chip and triggers the real `Open StudyPad` action
+     * - Failure modes:
+     *   - fails if the seeded label filter or StudyPad action never appears
+     *   - fails if the reader never enters StudyPad mode for `UI Test Seed`
+     */
+    func testBookmarkListOpensStudyPadForSelectedLabel() {
+        let app = makeApp(seedBookmarkStudyPadWorkflowOnLaunch: true)
+        app.launch()
+
+        _ = openBookmarkListFromReaderMenu(in: app)
+        requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
+        requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10).tap()
+
+        let studyPadTitle = requireElement("readerStudyPadTitle", in: app, timeout: 10)
+        XCTAssertEqual(studyPadTitle.label, "UI Test Seed")
+    }
+
+    /**
      Verifies that selecting a seeded history row jumps the active reader to that prior location.
      *
      * - Side effects:
@@ -964,6 +989,7 @@ final class AndBibleUITests: XCTestCase {
         openLabelManagerOnLaunch: Bool = false,
         openLabelAssignmentOnLaunch: Bool = false,
         seedBookmarkLabelWorkflowOnLaunch: Bool = false,
+        seedBookmarkStudyPadWorkflowOnLaunch: Bool = false,
         seedBookmarkNavigationWorkflowOnLaunch: Bool = false,
         seedHistoryWorkflowOnLaunch: Bool = false,
         seedHistoryMultiRowWorkflowOnLaunch: Bool = false,
@@ -1013,6 +1039,9 @@ final class AndBibleUITests: XCTestCase {
         }
         if seedBookmarkLabelWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_BOOKMARK_LABEL_WORKFLOW"]
+        }
+        if seedBookmarkStudyPadWorkflowOnLaunch {
+            app.launchArguments += ["UITEST_SEED_BOOKMARK_STUDYPAD_WORKFLOW"]
         }
         if seedBookmarkNavigationWorkflowOnLaunch {
             app.launchArguments += ["UITEST_SEED_BOOKMARK_NAVIGATION_WORKFLOW"]

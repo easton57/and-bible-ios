@@ -251,6 +251,10 @@ public struct BibleReaderView: View {
     private let uiTestSeedsBookmarkLabelWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_LABEL_WORKFLOW")
 
+    /// Launch-argument override used by XCUITests to seed one labeled bookmark for StudyPad handoff.
+    private let uiTestSeedsBookmarkStudyPadWorkflowOnLaunch =
+        ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_STUDYPAD_WORKFLOW")
+
     /// Launch-argument override used by XCUITests to seed one bookmark-navigation target.
     private let uiTestSeedsBookmarkNavigationWorkflowOnLaunch =
         ProcessInfo.processInfo.arguments.contains("UITEST_SEED_BOOKMARK_NAVIGATION_WORKFLOW")
@@ -1364,6 +1368,7 @@ public struct BibleReaderView: View {
                     Text(controller?.activeStudyPadLabelName ?? String(localized: "study_pad"))
                         .font(.headline)
                         .lineLimit(1)
+                        .accessibilityIdentifier("readerStudyPadTitle")
 
                     Spacer()
                     Color.clear.frame(width: 80, height: 1)
@@ -2383,6 +2388,35 @@ public struct BibleReaderView: View {
     }
 
     /**
+     Seeds one deterministic labeled bookmark for bookmark-list StudyPad workflows.
+     *
+     * - Returns: Identifier of the seeded bookmark, or `nil` when the bookmark or label-link save
+     *   path fails.
+     * - Side effects:
+     *   - inserts one `Genesis 1:1` bookmark into SwiftData
+     *   - assigns the seeded `UI Test Seed` label to that bookmark so bookmark filtering can expose
+     *     the StudyPad handoff action
+     * - Failure modes:
+     *   - returns `nil` when bookmark insertion fails
+     *   - returns `nil` when the seeded label cannot be resolved or the bookmark-to-label link
+     *     cannot be created
+     */
+    private func seedBookmarkStudyPadWorkflowForUITests() -> UUID? {
+        guard let bookmarkId = seedBookmarkForUITests(book: "Genesis", ordinalStart: 1) else {
+            return nil
+        }
+        let store = BookmarkStore(modelContext: modelContext)
+        guard let labelId = store.labels().first(where: { $0.name == "UI Test Seed" })?.id else {
+            return nil
+        }
+        let service = BookmarkService(store: store)
+        guard service.toggleLabel(bookmarkId: bookmarkId, labelId: labelId) != nil else {
+            return nil
+        }
+        return bookmarkId
+    }
+
+    /**
      Seeds one deterministic bookmark-navigation target for XCUITests.
      *
      * - Returns: Identifier of the seeded bookmark, or `nil` when the insert/save path fails.
@@ -2537,6 +2571,10 @@ public struct BibleReaderView: View {
             resetLabelsForUITests()
             resetBookmarksForUITests()
             _ = seedLabelAssignmentBookmarkForUITests()
+        } else if uiTestSeedsBookmarkStudyPadWorkflowOnLaunch {
+            resetLabelsForUITests()
+            resetBookmarksForUITests()
+            _ = seedBookmarkStudyPadWorkflowForUITests()
         } else if uiTestSeedsBookmarkNavigationWorkflowOnLaunch {
             resetBookmarksForUITests()
             _ = seedBookmarkNavigationTargetForUITests()
