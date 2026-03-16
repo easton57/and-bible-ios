@@ -40,14 +40,15 @@ public final class SearchIndexService: @unchecked Sendable {
     public var indexingKey: String = ""
 
     /**
-     Creates the shared FTS5 index database in the app documents directory if needed.
+     Creates the shared FTS5 index database if needed.
 
      The initializer opens `search_indexes.sqlite`, enables WAL mode, creates the
      required tables, and invalidates metadata for indexes built against older schemas.
+     Production launches store the database in Documents, while the in-memory XCUITest
+     harness uses a per-launch temporary database beside its disposable SWORD module root.
      */
     public init() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        dbPath = docs.appendingPathComponent("search_indexes.sqlite").path
+        dbPath = Self.defaultDatabasePath()
         openDatabase()
     }
 
@@ -90,6 +91,38 @@ public final class SearchIndexService: @unchecked Sendable {
             DELETE FROM indexed_modules WHERE schema_version < \(Self.schemaVersion)
                 OR schema_version IS NULL
         """, nil, nil, nil)
+    }
+
+    /**
+     Resolves the SQLite database path for the current runtime environment.
+
+     - Returns: Documents-backed index path for production launches, or a per-launch temporary
+       path when the in-memory XCUITest harness is active.
+     - Side effects:
+       - creates the parent directory for the selected database path when needed
+     - Failure modes:
+       - falls back to the shared documents directory when the UI-test launch arguments are absent
+       - silently ignores directory-creation failures and lets SQLite surface any later open error
+     */
+    private static func defaultDatabasePath() -> String {
+        let fileManager = FileManager.default
+        let databaseURL: URL
+
+        if ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES") {
+            let swordRoot = URL(fileURLWithPath: SwordManager.defaultModulePath(), isDirectory: true)
+            databaseURL = swordRoot
+                .deletingLastPathComponent()
+                .appendingPathComponent("search_indexes.sqlite")
+        } else {
+            let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+            databaseURL = docs.appendingPathComponent("search_indexes.sqlite")
+        }
+
+        try? fileManager.createDirectory(
+            at: databaseURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        return databaseURL.path
     }
 
     // MARK: - Index Management

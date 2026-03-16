@@ -727,7 +727,7 @@ public struct BibleReaderView: View {
                 SearchView(
                     swordModule: focusedController?.activeModule,
                     swordManager: focusedController?.swordManager,
-                    searchIndexService: uiTestUsesInMemoryStores && uiTestOpensSearchOnLaunch ? nil : searchIndexService,
+                    searchIndexService: searchIndexService,
                     installedBibleModules: focusedController?.installedBibleModules ?? [],
                     currentBook: focusedController?.currentBook ?? "Genesis",
                     currentOsisBookId: focusedController?.osisBookId(for: focusedController?.currentBook ?? "Genesis") ?? BibleReaderController.osisBookId(for: focusedController?.currentBook ?? "Genesis"),

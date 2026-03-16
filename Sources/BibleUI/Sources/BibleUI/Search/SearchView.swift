@@ -763,9 +763,11 @@ public struct SearchView: View {
      Checks whether the active module already has an index and updates `viewState` accordingly.
 
      Side effects:
-     - mutates `viewState` to `.ready` or `.needsIndex`
+     - mutates `viewState` to `.ready`, `.needsIndex`, or `.creatingIndex`
      - may trigger `autoSearchIfNeeded()` when the search UI becomes ready
      - reads index availability from `SearchIndexService`
+     - automatically begins index creation for the disposable UI-test harness when the bundled
+       module set is present but not yet indexed
 
      Failure modes:
      - if either `searchIndexService` or `swordModule` is unavailable, the method intentionally
@@ -782,6 +784,8 @@ public struct SearchView: View {
         if service.hasIndex(for: mod.info.name) {
             viewState = .ready
             autoSearchIfNeeded()
+        } else if ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES") {
+            startIndexCreation()
         } else {
             viewState = .needsIndex(
                 moduleName: mod.info.name,
@@ -790,9 +794,10 @@ public struct SearchView: View {
         }
     }
 
-    /// Auto-executes a search when `initialQuery` seeded the query field on appear.
+    /// Auto-executes a search when the view was launched with a seeded query.
     private func autoSearchIfNeeded() {
-        if !initialQuery.isEmpty && !query.isEmpty {
+        let hasSeededQuery = !initialQuery.isEmpty || uiTestInitialQueryOverride != nil
+        if hasSeededQuery && !query.isEmpty {
             performSearch()
         }
     }
@@ -883,6 +888,7 @@ public struct SearchView: View {
                 await service.createIndex(module: mod)
             }
             viewState = .ready
+            autoSearchIfNeeded()
         }
     }
 

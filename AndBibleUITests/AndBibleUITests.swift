@@ -95,12 +95,38 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         let searchScreen = openSearch(in: app, launchedDirectly: true)
-        waitForSearchToFinish(on: searchScreen, timeout: 20)
+        waitForSearchToFinish(on: searchScreen, timeout: 120)
 
         let searchState = searchScreen.value as? String ?? ""
         XCTAssertTrue(
             searchState.contains("query=earth"),
             "Expected search state to retain the seeded query, got '\(searchState)'."
+        )
+    }
+
+    /**
+     Verifies that the direct-launch Search harness can build an index and return bundled results.
+     *
+     * - Side effects:
+     *   - launches the app directly into Search with the initial query `earth`
+     *   - waits for the disposable UI-test module set to be indexed and searched
+     * - Failure modes:
+     *   - fails if the Search screen never reaches the ready state after index creation
+     *   - fails if the bundled module set is missing or the search still returns zero hits
+     */
+    func testSearchDirectLaunchBuildsIndexAndReturnsBundledResults() {
+        let app = makeApp(openSearchOnLaunch: true, searchQuery: "earth")
+        app.launch()
+
+        let searchScreen = openSearch(in: app, launchedDirectly: true)
+        waitForSearchToFinish(on: searchScreen, timeout: 120)
+
+        let searchState = searchScreen.value as? String ?? ""
+        let resultsCount = searchResultsCount(from: searchState)
+        XCTAssertGreaterThan(
+            resultsCount,
+            0,
+            "Expected bundled search results for 'earth', got '\(searchState)'."
         )
     }
 
@@ -1524,6 +1550,7 @@ final class AndBibleUITests: XCTestCase {
         let app = XCUIApplication()
         trackedApp = app
         app.launchArguments += ["UITEST_DISABLE_CALCULATOR_GATE", "UITEST_USE_IN_MEMORY_STORES"]
+        app.launchEnvironment["UITEST_SESSION_ID"] = UUID().uuidString
         if let settingsTarget {
             app.launchArguments += ["UITEST_OPEN_SETTINGS"]
             app.launchEnvironment["UITEST_SETTINGS_SCROLL_TARGET"] = settingsTarget
@@ -1626,11 +1653,13 @@ final class AndBibleUITests: XCTestCase {
      * - Parameters:
      *   - searchScreen: Search root element exporting deterministic state in its accessibility
      *     value.
-     *   - timeout: Maximum time to wait for the `searching=false` state token.
+     *   - timeout: Maximum time to wait for the `state=ready;searching=false` state.
      * - Side effects:
-     *   - blocks the current XCTest method until the search state reports completion or times out
+     *   - blocks the current XCTest method until the search state reports ready completion or
+     *     times out
      * - Failure modes:
-     *   - fails the test if the Search screen never reports `searching=false` before the timeout
+     *   - fails the test if the Search screen never reports `state=ready;searching=false`
+     *     before the timeout
      */
     private func waitForSearchToFinish(on searchScreen: XCUIElement, timeout: TimeInterval) {
         let predicate = NSPredicate { evaluated, _ in
@@ -1638,11 +1667,29 @@ final class AndBibleUITests: XCTestCase {
                   let value = element.value as? String else {
                 return false
             }
-            return value.contains("searching=false")
+            return value.contains("state=ready") && value.contains("searching=false")
         }
 
         expectation(for: predicate, evaluatedWith: searchScreen)
         waitForExpectations(timeout: timeout)
+    }
+
+    /**
+     Extracts the exported numeric result count from the Search accessibility state token.
+     *
+     * - Parameter searchState: Semicolon-delimited Search screen state string.
+     * - Returns: Parsed result count, or `-1` when the token is missing or malformed.
+     * - Side effects: none.
+     * - Failure modes:
+       - returns `-1` when the Search screen accessibility export changes shape unexpectedly
+     */
+    private func searchResultsCount(from searchState: String) -> Int {
+        guard let resultsToken = searchState
+            .split(separator: ";")
+            .first(where: { $0.hasPrefix("results=") }) else {
+            return -1
+        }
+        return Int(resultsToken.dropFirst("results=".count)) ?? -1
     }
 
 
