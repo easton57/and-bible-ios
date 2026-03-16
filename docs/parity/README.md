@@ -14,15 +14,9 @@ Current maturity:
 
 - `settings/` is the most complete domain and already includes guardrails,
   verification, regression evidence, and baselines
-- `bridge/` now also includes a verification matrix, regression report, and
-  explicit maintenance guardrails because protocol drift there is especially
-  hard to catch after the fact
-- `sync/` also now warrants explicit guardrails because backend keys, bootstrap
-  markers, and patch/baseline semantics are easy to break without obvious local
-  failures
-- `bookmarks/` now also includes guardrails because label semantics, note
-  persistence, and StudyPad/My Notes separation are easy to regress through
-  seemingly local UI or model changes
+- higher-risk domains such as `bridge/`, `sync/`, `bookmarks/`, and `search/`
+  now also include explicit guardrails because their contract drift is hard to
+  catch after the fact
 - the remaining domains currently center on contract, dispositions,
   verification, and regression evidence, with room to add guardrails or
   baselines where they justify the maintenance cost
