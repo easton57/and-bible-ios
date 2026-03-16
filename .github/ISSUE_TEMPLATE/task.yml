@@ -1,0 +1,13 @@
+name: Task
+description: Something that needs to be done (that is not bug or feature)
+title: ""
+labels:
+  - Type: Task
+body:
+  - type: textarea
+    id: task-description
+    attributes:
+      label: Task description
+      description: Describe what needs to be done.
+    validations:
+      required: true

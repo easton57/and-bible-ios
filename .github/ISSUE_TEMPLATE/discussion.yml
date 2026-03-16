@@ -1,0 +1,13 @@
+name: Discussion
+description: Start a discussion about a specific topic
+title: ""
+labels:
+  - Type: Discussion
+body:
+  - type: textarea
+    id: topic
+    attributes:
+      label: Discussion topic
+      description: Describe the topic you want to discuss.
+    validations:
+      required: true
