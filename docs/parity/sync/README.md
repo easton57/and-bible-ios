@@ -8,6 +8,7 @@ This directory holds Android-aligned sync parity documentation for iOS.
 2. [dispositions.md](dispositions.md): explicit iOS deviations and operational constraints
 3. [verification-matrix.md](verification-matrix.md): current status by contract area
 4. [regression-report.md](regression-report.md): focused validation evidence
+5. [guardrails.md](guardrails.md): maintenance rules for high-risk sync changes
 
 Operational companion docs:
 

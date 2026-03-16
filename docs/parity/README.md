@@ -17,6 +17,9 @@ Current maturity:
 - `bridge/` now also includes a verification matrix, regression report, and
   explicit maintenance guardrails because protocol drift there is especially
   hard to catch after the fact
+- `sync/` also now warrants explicit guardrails because backend keys, bootstrap
+  markers, and patch/baseline semantics are easy to break without obvious local
+  failures
 - the remaining domains currently center on contract, dispositions,
   verification, and regression evidence, with room to add guardrails or
   baselines where they justify the maintenance cost
