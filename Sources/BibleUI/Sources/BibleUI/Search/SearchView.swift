@@ -822,15 +822,15 @@ public struct SearchView: View {
     /**
      Provides a deterministic direct-launch query for the XCUITest search harness only.
 
-     - Returns: Seed query from the UI-test launch environment when the dedicated Search launch
-       route is active, otherwise `nil`.
+     - Returns: Seed query from the UI-test launch environment when the in-memory XCUITest harness
+       is active, otherwise `nil`.
      - Side effects: none.
      - Failure modes:
-     *   - ignores missing launch arguments or empty environment values so production launches never
-     *     pick up a test-only query
+     *   - ignores missing launch arguments or empty environment values so production launches and
+     *     non-search UI tests never pick up a test-only query
      */
     private var uiTestInitialQueryOverride: String? {
-        guard ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_SEARCH") else { return nil }
+        guard ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES") else { return nil }
         guard let query = ProcessInfo.processInfo.environment["UITEST_SEARCH_QUERY"],
               !query.isEmpty else {
             return nil

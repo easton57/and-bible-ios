@@ -131,6 +131,48 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Verifies that the real reader Search workflow can navigate to a bundled search hit.
+     *
+     * - Side effects:
+     *   - launches the standard reader shell with one deterministic seeded query for the Search UI
+     *   - opens Search from the real reader toolbar, waits for the bundled index/search pass, and
+     *     taps the first returned result row
+     *   - dismisses Search through the normal result-selection flow and navigates the reader to
+     *     the selected passage
+     * - Failure modes:
+     *   - fails if Search cannot be opened from the reader toolbar
+     *   - fails if bundled search results do not produce at least one tappable result row
+     *   - fails if selecting the result does not move the reader away from `Genesis 1`
+     */
+    func testSearchResultSelectionNavigatesReaderToBundledReference() {
+        let app = makeApp(searchQuery: "noah")
+        app.launch()
+
+        let currentReferenceState = requireElement("readerCurrentReferenceState", in: app, timeout: 10)
+        XCTAssertEqual(currentReferenceState.label, "Genesis 1")
+
+        let searchScreen = openSearch(in: app)
+        waitForSearchToFinish(on: searchScreen, timeout: 120)
+
+        let searchState = searchScreen.value as? String ?? ""
+        XCTAssertTrue(
+            searchState.contains("query=noah"),
+            "Expected Search to run the seeded query, got '\(searchState)'."
+        )
+        XCTAssertGreaterThan(
+            searchResultsCount(from: searchState),
+            0,
+            "Expected bundled search results for 'noah', got '\(searchState)'."
+        )
+
+        requireFirstSearchResultRow(in: app, timeout: 15).tap()
+
+        let referencePredicate = NSPredicate(format: "label != %@", "Genesis 1")
+        expectation(for: referencePredicate, evaluatedWith: currentReferenceState)
+        waitForExpectations(timeout: 10)
+    }
+
+    /**
      Verifies that an active reading plan can advance from day one to day two.
      *
      * - Side effects:
@@ -1690,6 +1732,34 @@ final class AndBibleUITests: XCTestCase {
             return -1
         }
         return Int(resultsToken.dropFirst("results=".count)) ?? -1
+    }
+
+    /**
+     Resolves the first tappable Search result row exported by the current Search screen.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum time to wait for the first result row to materialize.
+     * - Returns: First matching Search result row element.
+     * - Side effects:
+     *   - queries the live accessibility hierarchy for any identifier prefixed with
+     *     `searchResultRow::`
+     * - Failure modes:
+     *   - fails when the Search screen exports no tappable result rows before the timeout
+     */
+    private func requireFirstSearchResultRow(
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> XCUIElement {
+        let results = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "searchResultRow::")
+        )
+        let firstMatch = results.firstMatch
+        XCTAssertTrue(
+            firstMatch.waitForExistence(timeout: timeout),
+            "Expected at least one search result row within \(timeout) seconds."
+        )
+        return firstMatch
     }
 
 
