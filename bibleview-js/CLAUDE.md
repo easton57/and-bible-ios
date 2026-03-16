@@ -1,61 +1,95 @@
-# CLAUDE.md - bibleview-js (iOS Fork)
+# CLAUDE.md - bibleview-js
 
-## Purpose
-Forked Vue.js frontend from Android AndBible's `app/bibleview-js/`. Renders
-Bible text, bookmarks, StudyPads, and other documents in a WKWebView on iOS.
+This file provides guidance to Claude Code when working in `bibleview-js/`.
 
-## Key Modification: Platform Bridge Abstraction
+## Project Overview
 
-The primary change from Android is the `native-bridge.ts` abstraction layer:
+`bibleview-js` is the Vue.js frontend bundled into the iOS app's WKWebView. It
+is a fork of the Android AndBible frontend, but Android compatibility is still a
+hard requirement.
 
-```
-composables/native-bridge.ts  ← NEW: Platform detection + routing
-composables/android.ts         ← MODIFIED: Delegates to native-bridge.ts
-```
+Most feature logic, document rendering, bridge payloads, and client-object
+shapes are still shared in spirit with Android. Treat Android parity as the
+default unless the repo explicitly documents an intentional iOS divergence.
 
-### How It Works
-```typescript
-// native-bridge.ts detects platform:
-const isIOS = !!window.webkit?.messageHandlers?.bibleView
-const isAndroid = !!window.android
+## Android Compatibility
 
-// Routes calls to correct native bridge:
-export function callNative(method: string, ...args: any[]) {
-    if (isIOS) {
-        window.webkit.messageHandlers.bibleView.postMessage({ method, args })
-    } else if (isAndroid) {
-        (window.android as any)[method](...args)
-    }
-}
+- Never break Android compatibility. Do not change shared bridge method names,
+  event names, payload shapes, async response handling, document models, or
+  localization keys in ways that would diverge from Android by accident.
+- Prefer additive or routing-style changes over platform forks. If a platform
+  difference is necessary, isolate it in a narrow abstraction instead of
+  rewriting shared component behavior.
+- When changing a shared contract, verify both the iOS usage here and the
+  Android source of truth before treating the work as complete.
+- If you need a local Android reference checkout, clone
+  `https://github.com/andbible/and-bible` into `.and-bible-android/` at the
+  repo root. That directory is gitignored and should remain local-only.
 
-// Async calls use the same callId pattern on both platforms
-export function callNativeAsync(method: string, callId: number, ...args: any[]) {
-    callNative(method, callId, ...args)
-    // Response comes back via: bibleView.response(callId, value)
-}
-```
+Useful Android reference paths inside that local clone:
 
-### Rules for Modifications
-1. **Never break Android compatibility** — `android.ts` must continue to work unchanged
-2. **Minimize changes** — Only modify files necessary for platform abstraction
-3. **Same response pattern** — Both platforms use `bibleView.response(callId, value)` for async
-4. **Same event pattern** — Both platforms use `bibleView.emit(event, data)` for native→JS
+- `.and-bible-android/app/bibleview-js/`
+- `.and-bible-android/app/bibleview-js/src/composables/android.ts`
+- `.and-bible-android/app/bibleview-js/src/types/client-objects.ts`
 
-## Build Commands
+Do not commit machine-specific sibling-path assumptions such as `../and-bible/`.
+
+## Architecture
+
+### Key Files
+
+- `src/main.ts`: frontend bootstrap
+- `src/components/BibleView.vue`: root reader/document surface
+- `src/composables/android.ts`: main bridge-facing frontend contract used by the
+  app surface
+- `src/composables/native-bridge.ts`: platform routing layer for Android WebView
+  vs iOS WKWebView calls
+- `src/types/client-objects.ts`: shared client-object payload shapes
+- `src/utils.ts`: shared DOM/helpers, including some WKWebView-specific handling
+
+### Bridge Model
+
+- Android bridge calls still use `window.android.methodName(...)`
+- iOS bridge calls use
+  `window.webkit.messageHandlers.bibleView.postMessage({ method, args })`
+- Async responses on both platforms flow back through
+  `window.bibleView.response(callId, value)`
+- Native-to-JS events still use the shared `bibleView.emit(event, data)` pattern
+
+The main iOS-specific abstraction is `src/composables/native-bridge.ts`, but do
+not assume all platform-specific logic lives only there. Keep any further
+divergence narrow and deliberate.
+
+## Build and Validation
+
+Run only the frontend checks relevant to the change, but at minimum use the
+standard repo commands:
+
 ```bash
-npm install              # Initial setup
-npm run dev              # Development server
-npm run test:ci          # Unit tests
-npm run lint             # ESLint checking
-npm run build-debug      # Debug build (output → dist/)
-npm run build-production # Production build
+npm install
+npm run test:ci
+npm run lint
+npm run type-check
+npm run build-debug
 ```
 
-## Build Output
-The `dist/` directory contents are copied into `Sources/BibleView/Resources/bibleview-js/`
-for embedding in the iOS app bundle.
+Other available scripts:
 
-## Reference
-- Original source: `../and-bible/app/bibleview-js/`
-- Android bridge: `../and-bible/app/bibleview-js/src/composables/android.ts`
-- Client types: `../and-bible/app/bibleview-js/src/types/client-objects.ts`
+```bash
+npm run dev
+npm run build-production
+```
+
+The build output in `dist/` is embedded into the iOS app bundle under
+`Sources/BibleView/Resources/bibleview-js/`.
+
+## Working Rules
+
+- Minimize divergence from Android unless iOS requires a specific bridge or
+  platform adaptation.
+- If you change bridge contracts, verify the corresponding native iOS code in
+  `Sources/BibleView/` or `Sources/BibleUI/` and compare against Android.
+- Keep shared payload and type changes synchronized with
+  `src/types/client-objects.ts` and related consumers.
+- Do not introduce iOS-only behavior into shared components when the change can
+  be expressed in the bridge/adaptation layer instead.

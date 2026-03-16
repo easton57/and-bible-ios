@@ -66,3 +66,6 @@ libsword/libsword.xcframework/
 # Archives
 *.zip
 *.tar.gz
+
+# Android parity
+.and-bible-android/

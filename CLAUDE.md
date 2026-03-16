@@ -33,6 +33,7 @@ This repository is no longer in an early scaffolding state:
 - **Hybrid native/web rendering**: Bible document content is still rendered in WKWebView, while navigation, settings, bookmarks, sync, and supporting workflows are native SwiftUI
 - **SwiftData persistence**: workspaces, windows, bookmarks, labels, reading plans, and related state live in SwiftData-backed models and services inside `BibleCore`
 - **Cross-platform parity translation**: many services and UI contracts intentionally mirror the existing AndBible product behavior across platforms
+- **Android compatibility is mandatory**: do not change shared data contracts, sync formats, bridge payloads, or frontend semantics in ways that would break Android parity unless the change is explicitly coordinated across platforms
 - **Deterministic UI harnesses**: XCUITests use explicit `UITEST_*` launch arguments and in-memory stores. Test-only behavior must stay behind those gates
 
 ### Native ↔ WebView Communication
@@ -40,6 +41,13 @@ This repository is no longer in an early scaffolding state:
 - Swift → WebView: `evaluateJavaScript(...)` through bridge/coordinator layers in `BibleView`
 - WebView → Swift: `WKScriptMessageHandler`-driven bridge types and delegates
 - Data contracts should stay aligned with the shared Vue.js surface and existing product bridge payloads
+
+## Android Compatibility
+
+- Never break Android compatibility as a side effect of iOS work. Android behavior remains the parity baseline for shared workflows, persisted formats, localization keys, and bridge contracts unless the repo explicitly documents an intended divergence.
+- When changing shared contracts, check both the native iOS implementation and the shared/frontend surface before treating the change as complete.
+- If you need a local Android reference checkout, clone `https://github.com/andbible/and-bible` into `.and-bible-android/` at the repo root. That directory is gitignored and should be used only as a local parity reference.
+- Do not commit machine-specific sibling-path assumptions such as `../and-bible/`.
 
 ## Build System
 
