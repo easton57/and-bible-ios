@@ -16,8 +16,6 @@ This repository is no longer in an early scaffolding state:
 - Search, bookmarks, history, settings, sync, and reading-plan flows all have
   meaningful native SwiftUI implementation and test coverage
 
-The original Android reference codebase is at `../and-bible/`.
-
 ## Architecture
 
 ### Core Components
@@ -34,14 +32,14 @@ The original Android reference codebase is at `../and-bible/`.
 - **Reader-coordinator design**: `BibleReaderView` owns top-level sheet routing and delegates reading behavior to focused controllers managed by `WindowManager`
 - **Hybrid native/web rendering**: Bible document content is still rendered in WKWebView, while navigation, settings, bookmarks, sync, and supporting workflows are native SwiftUI
 - **SwiftData persistence**: workspaces, windows, bookmarks, labels, reading plans, and related state live in SwiftData-backed models and services inside `BibleCore`
-- **Android-parity translation**: many services and UI contracts intentionally mirror Android behavior; the Android repo should be treated as the primary parity reference
+- **Cross-platform parity translation**: many services and UI contracts intentionally mirror the existing AndBible product behavior across platforms
 - **Deterministic UI harnesses**: XCUITests use explicit `UITEST_*` launch arguments and in-memory stores. Test-only behavior must stay behind those gates
 
 ### Native ↔ WebView Communication
 
 - Swift → WebView: `evaluateJavaScript(...)` through bridge/coordinator layers in `BibleView`
 - WebView → Swift: `WKScriptMessageHandler`-driven bridge types and delegates
-- Data contracts should stay aligned with the shared Vue.js surface and, where relevant, with Android bridge payloads
+- Data contracts should stay aligned with the shared Vue.js surface and existing product bridge payloads
 
 ## Build System
 
@@ -162,11 +160,6 @@ python3 scripts/check_repo_standards.py docblocks --all-files
 - `bibleview-js/src/components/BibleView.vue`: root BibleView component
 - `bibleview-js/src/composables/`: shared frontend logic
 
-### Android Reference
-
-- `../and-bible/app/src/main/java/`: native Android parity reference
-- `../and-bible/app/bibleview-js/src/`: Android/shared frontend reference
-
 ## Code Patterns
 
 ### Persistence and Environment
@@ -208,7 +201,6 @@ test-only behavior leak into normal runtime paths.
 - When changing bridge contracts, verify both:
   - iOS bridge/coordinator code in `BibleView`
   - shared frontend code in `bibleview-js`
-- If the change is Android-parity-sensitive, compare against `../and-bible/`
 
 ## Persistence Structure
 
@@ -244,6 +236,7 @@ storage concerns into SwiftUI views.
 ### Rebuilding libsword
 
 Only do this when the binary or native integration actually changes:
+
 ```bash
 cd libsword
 ./build-ios.sh
@@ -301,6 +294,5 @@ Impact:
 
 ## Notes
 
-- The Android repo at `../and-bible/` remains the main parity reference
 - Prefer targeted simulator validation over full-suite runs unless shared harness or coordinator state changed
 - Keep `CLAUDE.md` factual and current; do not leave milestone-style status sections that become stale after major repository changes
