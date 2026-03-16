@@ -122,7 +122,12 @@ jobs:
         id: simulator
         run: python3 scripts/resolve_ios_simulator_destination.py --project AndBible.xcodeproj --scheme AndBible
 
-      - name: Build and run simulator tests
+      - name: Boot selected simulator
+        run: |
+          xcrun simctl boot "${{ steps.simulator.outputs.simulator_id }}" || true
+          xcrun simctl bootstatus "${{ steps.simulator.outputs.simulator_id }}" -b
+
+      - name: Build for testing
         run: >-
           mkdir -p .artifacts &&
           xcodebuild
@@ -133,7 +138,19 @@ jobs:
           -derivedDataPath "${DERIVED_DATA_PATH}"
           -resultBundlePath "${XCRESULT_BUNDLE_PATH}"
           CODE_SIGNING_ALLOWED=NO
-          test
+          build-for-testing
+
+      - name: Run simulator tests without rebuilding
+        run: >-
+          xcodebuild
+          -project AndBible.xcodeproj
+          -scheme AndBible
+          -configuration Debug
+          -destination "${{ steps.simulator.outputs.destination }}"
+          -derivedDataPath "${DERIVED_DATA_PATH}"
+          -resultBundlePath "${XCRESULT_BUNDLE_PATH}"
+          CODE_SIGNING_ALLOWED=NO
+          test-without-building
 
       - name: Upload xcodebuild test result bundle
         if: always()

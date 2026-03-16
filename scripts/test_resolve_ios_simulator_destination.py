@@ -97,6 +97,7 @@ class ResolveIosSimulatorDestinationTests(unittest.TestCase):
         self.assertEqual(
             stdout.getvalue(),
             "destination=id=ABC-123\n"
+            "simulator_id=ABC-123\n"
             "device_name=iPhone 16 Pro\n"
             "os_version=18.2\n",
         )

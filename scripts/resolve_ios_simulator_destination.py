@@ -220,14 +220,18 @@ def provision_simulator(preferred_order: list[str] | None = None) -> str | None:
 
 
 def write_github_output(output_path: Path, destination: str, device_name: str, os_version: str) -> None:
+    simulator_id = destination.removeprefix("id=")
     with output_path.open("a", encoding="utf-8") as file_handle:
         file_handle.write(f"destination={destination}\n")
+        file_handle.write(f"simulator_id={simulator_id}\n")
         file_handle.write(f"device_name={device_name}\n")
         file_handle.write(f"os_version={os_version}\n")
 
 
 def print_resolved_output(destination: str, device_name: str, os_version: str) -> None:
+    simulator_id = destination.removeprefix("id=")
     print(f"destination={destination}")
+    print(f"simulator_id={simulator_id}")
     print(f"device_name={device_name}")
     print(f"os_version={os_version}")
 
