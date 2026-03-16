@@ -4,97 +4,132 @@
 
 ### In Xcode (Recommended)
 
-1. **Open the project:**
+1. Open the project:
    ```bash
    open AndBible.xcodeproj
    ```
-   Or: Double-click `AndBible.xcodeproj` in Finder
+   Or double-click `AndBible.xcodeproj` in Finder.
 
-2. **Wait for package resolution:**
-   - Xcode will automatically resolve the Swift Package dependencies
-   - This may take 10-30 seconds on first open
+2. Wait for Swift package resolution.
+   - First open can take a bit while Xcode resolves packages.
 
-3. **Select a simulator:**
-   - Click the device selector next to the play button
-   - Choose "iPhone 17" or any iOS simulator
+3. Select a simulator.
+   - `iPhone 17` is the current standard simulator target used in repo validation.
 
-4. **Build and Run:**
-   - Press `Cmd+R` or click the Play button
-   - First build takes 1-2 minutes
-   - Subsequent builds are faster
+4. Build and run.
+   - Press `Cmd+R`
+   - First build is slower than incremental builds
+
+## Command-Line Build and Test
+
+### Build
+
+```bash
+xcodebuild -project AndBible.xcodeproj -scheme AndBible \
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
+```
+
+### Test
+
+```bash
+xcodebuild -project AndBible.xcodeproj -scheme AndBible \
+  -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
+
+### Focused Test Run
+
+```bash
+xcodebuild -project AndBible.xcodeproj -scheme AndBible \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  test -only-testing:AndBibleUITests/AndBibleUITests/testExample
+```
 
 ## Project Structure
 
-```
-AndBible.xcodeproj  ← Open this in Xcode!
-├── App code: AndBible/
-│   ├── AndBibleApp.swift
-│   └── ContentView.swift
-└── Library modules (Swift Package):
-    ├── SwordKit       - Bible library wrapper
-    ├── BibleCore      - Domain models & services
-    ├── BibleView      - Vue.js WebView component
-    └── BibleUI        - SwiftUI screens
+```text
+AndBible.xcodeproj              # Open this in Xcode
+AndBible/                       # App target
+AndBibleTests/                  # App/unit test bundle
+AndBibleUITests/                # UI test bundle
+Package.swift                   # Local Swift package
+Sources/
+  SwordKit/                     # libsword wrapper
+  BibleCore/                    # Models, services, persistence
+  BibleView/                    # WKWebView bridge + bundled frontend
+  BibleUI/                      # SwiftUI screens and reader coordinator
+bibleview-js/                   # Shared Vue.js frontend
 ```
 
 ## What to Expect
 
-### Current State (Phase 1 Scaffolding Complete)
-✅ App compiles and launches
-✅ Basic SwiftUI structure in place
-✅ All modules scaffolded
-✅ Vue.js bundle integrated
-⚠️  Using stub SWORD library (mock data)
-🚧 Most features are placeholder UI only
+This repository is not a placeholder scaffold.
 
-### What Works
-- App launches in simulator
-- Basic navigation structure
-- SwiftUI views render
-- Module architecture is set up
+Current baseline:
+- the app builds and runs through `AndBible.xcodeproj`
+- real `libsword` is checked in via `libsword/libsword.xcframework`
+- the repo has active unit and XCUITest coverage
+- native SwiftUI flows exist for settings, sync, bookmarks, history, workspaces, reading plans, downloads, and search
+- Bible content still uses the WKWebView/Vue.js hybrid path where appropriate
 
-### What Doesn't Work Yet
-- Loading actual Bible modules (using stubs)
-- Bible text display (needs implementation)
-- Bookmarks, search, settings (placeholders)
-- Most UI interactions
+## Recommended Validation Baseline
 
-## Next Steps (Phase 1 Implementation)
+Run these after code changes:
 
-1. **Verify app launches** - Run in simulator, see the app shell
-2. **Implement mock data provider** - Create sample Bible verses
-3. **Connect BibleView** - Display Genesis 1 using Vue.js component
-4. **Basic navigation** - Book/Chapter/Verse selection
-5. **Replace stubs** - Build real libsword when needed
+```bash
+git diff --check
+python3 scripts/check_repo_standards.py docblocks --all-files
+```
+
+Then run the most relevant simulator tests for the area you changed.
+
+## Vue.js Frontend
+
+If you changed `bibleview-js/`, run:
+
+```bash
+cd bibleview-js
+npm install            # first-time setup
+npm run test:ci
+npm run lint
+npm run type-check
+npm run build-debug
+```
+
+Rebuild the frontend bundle before app validation when frontend assets changed.
 
 ## Troubleshooting
 
-### "Package resolution failed"
-- Check that you're online (first time needs to download dependencies)
-- Try: Product → Clean Build Folder (Cmd+Shift+K)
-- Close and reopen Xcode
+### Package resolution failed
+- Check network connectivity for the initial package fetch
+- Try Xcode clean build folder
+- Reopen Xcode if resolution gets stuck
 
-### "Build failed" errors
-- Make sure Xcode is up to date (Xcode 15+)
-- Check iOS deployment target is set to 17.0+
-- See CLAUDE.md for detailed build info
+### UI tests seem stale
+- Use a clean run with a dedicated derived-data path:
+  ```bash
+  xcodebuild -project AndBible.xcodeproj -scheme AndBible \
+    -destination 'platform=iOS Simulator,name=iPhone 17' \
+    -derivedDataPath .derivedData-local \
+    clean test
+  ```
 
-### Can't select simulator
-- Open Window → Devices and Simulators
-- Download iOS 17+ simulator if needed
-- Restart Xcode
+### Search UI tests suddenly return zero results
+- Inspect the UI test harness setup before changing Search assertions
+- Direct-launch Search tests depend on:
+  - a temporary SWORD root
+  - a temporary Search index path
+  - bundled modules being available in the harness
 
 ## Resources
 
-- **Full documentation:** See `CLAUDE.md` in project root
-- **Android reference:** `../and-bible/` (original app)
-- **Vue.js code:** `bibleview-js/` (shared frontend)
+- Full repo guidance: `CLAUDE.md`
+- Android reference repository: https://github.com/andbible/and-bible
+- Shared frontend code: `bibleview-js/`
+- Google Drive OAuth setup notes: `docs/howto/google-drive-oauth-setup.md`
 
 ## Development Workflow
 
-1. **Make Swift changes** → Edit in Xcode
-2. **Make Vue.js changes** → Build in `bibleview-js/`, copy to Resources
-3. **Test** → Cmd+R in Xcode
-4. **Commit** → Use git as normal
-
-Happy coding! 🎉
+1. Make the code change
+2. Run repo guardrails
+3. Run the narrowest relevant simulator or frontend validation
+4. Commit with the repo commit-message format
