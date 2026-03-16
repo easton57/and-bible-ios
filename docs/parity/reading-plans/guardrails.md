@@ -78,3 +78,9 @@ focused coverage rather than relying on the existing subset alone.
   - reading-plan workflow tests in `AndBibleUITests`
   - restore/apply/upload regressions in `AndBibleTests`
   - explicit parity documentation in this directory
+
+## Potential Improvements
+
+- add focused regression coverage for custom `.properties` plan import
+- add focused UI coverage for reading-plan list, start, delete, and import behavior
+- add focused lifecycle coverage for the additive iOS-only algorithmic plans

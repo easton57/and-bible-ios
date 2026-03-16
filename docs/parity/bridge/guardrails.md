@@ -94,3 +94,10 @@ indirect note/document workflows alone.
     `bridge-guide.md`
   - review discipline on `BibleBridge`, `BibleWebView`, `BridgeTypes`, and the
     corresponding `bibleview-js` types
+
+## Potential Improvements
+
+- add a generated snapshot of JS method names and emitted event names
+- add a lightweight parity checker for `BridgeTypes.swift` versus selected
+  TypeScript type definitions
+- add dedicated focused coverage for `callId` request/response flows

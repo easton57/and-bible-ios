@@ -103,3 +103,10 @@ focused coverage rather than relying on the existing subset alone.
   - focused Sync UI coverage in `AndBibleUITests`
   - dedicated workspace sync tests in `WorkspaceSyncRestoreTests.swift`
   - explicit parity documentation in this directory
+
+## Potential Improvements
+
+- add a machine-readable snapshot of Android-compatible sync keys and category names
+- bring the dedicated workspace sync regression target into a standard shared-scheme or equivalent
+  runnable path
+- add a focused XCUITest for the adopt-versus-create confirmation branch

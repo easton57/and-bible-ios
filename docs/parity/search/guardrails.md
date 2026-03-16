@@ -80,3 +80,10 @@ add focused coverage rather than relying on the current subset alone.
   - search workflow tests in `AndBibleUITests`
   - Strong's search regressions in `AndBibleTests`
   - explicit parity documentation in this directory
+
+## Potential Improvements
+
+- add focused regression coverage for multi-translation selection and grouped result totals
+- add a tighter guardrail around search option-to-query rerun wiring
+- add a machine-readable snapshot of supported search scopes and word modes if the option surface
+  expands materially

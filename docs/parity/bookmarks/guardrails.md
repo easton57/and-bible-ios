@@ -82,3 +82,10 @@ focused coverage rather than relying on the existing bookmark subset alone.
   - bookmark workflow tests in `AndBibleUITests`
   - note persistence regressions in `AndBibleTests`
   - explicit parity documentation in this directory
+
+## Potential Improvements
+
+- add focused UI coverage for generic-bookmark visible workflows
+- add focused UI coverage for broader StudyPad reorder and delete behavior
+- add machine-readable snapshots of bookmark sort and filter state contracts if the UI surface grows
+  materially more complex

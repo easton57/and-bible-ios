@@ -80,3 +80,9 @@ focused coverage rather than relying on the existing reader subset alone.
   - reader workflow tests in `AndBibleUITests`
   - explicit parity documentation in this directory
   - adjacent-domain coverage where reader handoff is part of the assertion
+
+## Potential Improvements
+
+- add focused regression coverage for fullscreen, swipe-mode, and auto-fullscreen behavior
+- add focused workflow coverage for compare presentation
+- add a tighter guardrail around reader config emission into the embedded document client
