@@ -1,10 +1,16 @@
+import io
 import unittest
 from pathlib import Path
 import sys
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from resolve_ios_simulator_destination import choose_candidate, parse_candidates
+from resolve_ios_simulator_destination import (
+    choose_candidate,
+    parse_candidates,
+    print_resolved_output,
+)
 
 
 class ResolveIosSimulatorDestinationTests(unittest.TestCase):
@@ -35,6 +41,17 @@ class ResolveIosSimulatorDestinationTests(unittest.TestCase):
         ]
 
         self.assertEqual(choose_candidate(candidates), ("iPhone 14", "17.4", "ID-14"))
+
+    def test_print_resolved_output_emits_local_cli_values(self) -> None:
+        with patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            print_resolved_output("id=ABC-123", "iPhone 16 Pro", "18.2")
+
+        self.assertEqual(
+            stdout.getvalue(),
+            "destination=id=ABC-123\n"
+            "device_name=iPhone 16 Pro\n"
+            "os_version=18.2\n",
+        )
 
 
 if __name__ == "__main__":

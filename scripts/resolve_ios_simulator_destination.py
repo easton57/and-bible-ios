@@ -105,6 +105,12 @@ def write_github_output(output_path: Path, destination: str, device_name: str, o
         file_handle.write(f"os_version={os_version}\n")
 
 
+def print_resolved_output(destination: str, device_name: str, os_version: str) -> None:
+    print(f"destination={destination}")
+    print(f"device_name={device_name}")
+    print(f"os_version={os_version}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", default="AndBible.xcodeproj", help="Xcode project path")
@@ -138,11 +144,10 @@ def main() -> int:
 
     print(f"Selected simulator: {name} (iOS {os_version})")
 
-    if not args.github_output:
-        print("GITHUB_OUTPUT is not set and no --github-output path was provided", file=sys.stderr)
-        return 1
-
-    write_github_output(Path(args.github_output), destination, name, os_version)
+    if args.github_output:
+        write_github_output(Path(args.github_output), destination, name, os_version)
+    else:
+        print_resolved_output(destination, name, os_version)
     return 0
 
 
