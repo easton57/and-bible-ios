@@ -72,7 +72,8 @@ jobs:
     timeout-minutes: 90
     env:
       DERIVED_DATA_PATH: .derivedData
-      XCRESULT_BUNDLE_PATH: .artifacts/AndBibleTests.xcresult
+      BUILD_XCRESULT_BUNDLE_PATH: .artifacts/AndBibleBuild.xcresult
+      TEST_XCRESULT_BUNDLE_PATH: .artifacts/AndBibleTests.xcresult
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -136,7 +137,7 @@ jobs:
           -configuration Debug
           -destination "${{ steps.simulator.outputs.destination }}"
           -derivedDataPath "${DERIVED_DATA_PATH}"
-          -resultBundlePath "${XCRESULT_BUNDLE_PATH}"
+          -resultBundlePath "${BUILD_XCRESULT_BUNDLE_PATH}"
           CODE_SIGNING_ALLOWED=NO
           build-for-testing
 
@@ -148,7 +149,7 @@ jobs:
           -configuration Debug
           -destination "${{ steps.simulator.outputs.destination }}"
           -derivedDataPath "${DERIVED_DATA_PATH}"
-          -resultBundlePath "${XCRESULT_BUNDLE_PATH}"
+          -resultBundlePath "${TEST_XCRESULT_BUNDLE_PATH}"
           CODE_SIGNING_ALLOWED=NO
           test-without-building
 
@@ -157,6 +158,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: andbible-xcresult-${{ github.run_id }}
-          path: ${{ env.XCRESULT_BUNDLE_PATH }}
+          path: .artifacts/*.xcresult
           if-no-files-found: warn
           retention-days: 14
