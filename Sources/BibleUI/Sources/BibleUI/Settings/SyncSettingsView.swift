@@ -176,6 +176,11 @@ public struct SyncSettingsView: View {
         .accessibilityIdentifier("syncSettingsScreen")
         .accessibilityValue(syncSettingsAccessibilityValue)
         .navigationTitle(String(localized: "sync_adapter"))
+        .safeAreaInset(edge: .bottom) {
+            if isUITestHarnessEnabled {
+                uiTestHarnessControls
+            }
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -550,8 +555,41 @@ public struct SyncSettingsView: View {
                         disableRemoteSync(for: category)
                     }
                     .font(.caption)
-                    .accessibilityIdentifier("syncCategoryDisableButton::\(category.rawValue)")
                 }
+            }
+        }
+    }
+
+    /**
+     Deterministic XCUITest controls rendered outside the `Form` row hierarchy.
+
+     These controls mirror the existing test-only backend and category mutation actions but avoid the
+     flaky hit-testing behavior seen for nested row buttons on GitHub-hosted simulators.
+
+     - Returns: A bottom inset containing one stable action per enabled remote category.
+     - Side effects: Tapping a control invokes the same persistence helpers used by the inline
+       harness actions.
+     - Failure modes: Hidden when the XCUITest harness is not active.
+     */
+    @ViewBuilder
+    private var uiTestHarnessControls: some View {
+        let enabledCategories = RemoteSyncCategory.allCases.filter(isRemoteCategoryEnabled)
+        if !enabledCategories.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(enabledCategories, id: \.self) { category in
+                        Button("Disable \(category.rawValue)") {
+                            disableRemoteSync(for: category)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .accessibilityIdentifier("syncCategoryDisableButton::\(category.rawValue)")
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
         }
     }

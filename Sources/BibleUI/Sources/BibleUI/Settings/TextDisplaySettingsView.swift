@@ -177,8 +177,6 @@ public struct TextDisplaySettingsView: View {
                                 .foregroundStyle((settings.justifyText ?? false) ? Color.accentColor : Color.secondary)
                         }
                     }
-                    .accessibilityIdentifier("textDisplayJustifyTextToggle")
-                    .accessibilityValue(uiTestJustifyStateLabel)
                 } else {
                     Toggle(String(localized: "justify_text"), isOn: boolBinding(\.justifyText, default: false))
                         .accessibilityIdentifier("textDisplayJustifyTextToggle")
@@ -222,6 +220,35 @@ public struct TextDisplaySettingsView: View {
         .accessibilityIdentifier("textDisplaySettingsScreen")
         .accessibilityValue(accessibilityState)
         .navigationTitle(String(localized: "text_display"))
+        .safeAreaInset(edge: .bottom) {
+            if uiTestUsesInMemoryStores {
+                uiTestHarnessControls
+            }
+        }
+    }
+
+    /**
+     Deterministic XCUITest controls rendered outside the `Form` row hierarchy.
+
+     The in-memory harness uses this bottom inset instead of relying on a nested `Form` button whose
+     tap handling is less reliable on hosted simulators.
+
+     - Returns: A bottom inset containing one stable justify-text toggle action.
+     - Side effects: Tapping the button mutates `settings.justifyText` through `toggleJustifyText()`.
+     - Failure modes: Hidden when the in-memory XCUITest harness is not active.
+     */
+    @ViewBuilder
+    private var uiTestHarnessControls: some View {
+        Button("Toggle Justify Text") {
+            toggleJustifyText()
+        }
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .accessibilityIdentifier("textDisplayJustifyTextToggle")
+        .accessibilityValue(uiTestJustifyStateLabel)
+        .padding(.vertical, 8)
     }
 
     /**
