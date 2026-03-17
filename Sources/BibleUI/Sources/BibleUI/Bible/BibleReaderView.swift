@@ -129,6 +129,9 @@ public struct BibleReaderView: View {
     /// Presents bookmark browsing and navigation UI.
     @State private var showBookmarks = false
 
+    /// Forces a fresh bookmark-sheet identity when XCUITests need state-reset verification.
+    @State private var bookmarkSheetPresentationID = UUID()
+
     /// Presents the consolidated settings screen.
     @State private var showSettings = false
 
@@ -152,6 +155,9 @@ public struct BibleReaderView: View {
 
     /// Presents reading history for jump-back navigation.
     @State private var showHistory = false
+
+    /// Forces a fresh history-sheet identity when XCUITests need state-reset verification.
+    @State private var historySheetPresentationID = UUID()
 
     /// Presents the compare-translations sheet.
     @State private var showCompare = false
@@ -231,6 +237,18 @@ public struct BibleReaderView: View {
 
     /// Launch-argument override used by XCUITests to present Settings immediately on launch.
     private let uiTestOpensSettingsOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_SETTINGS")
+
+    /// Launch-argument override used by XCUITests to present Bookmarks immediately on launch.
+    private let uiTestOpensBookmarksOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_BOOKMARKS")
+
+    /// Launch-argument override used by XCUITests to present History immediately on launch.
+    private let uiTestOpensHistoryOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_HISTORY")
+
+    /// Launch-argument override used by XCUITests to present Downloads immediately on launch.
+    private let uiTestOpensDownloadsOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_DOWNLOADS")
+
+    /// Launch-argument override used by XCUITests to present About immediately on launch.
+    private let uiTestOpensAboutOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_ABOUT")
 
     /// Launch-argument override used by XCUITests to present Text Display immediately on launch.
     private let uiTestOpensTextDisplayOnLaunch = ProcessInfo.processInfo.arguments.contains("UITEST_OPEN_TEXT_DISPLAY")
@@ -754,8 +772,12 @@ public struct BibleReaderView: View {
                     onOpenStudyPad: { labelId in
                         showBookmarks = false
                         focusedController?.loadStudyPadDocument(labelId: labelId)
-                    }
+                    },
+                    onUITestDismissAndReopen: uiTestUsesInMemoryStores && uiTestOpensBookmarksOnLaunch
+                        ? reopenBookmarksForUITests
+                        : nil
                 )
+                .id(bookmarkSheetPresentationID)
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -846,6 +868,9 @@ public struct BibleReaderView: View {
         .sheet(isPresented: $showHistory) {
             NavigationStack {
                 HistoryView(
+                    onUITestDismissAndReopen: uiTestUsesInMemoryStores && uiTestOpensHistoryOnLaunch
+                        ? reopenHistoryForUITests
+                        : nil,
                     bookNameResolver: { [weak ctrl = focusedController] osisId in
                         ctrl?.bookName(forOsisId: osisId)
                     }
@@ -859,6 +884,7 @@ public struct BibleReaderView: View {
                         uiTestHistoryNavigationState = didNavigate ? "navigated:\(key)" : "failed:\(key)"
                     }
                 }
+                .id(historySheetPresentationID)
             }
         }
         .sheet(isPresented: $showDownloads, onDismiss: {
@@ -1131,6 +1157,109 @@ public struct BibleReaderView: View {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     Runs one reader action immediately or after the menu-dismiss delay used by the production
+     toolbar menu.
+     */
+    private func performReaderAction(afterMenuDelay: Bool = false, _ action: @escaping () -> Void) {
+        if afterMenuDelay {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: action)
+        } else {
+            action()
+        }
+    }
+
+    /** Opens Bookmarks from the reader shell. */
+    private func openBookmarksFromReaderAction(afterMenuDelay: Bool = false) {
+        performReaderAction(afterMenuDelay: afterMenuDelay) {
+            showBookmarks = true
+        }
+    }
+
+    /** Opens History from the reader shell. */
+    private func openHistoryFromReaderAction(afterMenuDelay: Bool = false) {
+        performReaderAction(afterMenuDelay: afterMenuDelay) {
+            showHistory = true
+        }
+    }
+
+    /** Opens Reading Plans from the reader shell. */
+    private func openReadingPlansFromReaderAction(afterMenuDelay: Bool = false) {
+        performReaderAction(afterMenuDelay: afterMenuDelay) {
+            showReadingPlans = true
+        }
+    }
+
+    /** Opens Settings from the reader shell. */
+    private func openSettingsFromReaderAction(afterMenuDelay: Bool = false) {
+        performReaderAction(afterMenuDelay: afterMenuDelay) {
+            showSettings = true
+        }
+    }
+
+    /** Opens Workspaces from the reader shell. */
+    private func openWorkspacesFromReaderAction(afterMenuDelay: Bool = false) {
+        performReaderAction(afterMenuDelay: afterMenuDelay) {
+            showWorkspaces = true
+        }
+    }
+
+    /** Opens Downloads from the reader shell. */
+    private func openDownloadsFromReaderAction(afterMenuDelay: Bool = false) {
+        performReaderAction(afterMenuDelay: afterMenuDelay) {
+            showDownloads = true
+        }
+    }
+
+    /** Opens About from the reader shell. */
+    private func openAboutFromReaderAction(afterMenuDelay: Bool = false) {
+        performReaderAction(afterMenuDelay: afterMenuDelay) {
+            showAbout = true
+        }
+    }
+
+    /**
+     Dismisses and reopens Bookmarks for deterministic XCUITests.
+     *
+     * - Side effects:
+     *   - closes the current bookmark sheet
+     *   - yields twice on the main actor so SwiftUI tears down the first presentation before
+     *     reopening it
+     * - Failure modes:
+     *   - returns without mutation when the bookmark sheet is already not presented
+     */
+    private func reopenBookmarksForUITests() {
+        guard showBookmarks else { return }
+        showBookmarks = false
+        Task { @MainActor in
+            await Task.yield()
+            await Task.yield()
+            bookmarkSheetPresentationID = UUID()
+            showBookmarks = true
+        }
+    }
+
+    /**
+     Dismisses and reopens History for deterministic XCUITests.
+     *
+     * - Side effects:
+     *   - closes the current history sheet
+     *   - yields twice on the main actor so SwiftUI tears down the first presentation before
+     *     reopening it
+     * - Failure modes:
+     *   - returns without mutation when the history sheet is already not presented
+     */
+    private func reopenHistoryForUITests() {
+        guard showHistory else { return }
+        showHistory = false
+        Task { @MainActor in
+            await Task.yield()
+            await Task.yield()
+            historySheetPresentationID = UUID()
+            showHistory = true
         }
     }
 
@@ -1699,23 +1828,17 @@ public struct BibleReaderView: View {
                             }
 
                             Button(String(localized: "all_text_options"), systemImage: "textformat.size") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showSettings = true
-                                }
+                                openSettingsFromReaderAction(afterMenuDelay: true)
                             }
 
                             Divider()
 
                             Button(String(localized: "bookmarks"), systemImage: "bookmark") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showBookmarks = true
-                                }
+                                openBookmarksFromReaderAction(afterMenuDelay: true)
                             }
                             .accessibilityIdentifier("readerOpenBookmarksAction")
                             Button(String(localized: "history"), systemImage: "clock") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showHistory = true
-                                }
+                                openHistoryFromReaderAction(afterMenuDelay: true)
                             }
                             .accessibilityIdentifier("readerOpenHistoryAction")
                             Button(String(localized: "compare"), systemImage: "rectangle.split.2x1") {
@@ -1724,28 +1847,20 @@ public struct BibleReaderView: View {
                                 }
                             }
                             Button(String(localized: "reading_plans"), systemImage: "calendar") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showReadingPlans = true
-                                }
+                                openReadingPlansFromReaderAction(afterMenuDelay: true)
                             }
                             .accessibilityIdentifier("readerOpenReadingPlansAction")
                             Button(String(localized: "settings"), systemImage: "gear") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showSettings = true
-                                }
+                                openSettingsFromReaderAction(afterMenuDelay: true)
                             }
                             .accessibilityIdentifier("readerOpenSettingsAction")
                             Divider()
                             Button(String(localized: "workspaces"), systemImage: "square.stack") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showWorkspaces = true
-                                }
+                                openWorkspacesFromReaderAction(afterMenuDelay: true)
                             }
                             .accessibilityIdentifier("readerOpenWorkspacesAction")
                             Button(String(localized: "downloads"), systemImage: "arrow.down.circle") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showDownloads = true
-                                }
+                                openDownloadsFromReaderAction(afterMenuDelay: true)
                             }
                             .accessibilityIdentifier("readerOpenDownloadsAction")
                             if !(controller?.installedDictionaryModules.isEmpty ?? true) {
@@ -1830,9 +1945,7 @@ public struct BibleReaderView: View {
                             }
                             Divider()
                             Button(String(localized: "about"), systemImage: "info.circle") {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showAbout = true
-                                }
+                                openAboutFromReaderAction(afterMenuDelay: true)
                             }
                             .accessibilityIdentifier("readerOpenAboutAction")
                             Button(String(localized: "rate_app"), systemImage: "star") {
@@ -2425,6 +2538,24 @@ public struct BibleReaderView: View {
     }
 
     /**
+     Waits briefly for the reader shell to establish an active window before window-scoped XCUITest
+     seeding runs.
+     *
+     * - Side effects:
+     *   - repeatedly yields on the main actor while the reader coordinator finishes bootstrapping
+     * - Failure modes:
+     *   - returns after the bounded wait even if no active window becomes available
+     */
+    private func waitForUITestActiveWindow(maxAttempts: Int = 40) async {
+        for _ in 0..<maxAttempts {
+            if windowManager.activeWindow != nil {
+                return
+            }
+            await Task.yield()
+        }
+    }
+
+    /**
      Seeds one deterministic whole-verse Bible bookmark for XCUITest workflows.
 
      - Parameters:
@@ -2937,24 +3068,10 @@ public struct BibleReaderView: View {
         if uiTestOpensSearchOnLaunch {
             await waitForUITestSearchDependencies()
             presentSearch(initialQuery: ProcessInfo.processInfo.environment["UITEST_SEARCH_QUERY"] ?? "earth")
-        } else if uiTestOpensTextDisplayOnLaunch {
-            showTextDisplaySettings = true
-        } else if uiTestOpensSyncSettingsOnLaunch {
-            seedSyncSettingsForUITests()
-            showSyncSettings = true
-        } else if uiTestOpensColorsOnLaunch {
-            seedColorsForUITests()
-            showColorSettings = true
-        } else if uiTestOpensImportExportOnLaunch {
-            showImportExport = true
-        } else if uiTestOpensLabelManagerOnLaunch {
-            resetLabelsForUITests()
-            showLabelManager = true
-        } else if uiTestOpensLabelAssignmentOnLaunch {
-            resetLabelsForUITests()
-            resetBookmarksForUITests()
-            uiTestLabelAssignmentBookmarkID = seedLabelAssignmentBookmarkForUITests()
-        } else if uiTestSeedsBookmarkLabelWorkflowOnLaunch {
+            return
+        }
+
+        if uiTestSeedsBookmarkLabelWorkflowOnLaunch {
             resetLabelsForUITests()
             resetBookmarksForUITests()
             _ = seedLabelAssignmentBookmarkForUITests()
@@ -2977,11 +3094,40 @@ public struct BibleReaderView: View {
             resetBookmarksForUITests()
             _ = seedBookmarkFilterWorkflowForUITests()
         } else if uiTestSeedsHistoryMultiRowWorkflowOnLaunch {
+            await waitForUITestActiveWindow()
             resetHistoryForUITests()
             seedHistoryForUITests(keys: ["Exod.2.1", "Matt.3.1"])
         } else if uiTestSeedsHistoryWorkflowOnLaunch {
+            await waitForUITestActiveWindow()
             resetHistoryForUITests()
             seedHistoryForUITests(keys: ["Exod.2.1"])
+        }
+
+        if uiTestOpensBookmarksOnLaunch {
+            showBookmarks = true
+        } else if uiTestOpensHistoryOnLaunch {
+            showHistory = true
+        } else if uiTestOpensDownloadsOnLaunch {
+            showDownloads = true
+        } else if uiTestOpensAboutOnLaunch {
+            showAbout = true
+        } else if uiTestOpensTextDisplayOnLaunch {
+            showTextDisplaySettings = true
+        } else if uiTestOpensSyncSettingsOnLaunch {
+            seedSyncSettingsForUITests()
+            showSyncSettings = true
+        } else if uiTestOpensColorsOnLaunch {
+            seedColorsForUITests()
+            showColorSettings = true
+        } else if uiTestOpensImportExportOnLaunch {
+            showImportExport = true
+        } else if uiTestOpensLabelManagerOnLaunch {
+            resetLabelsForUITests()
+            showLabelManager = true
+        } else if uiTestOpensLabelAssignmentOnLaunch {
+            resetLabelsForUITests()
+            resetBookmarksForUITests()
+            uiTestLabelAssignmentBookmarkID = seedLabelAssignmentBookmarkForUITests()
         } else if uiTestOpensReadingPlansOnLaunch {
             resetReadingPlansForUITests()
             showReadingPlans = true

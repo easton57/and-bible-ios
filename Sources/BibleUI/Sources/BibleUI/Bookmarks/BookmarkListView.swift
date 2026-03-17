@@ -56,6 +56,9 @@ public struct BookmarkListView: View {
     /// Optional callback used to open a study pad for a selected label.
     var onOpenStudyPad: ((UUID) -> Void)?
 
+    /// Optional XCUITest-only callback that dismisses and reopens the bookmark sheet deterministically.
+    var onUITestDismissAndReopen: (() -> Void)?
+
     /// Test-only flag exposing deterministic in-list dismiss affordances during XCUITest runs.
     private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
 
@@ -65,10 +68,17 @@ public struct BookmarkListView: View {
      - Parameters:
        - onNavigate: Callback invoked when the user opens a bookmark from the list.
        - onOpenStudyPad: Callback invoked when the user wants to open a selected label's study pad.
+       - onUITestDismissAndReopen: Optional XCUITest-only callback that dismisses and reopens the
+         bookmark sheet without relying on the reader overflow menu.
      */
-    public init(onNavigate: ((String, Int) -> Void)? = nil, onOpenStudyPad: ((UUID) -> Void)? = nil) {
+    public init(
+        onNavigate: ((String, Int) -> Void)? = nil,
+        onOpenStudyPad: ((UUID) -> Void)? = nil,
+        onUITestDismissAndReopen: (() -> Void)? = nil
+    ) {
         self.onNavigate = onNavigate
         self.onOpenStudyPad = onOpenStudyPad
+        self.onUITestDismissAndReopen = onUITestDismissAndReopen
     }
 
     /**
@@ -186,6 +196,10 @@ public struct BookmarkListView: View {
             if uiTestUsesInMemoryStores {
                 Button("Dismiss Bookmark Sheet") { dismiss() }
                     .accessibilityIdentifier("bookmarkListHarnessDoneButton")
+                if let onUITestDismissAndReopen {
+                    Button("Dismiss and Reopen Bookmark Sheet") { onUITestDismissAndReopen() }
+                        .accessibilityIdentifier("bookmarkListHarnessReopenButton")
+                }
             }
 
             // Label filter chips

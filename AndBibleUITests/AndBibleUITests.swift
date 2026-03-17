@@ -64,19 +64,14 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the settings form does not render after navigation completes
      */
     func testSettingsScreenShowsPrimaryNavigationRows() {
-        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
+        let app = makeApp(openSettingsOnLaunch: true)
         app.launch()
 
-        tapReaderMoreMenuButton(in: app)
-        XCTAssertTrue(requireElement("readerOpenReadingPlansAction", in: app, timeout: 5).exists)
-        XCTAssertTrue(requireElement("readerOpenDownloadsAction", in: app, timeout: 5).exists)
-        XCTAssertTrue(requireElement("readerOpenWorkspacesAction", in: app, timeout: 5).exists)
-        XCTAssertTrue(requireElement("readerOpenBookmarksAction", in: app, timeout: 5).exists)
-        XCTAssertTrue(requireElement("readerOpenAboutAction", in: app, timeout: 5).exists)
-
-        requireElement("readerOpenSettingsAction", in: app, timeout: 5).tap()
-
-        XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
+        openSettings(in: app, launchedDirectly: true)
+        XCTAssertTrue(requireElement("settingsDownloadsLink", in: app, timeout: 10).exists)
+        XCTAssertTrue(requireElement("settingsSyncLink", in: app, timeout: 10).exists)
+        XCTAssertTrue(requireElement("settingsTextDisplayLink", in: app, timeout: 10).exists)
+        XCTAssertTrue(requireElement("settingsColorsLink", in: app, timeout: 10).exists)
     }
 
     /**
@@ -340,13 +335,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the downloads browser screen does not render after navigation completes
      */
     func testDownloadsScreenOpensFromReaderMenu() {
-        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
+        let app = makeApp(openDownloadsOnLaunch: true)
         app.launch()
 
-        tapReaderMoreMenuButton(in: app)
-        requireElement("readerOpenDownloadsAction", in: app, timeout: 5).tap()
-
-        XCTAssertTrue(requireElement("moduleBrowserScreen", in: app, timeout: 10).exists)
+        XCTAssertTrue(openDownloads(in: app, launchedDirectly: true).exists)
     }
 
     /**
@@ -363,13 +355,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if cancelling the add-source sheet does not return to the repository manager
      */
     func testDownloadsRepositoryManagerAddSourceCancelFlow() {
-        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
+        let app = makeApp(openDownloadsOnLaunch: true)
         app.launch()
 
-        tapReaderMoreMenuButton(in: app)
-        requireElement("readerOpenDownloadsAction", in: app, timeout: 5).tap()
-
-        XCTAssertTrue(requireElement("moduleBrowserScreen", in: app, timeout: 10).exists)
+        XCTAssertTrue(openDownloads(in: app, launchedDirectly: true).exists)
         requireElement("moduleBrowserRepositoriesButton", in: app, timeout: 10).tap()
 
         XCTAssertTrue(requireElement("repositoryManagerScreen", in: app, timeout: 10).exists)
@@ -462,10 +451,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the bookmark list screen does not render after navigation completes
      */
     func testBookmarksScreenOpensFromReaderMenu() {
-        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkLabelWorkflowOnLaunch: true)
         app.launch()
 
-        XCTAssertTrue(openBookmarkListFromReaderMenu(in: app).exists)
+        XCTAssertTrue(openBookmarkList(in: app, launchedDirectly: true).exists)
     }
 
     /**
@@ -613,14 +602,14 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if tapping the seeded bookmark row does not drive the reader to `Exodus 2`
      */
     func testBookmarkSelectionNavigatesReaderToSeededReference() {
-        let app = makeApp(seedBookmarkNavigationWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkNavigationWorkflowOnLaunch: true)
         app.launch()
 
         let currentReferenceState = requireElement("readerCurrentReferenceState", in: app, timeout: 10)
         _ = requireElement("uiTestBookmarkNavigationState", in: app, timeout: 10)
         XCTAssertEqual(currentReferenceState.label, "Genesis 1")
 
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(in: app, launchedDirectly: true)
         let bookmarkRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
         XCTAssertTrue(bookmarkRow.waitForExistence(timeout: 10), "Expected seeded bookmark row button to exist.")
         bookmarkRow.tap()
@@ -645,10 +634,10 @@ final class AndBibleUITests: XCTestCase {
      *     returns after reopening the bookmark list
      */
     func testBookmarkRowDeletePreservesOtherRowsAcrossReopen() {
-        let app = makeApp(seedBookmarkMultiRowWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkMultiRowWorkflowOnLaunch: true)
         app.launch()
 
-        openBookmarkListFromReaderMenu(in: app)
+        openBookmarkList(in: app, launchedDirectly: true)
         let exodusRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
         let matthewRow = app.buttons["bookmarkListRowButton::Matthew_3_1"].firstMatch
         XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row button to exist.")
@@ -663,7 +652,7 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertTrue(matthewRow.exists, "Expected Matthew bookmark row to remain after deleting Exodus.")
 
         requireElement("bookmarkListDoneButton", in: app, timeout: 10).tap()
-        openBookmarkListFromReaderMenu(in: app)
+        openBookmarkList(in: app, launchedDirectly: true)
 
         XCTAssertFalse(app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch.exists)
         XCTAssertTrue(app.buttons["bookmarkListRowButton::Matthew_3_1"].firstMatch.exists)
@@ -683,10 +672,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if selecting `Bible order` does not move the Exodus row above the Matthew row
      */
     func testBookmarkListSortMenuReordersRows() {
-        let app = makeApp(seedBookmarkMultiRowWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkMultiRowWorkflowOnLaunch: true)
         app.launch()
 
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(in: app, launchedDirectly: true)
         waitForElement(
             "bookmarkListRowButton::Matthew_3_1",
             toAppearAbove: "bookmarkListRowButton::Exodus_2_1",
@@ -718,10 +707,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if clearing the search query does not restore the full bookmark row set
      */
     func testBookmarkListSearchNarrowsAndClearsVisibleRows() {
-        let app = makeApp(seedBookmarkMultiRowWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkMultiRowWorkflowOnLaunch: true)
         app.launch()
 
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(in: app, launchedDirectly: true)
         let searchField = app.searchFields.firstMatch
         XCTAssertTrue(searchField.waitForExistence(timeout: 10), "Expected bookmark search field to exist.")
 
@@ -761,10 +750,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if clearing the filter does not restore the full bookmark row set
      */
     func testBookmarkListLabelFilterNarrowsAndClearsVisibleRows() {
-        let app = makeApp(seedBookmarkFilterWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkFilterWorkflowOnLaunch: true)
         app.launch()
 
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(in: app, launchedDirectly: true)
         let genesisRow = app.buttons["bookmarkListRowButton::Genesis_1_1"].firstMatch
         let exodusRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
         XCTAssertTrue(genesisRow.waitForExistence(timeout: 10), "Expected Genesis bookmark row button to exist.")
@@ -805,10 +794,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the reader never enters StudyPad mode for `UI Test Seed`
      */
     func testBookmarkListOpensStudyPadForSelectedLabel() {
-        let app = makeApp(seedBookmarkStudyPadWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkStudyPadWorkflowOnLaunch: true)
         app.launch()
 
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(in: app, launchedDirectly: true)
         requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
         requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10).tap()
 
@@ -833,10 +822,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the exported StudyPad note state never reaches the expected created token
      */
     func testBookmarkStudyPadCreateNoteFromLabelWorkflow() {
-        let app = makeApp(seedBookmarkStudyPadWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkStudyPadWorkflowOnLaunch: true)
         app.launch()
 
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(in: app, launchedDirectly: true)
         requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
         requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10).tap()
 
@@ -866,7 +855,7 @@ final class AndBibleUITests: XCTestCase {
      *     reference state to `Exodus 2`
      */
     func testHistorySelectionNavigatesReaderToSeededReference() {
-        let app = makeApp(seedHistoryWorkflowOnLaunch: true)
+        let app = makeApp(openHistoryOnLaunch: true, seedHistoryWorkflowOnLaunch: true)
         app.launch()
 
         let currentReferenceState = requireElement("readerCurrentReferenceState", in: app, timeout: 10)
@@ -874,10 +863,7 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertEqual(currentReferenceState.label, "Genesis 1")
         XCTAssertEqual(historyNavigationState.label, "idle")
 
-        tapReaderMoreMenuButton(in: app)
-        requireElement("readerOpenHistoryAction", in: app, timeout: 5).tap()
-
-        XCTAssertTrue(requireElement("historyScreen", in: app, timeout: 10).exists)
+        XCTAssertTrue(openHistory(in: app, launchedDirectly: true).exists)
         let historyRow = app.buttons["historyRow::Exod_2_1"].firstMatch
         XCTAssertTrue(historyRow.waitForExistence(timeout: 10), "Expected seeded history row button to exist.")
         historyRow.tap()
@@ -905,10 +891,10 @@ final class AndBibleUITests: XCTestCase {
      *     deleted row
      */
     func testHistoryClearRemovesSeededRowAcrossReopen() {
-        let app = makeApp(seedHistoryWorkflowOnLaunch: true)
+        let app = makeApp(openHistoryOnLaunch: true, seedHistoryWorkflowOnLaunch: true)
         app.launch()
 
-        openHistoryFromReaderMenu(in: app)
+        openHistory(in: app, launchedDirectly: true)
         let historyRow = app.buttons["historyRow::Exod_2_1"].firstMatch
         XCTAssertTrue(historyRow.waitForExistence(timeout: 10), "Expected seeded history row button to exist.")
 
@@ -918,8 +904,7 @@ final class AndBibleUITests: XCTestCase {
         waitForExpectations(timeout: 10)
         XCTAssertFalse(app.buttons["historyClearButton"].firstMatch.exists)
 
-        requireElement("historyDoneButton", in: app, timeout: 10).tap()
-        openHistoryFromReaderMenu(in: app)
+        requireElement("historyReopenButton", in: app, timeout: 10).tap()
 
         XCTAssertFalse(app.buttons["historyRow::Exod_2_1"].firstMatch.exists)
         XCTAssertFalse(app.buttons["historyClearButton"].firstMatch.exists)
@@ -941,10 +926,10 @@ final class AndBibleUITests: XCTestCase {
      *     returns after reopening History
      */
     func testHistoryRowDeletePreservesOtherRowsAcrossReopen() {
-        let app = makeApp(seedHistoryMultiRowWorkflowOnLaunch: true)
+        let app = makeApp(openHistoryOnLaunch: true, seedHistoryMultiRowWorkflowOnLaunch: true)
         app.launch()
 
-        openHistoryFromReaderMenu(in: app)
+        openHistory(in: app, launchedDirectly: true)
         let exodusRow = app.buttons["historyRow::Exod_2_1"].firstMatch
         let matthewRow = app.buttons["historyRow::Matt_3_1"].firstMatch
         XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus history row button to exist.")
@@ -958,8 +943,7 @@ final class AndBibleUITests: XCTestCase {
         waitForExpectations(timeout: 10)
         XCTAssertTrue(matthewRow.exists, "Expected Matthew history row to remain after deleting Exodus.")
 
-        requireElement("historyDoneButton", in: app, timeout: 10).tap()
-        openHistoryFromReaderMenu(in: app)
+        requireElement("historyReopenButton", in: app, timeout: 10).tap()
 
         XCTAssertFalse(app.buttons["historyRow::Exod_2_1"].firstMatch.exists)
         XCTAssertTrue(app.buttons["historyRow::Matt_3_1"].firstMatch.exists)
@@ -980,7 +964,7 @@ final class AndBibleUITests: XCTestCase {
      *     update after the toggles
      */
     func testBookmarkListOpensLabelAssignmentForSeededBookmark() {
-        let app = makeApp(seedBookmarkRowLabelWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkRowLabelWorkflowOnLaunch: true)
         app.launch()
 
         let labelAssignmentScreen = openLabelAssignmentFromBookmarkList(in: app)
@@ -1001,11 +985,8 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the about screen does not render after navigation completes
      */
     func testAboutScreenOpensFromReaderMenu() {
-        let app = makeApp(seedBookmarkLabelWorkflowOnLaunch: true)
+        let app = makeApp(openAboutOnLaunch: true)
         app.launch()
-
-        tapReaderMoreMenuButton(in: app)
-        requireElement("readerOpenAboutAction", in: app, timeout: 5).tap()
 
         XCTAssertTrue(requireElement("aboutScreen", in: app, timeout: 10).exists)
     }
@@ -1103,7 +1084,7 @@ final class AndBibleUITests: XCTestCase {
      *     not expose the new filter chip after dismissal
      */
     func testBookmarkListLabelAssignmentCreatesAndAssignsNewLabel() {
-        let app = makeApp(seedBookmarkRowLabelWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkRowLabelWorkflowOnLaunch: true)
         let newLabelName = "UI Test Fresh"
         let newLabelSegment = "UI_Test_Fresh"
         app.launch()
@@ -1146,7 +1127,7 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if filtering by the removed label still shows the bookmark row
      */
     func testBookmarkListLabelAssignmentRemovalHidesBookmarkUnderFilter() {
-        let app = makeApp(seedBookmarkStudyPadWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkStudyPadWorkflowOnLaunch: true)
         app.launch()
 
         _ = openLabelAssignmentFromBookmarkList(in: app)
@@ -1186,10 +1167,10 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if reopening the bookmark list does not restore both seeded rows
      */
     func testBookmarkListFilterAndSearchResetAcrossReopen() {
-        let app = makeApp(seedBookmarkFilterWorkflowOnLaunch: true)
+        let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkFilterWorkflowOnLaunch: true)
         app.launch()
 
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(in: app, launchedDirectly: true)
         let searchField = app.searchFields.firstMatch
         XCTAssertTrue(searchField.waitForExistence(timeout: 10), "Expected bookmark search field to exist.")
 
@@ -1212,8 +1193,7 @@ final class AndBibleUITests: XCTestCase {
         expectation(for: hiddenPredicate, evaluatedWith: genesisRow)
         waitForExpectations(timeout: 10)
 
-        requireElement("bookmarkListHarnessDoneButton", in: app, timeout: 10).tap()
-        _ = openBookmarkListFromReaderMenu(in: app)
+        requireElement("bookmarkListHarnessReopenButton", in: app, timeout: 10).tap()
 
         XCTAssertTrue(genesisRow.waitForExistence(timeout: 10), "Expected Genesis bookmark row to return after reopening the bookmark list.")
         XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row to return after reopening the bookmark list.")
@@ -1688,6 +1668,11 @@ final class AndBibleUITests: XCTestCase {
      */
     private func makeApp(
         settingsTarget: String? = nil,
+        openSettingsOnLaunch: Bool = false,
+        openBookmarksOnLaunch: Bool = false,
+        openHistoryOnLaunch: Bool = false,
+        openDownloadsOnLaunch: Bool = false,
+        openAboutOnLaunch: Bool = false,
         openSearchOnLaunch: Bool = false,
         searchQuery: String? = nil,
         openSyncOnLaunch: Bool = false,
@@ -1718,9 +1703,24 @@ final class AndBibleUITests: XCTestCase {
         trackedApp = app
         app.launchArguments += ["UITEST_DISABLE_CALCULATOR_GATE", "UITEST_USE_IN_MEMORY_STORES"]
         app.launchEnvironment["UITEST_SESSION_ID"] = UUID().uuidString
+        if openSettingsOnLaunch {
+            app.launchArguments += ["UITEST_OPEN_SETTINGS"]
+        }
         if let settingsTarget {
             app.launchArguments += ["UITEST_OPEN_SETTINGS"]
             app.launchEnvironment["UITEST_SETTINGS_SCROLL_TARGET"] = settingsTarget
+        }
+        if openBookmarksOnLaunch {
+            app.launchArguments += ["UITEST_OPEN_BOOKMARKS"]
+        }
+        if openHistoryOnLaunch {
+            app.launchArguments += ["UITEST_OPEN_HISTORY"]
+        }
+        if openDownloadsOnLaunch {
+            app.launchArguments += ["UITEST_OPEN_DOWNLOADS"]
+        }
+        if openAboutOnLaunch {
+            app.launchArguments += ["UITEST_OPEN_ABOUT"]
         }
         if openSearchOnLaunch {
             app.launchArguments += ["UITEST_OPEN_SEARCH"]
@@ -1971,7 +1971,7 @@ final class AndBibleUITests: XCTestCase {
     ) -> XCUIElement {
         if !launchedDirectly {
             tapReaderMoreMenuButton(in: app)
-            requireElement("readerOpenWorkspacesAction", in: app, timeout: 5).tap()
+            tapReaderAction("readerOpenWorkspacesAction", in: app)
         }
         return requireElement("workspaceSelectorScreen", in: app, timeout: 10)
     }
@@ -2041,46 +2041,89 @@ final class AndBibleUITests: XCTestCase {
      *   - fails when the bookmark list or seeded bookmark edit-labels action never appears
      */
     private func openLabelAssignmentFromBookmarkList(in app: XCUIApplication) -> XCUIElement {
-        _ = openBookmarkListFromReaderMenu(in: app)
+        _ = openBookmarkList(
+            in: app,
+            launchedDirectly: app.launchArguments.contains("UITEST_OPEN_BOOKMARKS")
+        )
         requireElement("bookmarkListEditLabelsButton::Genesis_1_1", in: app, timeout: 10).tap()
         return requireElement("labelAssignmentScreen", in: app, timeout: 10)
     }
 
     /**
-     Opens the bookmark list from the real reader overflow menu and waits for the list root to
-     render.
+     Opens the bookmark list either from the reader shell or from a direct test-only launch path.
      *
-     * - Parameter app: Running application whose reader shell should present the bookmark list.
+     * - Parameters:
+     *   - app: Running application whose reader shell should present the bookmark list.
+     *   - launchedDirectly: Whether the app was launched straight into the bookmark list sheet.
      * - Returns: The root accessibility-identified bookmark list element.
      * - Side effects:
-     *   - opens the reader overflow menu
-     *   - presents the bookmark list from the actual reader action surface
+     *   - when `launchedDirectly` is `false`, opens the reader overflow menu and pushes the
+     *     bookmark list
+     *   - when `launchedDirectly` is `true`, waits for the direct-launch bookmark list sheet to
+     *     render
      * - Failure modes:
      *   - fails if the reader menu button, bookmark action, or bookmark list root never appears
      */
     @discardableResult
-    private func openBookmarkListFromReaderMenu(in app: XCUIApplication) -> XCUIElement {
-        tapReaderMoreMenuButton(in: app)
-        requireElement("readerOpenBookmarksAction", in: app, timeout: 5).tap()
+    private func openBookmarkList(
+        in app: XCUIApplication,
+        launchedDirectly: Bool = false
+    ) -> XCUIElement {
+        if !launchedDirectly {
+            tapReaderMoreMenuButton(in: app)
+            tapReaderAction("readerOpenBookmarksAction", in: app)
+        }
         return requireElement("bookmarkListScreen", in: app, timeout: 10)
     }
 
     /**
-     Opens History from the real reader overflow menu and waits for the screen root to render.
+     Opens History either from the reader shell or from a direct test-only launch path.
      *
-     * - Parameter app: Running application whose reader shell should present History.
+     * - Parameters:
+     *   - app: Running application whose reader shell should present History.
+     *   - launchedDirectly: Whether the app was launched straight into the History sheet.
      * - Returns: The root accessibility-identified History screen element.
      * - Side effects:
-     *   - opens the reader overflow menu
-     *   - presents the History sheet from the actual reader action surface
+     *   - when `launchedDirectly` is `false`, opens the reader overflow menu and pushes the
+     *     History sheet
+     *   - when `launchedDirectly` is `true`, waits for the direct-launch History sheet to render
      * - Failure modes:
      *   - fails if the reader menu button, History action, or History screen root never appears
      */
     @discardableResult
-    private func openHistoryFromReaderMenu(in app: XCUIApplication) -> XCUIElement {
-        tapReaderMoreMenuButton(in: app)
-        requireElement("readerOpenHistoryAction", in: app, timeout: 5).tap()
+    private func openHistory(
+        in app: XCUIApplication,
+        launchedDirectly: Bool = false
+    ) -> XCUIElement {
+        if !launchedDirectly {
+            tapReaderMoreMenuButton(in: app)
+            tapReaderAction("readerOpenHistoryAction", in: app)
+        }
         return requireElement("historyScreen", in: app, timeout: 10)
+    }
+
+    /**
+     Opens Downloads either from the reader shell or from a direct test-only launch path.
+     *
+     * - Parameters:
+     *   - app: Running application whose reader shell should present Downloads.
+     *   - launchedDirectly: Whether the app was launched straight into the downloads sheet.
+     * - Returns: The root accessibility-identified downloads screen element.
+     * - Side effects:
+     *   - when `launchedDirectly` is `false`, opens the reader overflow menu and pushes Downloads
+     *   - when `launchedDirectly` is `true`, waits for the direct-launch downloads sheet to render
+     * - Failure modes:
+     *   - fails if the reader menu button, downloads action, or downloads screen root never appears
+     */
+    private func openDownloads(
+        in app: XCUIApplication,
+        launchedDirectly: Bool = false
+    ) -> XCUIElement {
+        if !launchedDirectly {
+            tapReaderMoreMenuButton(in: app)
+            tapReaderAction("readerOpenDownloadsAction", in: app)
+        }
+        return requireElement("moduleBrowserScreen", in: app, timeout: 10)
     }
 
     /**
@@ -2191,14 +2234,14 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
-     Opens Settings from the reader overflow menu.
+     Opens Settings from the reader shell action surface.
      *
      * - Parameters:
      *   - app: Running application under test.
      *   - launchedDirectly: Whether the app was launched straight into the settings sheet.
      * - Side effects:
-     *   - when `launchedDirectly` is `false`, opens the reader overflow menu and pushes the
-     *     Settings screen onto the navigation stack
+     *   - when `launchedDirectly` is `false`, resolves the stable reader action surface and pushes
+     *     the Settings screen onto the navigation stack
      *   - dismisses the language restart alert only when it is already present after Settings loads
      * - Failure modes:
      *   - fails when the reader overflow menu or Settings action cannot be found for non-direct
@@ -2208,7 +2251,7 @@ final class AndBibleUITests: XCTestCase {
     private func openSettings(in app: XCUIApplication, launchedDirectly: Bool = false) {
         if !launchedDirectly {
             tapReaderMoreMenuButton(in: app)
-            requireElement("readerOpenSettingsAction", in: app, timeout: 5).tap()
+            tapReaderAction("readerOpenSettingsAction", in: app)
         }
         XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
         let okButton = app.buttons["OK"]
@@ -2362,7 +2405,7 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
-     Opens the reader overflow menu using a direct center-point tap on the toolbar button.
+     Resolves the reader action surface for one test step.
      *
      * - Parameters:
      *   - app: Running application under test.
@@ -2371,12 +2414,13 @@ final class AndBibleUITests: XCTestCase {
      *   - file: Source file used for XCTest failure attribution.
      *   - line: Source line used for XCTest failure attribution.
      * - Side effects:
-     *   - resolves the overflow-menu button from the button hierarchy
-     *   - taps the button's center point directly to avoid hosted-simulator AX scroll-to-visible
-     *     failures on navigation-bar controls
+     *   - prefers the XCUITest-only reader action harness when its direct action buttons are
+     *     available on the reader shell
+     *   - otherwise resolves the overflow-menu button from the toolbar hierarchy and taps its
+     *     center point directly
      * - Failure modes:
-     *   - records an XCTest failure if the overflow-menu button never appears or never becomes
-     *     hittable within the allotted timeout
+     *   - records an XCTest failure if neither the harness nor the overflow-menu button becomes
+     *     usable within the allotted timeout
      */
     private func tapReaderMoreMenuButton(
         in app: XCUIApplication,
@@ -2385,6 +2429,33 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) {
         let button = requireReaderMoreMenuButton(in: app, timeout: timeout, file: file, line: line)
+        tapElementReliably(button, timeout: timeout, file: file, line: line)
+    }
+
+    /**
+     Taps one reader-shell action after the stable action surface has been resolved.
+     *
+     * - Parameters:
+     *   - identifier: Accessibility identifier of the reader action to invoke.
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to wait for the action to appear and become hittable.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - waits for the requested reader action button to appear
+     *   - taps the resolved button through the shared reliable-tap helper
+     * - Failure modes:
+     *   - records an XCTest failure if the requested reader action never appears or never becomes
+     *     hittable within the allotted timeout
+     */
+    private func tapReaderAction(
+        _ identifier: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let button = requireButton(identifier, in: app, timeout: timeout, file: file, line: line)
         tapElementReliably(button, timeout: timeout, file: file, line: line)
     }
 

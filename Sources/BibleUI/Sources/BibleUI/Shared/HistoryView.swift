@@ -35,17 +35,30 @@ public struct HistoryView: View {
     /// Callback invoked when the user chooses a history item to navigate back to.
     var onNavigate: ((String) -> Void)?
 
+    /// Optional XCUITest-only callback that dismisses and reopens the history sheet deterministically.
+    var onUITestDismissAndReopen: (() -> Void)?
+
     /// Resolves an OSIS book ID to a human-readable name using the active controller's dynamic book list.
     var bookNameResolver: ((String) -> String?)?
+
+    /// Test-only flag exposing deterministic reopen affordances during XCUITest runs.
+    private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
 
     /**
      Creates the history screen.
 
      - Parameters:
+       - onUITestDismissAndReopen: Optional XCUITest-only callback that dismisses and reopens the
+         history sheet without relying on the reader overflow menu.
        - bookNameResolver: Optional resolver that maps OSIS IDs to dynamic, module-aware book names.
        - onNavigate: Optional callback invoked with the stored history key when a row is selected.
      */
-    public init(bookNameResolver: ((String) -> String?)? = nil, onNavigate: ((String) -> Void)? = nil) {
+    public init(
+        onUITestDismissAndReopen: (() -> Void)? = nil,
+        bookNameResolver: ((String) -> String?)? = nil,
+        onNavigate: ((String) -> Void)? = nil
+    ) {
+        self.onUITestDismissAndReopen = onUITestDismissAndReopen
         self.bookNameResolver = bookNameResolver
         self.onNavigate = onNavigate
     }
@@ -113,6 +126,12 @@ public struct HistoryView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button(String(localized: "done")) { dismiss() }
                     .accessibilityIdentifier("historyDoneButton")
+            }
+            if uiTestUsesInMemoryStores, let onUITestDismissAndReopen {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Reopen") { onUITestDismissAndReopen() }
+                        .accessibilityIdentifier("historyReopenButton")
+                }
             }
             if !history.isEmpty {
                 ToolbarItem(placement: .destructiveAction) {
