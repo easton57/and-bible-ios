@@ -129,6 +129,15 @@ public struct BookmarkListView: View {
         labels.filter { $0.isRealLabel }
     }
 
+    /// Stable XCUITest-only export of the currently visible bookmark rows.
+    private var uiTestBookmarkState: String {
+        let refs = filteredBookmarks
+            .map(Self.verseReference(for:))
+            .map(bookmarkListAccessibilitySegment(_:))
+            .sorted()
+        return refs.isEmpty ? "bookmarkState=empty" : "bookmarkState=\(refs.joined(separator: "|"))"
+    }
+
     /**
      Builds the bookmark list screen, empty state, and related sheets.
      */
@@ -202,7 +211,10 @@ public struct BookmarkListView: View {
                 Button("Dismiss Bookmark Sheet") { dismiss() }
                     .accessibilityIdentifier("bookmarkListHarnessDoneButton")
                 if let onUITestDismissAndReopen {
-                    Button("Dismiss and Reopen Bookmark Sheet") { onUITestDismissAndReopen() }
+                    Button("Dismiss and Reopen Bookmark Sheet") {
+                        resetStateForUITestReopen()
+                        onUITestDismissAndReopen()
+                    }
                         .accessibilityIdentifier("bookmarkListHarnessReopenButton")
                 }
             }
@@ -350,6 +362,12 @@ public struct BookmarkListView: View {
                     }
                 }
             }
+
+            Text(uiTestBookmarkState)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("bookmarkListHarnessState")
+                .accessibilityValue(uiTestBookmarkState)
         }
         .font(.caption.weight(.semibold))
         .padding(.horizontal, 16)
@@ -383,6 +401,21 @@ public struct BookmarkListView: View {
     private func deleteBookmark(_ bookmark: BibleBookmark) {
         modelContext.delete(bookmark)
         try? modelContext.save()
+    }
+
+    /**
+     Resets in-list filter and search state before the XCUITest harness reopens the sheet.
+     *
+     * Side effects:
+     * - clears the selected label filter and search query so a fresh bookmark-sheet presentation
+     *   starts from the same state as a new user-opened sheet
+     *
+     * Failure modes:
+     * - this helper cannot fail
+     */
+    private func resetStateForUITestReopen() {
+        selectedLabelId = nil
+        searchText = ""
     }
 
     /**

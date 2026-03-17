@@ -197,6 +197,7 @@ public struct HistoryView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("historyHarnessState")
+                .accessibilityValue(uiTestHistoryState)
         }
         .font(.caption.weight(.semibold))
         .padding(.horizontal, 16)

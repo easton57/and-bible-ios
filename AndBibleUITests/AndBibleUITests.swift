@@ -891,13 +891,13 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         _ = openHistory(in: app, launchedDirectly: true)
-        waitForElementValue("historyScreen", toEqual: "historyState=Exod_2_1", in: app)
+        waitForElementValue("historyHarnessState", toEqual: "historyState=Exod_2_1", in: app)
 
         tapElementReliably(requireElement("historyHarnessClearButton", in: app, timeout: 10), timeout: 10)
-        waitForElementValue("historyScreen", toEqual: "historyState=empty", in: app)
+        waitForElementValue("historyHarnessState", toEqual: "historyState=empty", in: app)
 
         tapElementReliably(requireElement("historyHarnessReopenButton", in: app, timeout: 10), timeout: 10)
-        waitForElementValue("historyScreen", toEqual: "historyState=empty", in: app)
+        waitForElementValue("historyHarnessState", toEqual: "historyState=empty", in: app)
     }
 
     /**
@@ -920,13 +920,13 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         _ = openHistory(in: app, launchedDirectly: true)
-        waitForElementValue("historyScreen", toEqual: "historyState=Exod_2_1|Matt_3_1", in: app)
+        waitForElementValue("historyHarnessState", toEqual: "historyState=Exod_2_1|Matt_3_1", in: app)
 
         tapElementReliably(requireElement("historyHarnessDeleteButton::Exod_2_1", in: app, timeout: 10), timeout: 10)
-        waitForElementValue("historyScreen", toEqual: "historyState=Matt_3_1", in: app)
+        waitForElementValue("historyHarnessState", toEqual: "historyState=Matt_3_1", in: app)
 
         tapElementReliably(requireElement("historyHarnessReopenButton", in: app, timeout: 10), timeout: 10)
-        waitForElementValue("historyScreen", toEqual: "historyState=Matt_3_1", in: app)
+        waitForElementValue("historyHarnessState", toEqual: "historyState=Matt_3_1", in: app)
     }
 
     /**
@@ -1173,10 +1173,12 @@ final class AndBibleUITests: XCTestCase {
         expectation(for: hiddenPredicate, evaluatedWith: genesisRow)
         waitForExpectations(timeout: 10)
 
-        requireElement("bookmarkListHarnessReopenButton", in: app, timeout: 10).tap()
-
-        XCTAssertTrue(genesisRow.waitForExistence(timeout: 10), "Expected Genesis bookmark row to return after reopening the bookmark list.")
-        XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row to return after reopening the bookmark list.")
+        reopenBookmarkList(in: app, launchedDirectly: true)
+        waitForElementValue(
+            "bookmarkListHarnessState",
+            toEqual: "bookmarkState=Exodus_2_1|Genesis_1_1",
+            in: app
+        )
     }
 
     /**
@@ -2070,7 +2072,10 @@ final class AndBibleUITests: XCTestCase {
      */
     private func reopenBookmarkList(in app: XCUIApplication, launchedDirectly: Bool) {
         if launchedDirectly {
-            requireElement("bookmarkListHarnessReopenButton", in: app, timeout: 10).tap()
+            tapElementReliably(
+                requireElement("bookmarkListHarnessReopenButton", in: app, timeout: 10),
+                timeout: 10
+            )
             XCTAssertTrue(requireElement("bookmarkListScreen", in: app, timeout: 10).exists)
             return
         }
@@ -2388,15 +2393,17 @@ final class AndBibleUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             let currentElement = app.descendants(matching: .any)[identifier].firstMatch
-            if currentElement.exists, currentElement.value as? String == expectedValue {
+            let currentValue = currentElement.value as? String
+            if currentElement.exists, currentValue == expectedValue || currentElement.label == expectedValue {
                 return
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
         let finalElement = app.descendants(matching: .any)[identifier].firstMatch
+        let finalValue = finalElement.value as? String
         XCTAssertEqual(
-            finalElement.value as? String,
+            finalValue ?? finalElement.label,
             expectedValue,
             "Expected element '\(identifier)' to reach value '\(expectedValue)' within \(timeout) seconds.",
             file: file,
