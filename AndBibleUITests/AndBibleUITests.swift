@@ -720,15 +720,19 @@ final class AndBibleUITests: XCTestCase {
         searchField.tap()
         searchField.typeText("Matthew")
 
-        let hiddenPredicate = NSPredicate(format: "exists == false")
-        expectation(for: hiddenPredicate, evaluatedWith: exodusRow)
-        waitForExpectations(timeout: 10)
-        XCTAssertTrue(matthewRow.exists, "Expected Matthew bookmark row to remain visible for the active search query.")
+        waitForElementValue(
+            "bookmarkListHarnessState",
+            toEqual: "bookmarkState=Matthew_3_1",
+            in: app
+        )
 
         replaceText(in: searchField, with: "")
 
-        XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row to return after clearing the search query.")
-        XCTAssertTrue(matthewRow.waitForExistence(timeout: 10), "Expected Matthew bookmark row to remain visible after clearing the search query.")
+        waitForElementValue(
+            "bookmarkListHarnessState",
+            toEqual: "bookmarkState=Exodus_2_1|Matthew_3_1",
+            in: app
+        )
     }
 
     /**
@@ -891,7 +895,10 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         _ = openHistory(in: app, launchedDirectly: true)
-        waitForElementValue("historyHarnessState", toEqual: "historyState=Exod_2_1", in: app)
+        XCTAssertTrue(
+            app.buttons["historyRow::Exod_2_1"].firstMatch.waitForExistence(timeout: 10),
+            "Expected seeded Exodus history row to exist before clearing History."
+        )
 
         tapElementReliably(requireElement("historyHarnessClearButton", in: app, timeout: 10), timeout: 10)
         waitForElementValue("historyHarnessState", toEqual: "historyState=empty", in: app)
@@ -920,7 +927,14 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         _ = openHistory(in: app, launchedDirectly: true)
-        waitForElementValue("historyHarnessState", toEqual: "historyState=Exod_2_1|Matt_3_1", in: app)
+        XCTAssertTrue(
+            app.buttons["historyRow::Exod_2_1"].firstMatch.waitForExistence(timeout: 10),
+            "Expected seeded Exodus history row to exist before deleting it."
+        )
+        XCTAssertTrue(
+            app.buttons["historyRow::Matt_3_1"].firstMatch.waitForExistence(timeout: 10),
+            "Expected seeded Matthew history row to exist before deleting Exodus."
+        )
 
         tapElementReliably(requireElement("historyHarnessDeleteButton::Exod_2_1", in: app, timeout: 10), timeout: 10)
         waitForElementValue("historyHarnessState", toEqual: "historyState=Matt_3_1", in: app)
@@ -1077,10 +1091,12 @@ final class AndBibleUITests: XCTestCase {
         replaceText(in: nameField, with: newLabelName)
         app.buttons["Create"].firstMatch.tap()
 
-        let newLabelRow = requireElement("labelAssignmentRow::\(newLabelSegment)", in: app, timeout: 10)
-        let assignedPredicate = NSPredicate(format: "value == %@", "assigned,notFavourite")
-        expectation(for: assignedPredicate, evaluatedWith: newLabelRow)
-        waitForExpectations(timeout: 10)
+        _ = requireElement("labelAssignmentRow::\(newLabelSegment)", in: app, timeout: 10)
+        waitForElementValue(
+            "labelAssignmentHarnessState",
+            toEqual: "labelAssignmentState=\(newLabelSegment)",
+            in: app
+        )
 
         requireElement("labelAssignmentDoneButton", in: app, timeout: 10).tap()
         XCTAssertTrue(requireElement("bookmarkListScreen", in: app, timeout: 10).exists)

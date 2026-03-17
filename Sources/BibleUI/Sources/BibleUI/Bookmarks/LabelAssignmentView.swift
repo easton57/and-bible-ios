@@ -53,9 +53,24 @@ struct LabelAssignmentView: View {
     /// Whether the target bookmark is a `GenericBookmark` instead of a `BibleBookmark`.
     @State private var isGenericBookmark = false
 
+    /// Test-only flag exposing deterministic state exports during XCUITest runs.
+    private let uiTestUsesInMemoryStores = ProcessInfo.processInfo.arguments.contains("UITEST_USE_IN_MEMORY_STORES")
+
     /// User-created labels that may be assigned in this UI.
     private var userLabels: [BibleCore.Label] {
         allLabels.filter { $0.isRealLabel }
+    }
+
+    /// Stable XCUITest-only export of the currently assigned user labels.
+    private var uiTestAssignmentState: String {
+        let assignedSegments = userLabels
+            .filter { assignedLabelIds.contains($0.id) }
+            .map(\.name)
+            .map(sanitizedAccessibilitySegment(_:))
+            .sorted()
+        return assignedSegments.isEmpty
+            ? "labelAssignmentState=empty"
+            : "labelAssignmentState=\(assignedSegments.joined(separator: "|"))"
     }
 
     /// Builds the label-assignment list, toolbar, and create-label alert.
@@ -133,6 +148,15 @@ struct LabelAssignmentView: View {
             Button("Cancel", role: .cancel) { newLabelName = "" }
         }
         .onAppear { loadAssignedLabels() }
+        .safeAreaInset(edge: .bottom) {
+            if uiTestUsesInMemoryStores {
+                Text(uiTestAssignmentState)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("labelAssignmentHarnessState")
+                    .accessibilityValue(uiTestAssignmentState)
+            }
+        }
     }
 
     /**
