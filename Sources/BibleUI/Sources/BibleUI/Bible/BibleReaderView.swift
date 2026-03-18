@@ -186,6 +186,9 @@ public struct BibleReaderView: View {
     /// Exported XCUITest-only StudyPad note workflow state used to diagnose shell-backed note creation.
     @State private var uiTestStudyPadNoteState = "idle"
 
+    /// Exported XCUITest-only StudyPad presentation state used to gate safe presentation assertions.
+    @State private var uiTestStudyPadPresentationState = "idle"
+
     /// Exported XCUITest-only My Notes note workflow state used to diagnose shell-backed note mutation.
     @State private var uiTestMyNotesNoteState = "idle"
 
@@ -735,6 +738,9 @@ public struct BibleReaderView: View {
                     Text("studyPadNoteState")
                         .accessibilityIdentifier("uiTestStudyPadNoteState")
                         .accessibilityValue(uiTestStudyPadNoteState)
+                    Text("studyPadPresentationState")
+                        .accessibilityIdentifier("uiTestStudyPadPresentationState")
+                        .accessibilityValue(uiTestStudyPadPresentationState)
                     Text("myNotesNoteState")
                         .accessibilityIdentifier("uiTestMyNotesNoteState")
                         .accessibilityValue(uiTestMyNotesNoteState)
@@ -788,8 +794,7 @@ public struct BibleReaderView: View {
                         )
                     },
                     onOpenStudyPad: { labelId in
-                        showBookmarks = false
-                        focusedController?.loadStudyPadDocument(labelId: labelId)
+                        openStudyPadForUITests(labelId: labelId)
                     },
                     onUITestDismissAndReopen: uiTestUsesInMemoryStores && uiTestOpensBookmarksOnLaunch
                         ? reopenBookmarksForUITests
@@ -2733,6 +2738,44 @@ public struct BibleReaderView: View {
         uiTestStudyPadNoteState = refreshedEntries.contains(where: {
             $0.id == entry.id && $0.textEntry?.text == noteText
         }) ? "created:\(noteStateToken)" : "failed:verify"
+    }
+
+    /**
+     Opens one StudyPad document and exports deterministic presentation state for XCUITests.
+     *
+     * - Parameter labelId: Label whose StudyPad should become active.
+     * - Side effects:
+     *   - dismisses the bookmark sheet before routing into StudyPad
+     *   - requests StudyPad presentation from the focused controller
+     *   - exports `opening`, `presented`, or `failed:*` state for deterministic UI assertions
+     *
+     * - Failure modes:
+     *   - exports `failed:missingController` when no focused controller exists
+     *   - exports `failed:openTimeout` when StudyPad never reports as visible
+     */
+    private func openStudyPadForUITests(labelId: UUID) {
+        guard let controller = focusedController else {
+            uiTestStudyPadPresentationState = "failed:missingController"
+            return
+        }
+
+        uiTestStudyPadPresentationState = "opening"
+        showBookmarks = false
+
+        Task { @MainActor in
+            await Task.yield()
+            controller.loadStudyPadDocument(labelId: labelId)
+
+            for _ in 0..<100 {
+                if controller.showingStudyPad {
+                    uiTestStudyPadPresentationState = "presented"
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+
+            uiTestStudyPadPresentationState = "failed:openTimeout"
+        }
     }
 
     /**

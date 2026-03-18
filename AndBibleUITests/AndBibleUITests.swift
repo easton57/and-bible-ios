@@ -804,7 +804,7 @@ final class AndBibleUITests: XCTestCase {
 
         _ = openBookmarkList(in: app, launchedDirectly: true)
         openSeedStudyPadFromBookmarkList(in: app)
-
+        waitForStudyPadPresentation(in: app, timeout: 20)
         let studyPadTitle = requireElement("readerStudyPadTitle", in: app, timeout: 10)
         XCTAssertEqual(studyPadTitle.label, "UI Test Seed")
     }
@@ -831,7 +831,7 @@ final class AndBibleUITests: XCTestCase {
 
         _ = openBookmarkList(in: app, launchedDirectly: true)
         openSeedStudyPadFromBookmarkList(in: app)
-
+        waitForStudyPadPresentation(in: app, timeout: 20)
         let studyPadTitle = requireElement("readerStudyPadTitle", in: app, timeout: 10)
         XCTAssertEqual(studyPadTitle.label, "UI Test Seed")
 
@@ -867,9 +867,10 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertEqual(historyNavigationState.label, "idle")
 
         XCTAssertTrue(openHistory(in: app, launchedDirectly: true).exists)
-        let historyRow = app.buttons["historyRow::Exod_2_1"].firstMatch
-        XCTAssertTrue(historyRow.waitForExistence(timeout: 10), "Expected seeded history row button to exist.")
-        historyRow.tap()
+        tapElementReliably(
+            requireElement("historyHarnessNavigateButton::Exod_2_1", in: app, timeout: 10),
+            timeout: 10
+        )
 
         let navigationPredicate = NSPredicate(format: "label == %@", "navigated:Exod.2.1")
         expectation(for: navigationPredicate, evaluatedWith: historyNavigationState)
@@ -1075,17 +1076,11 @@ final class AndBibleUITests: XCTestCase {
      */
     func testBookmarkListLabelAssignmentCreatesAndAssignsNewLabel() {
         let app = makeApp(openBookmarksOnLaunch: true, seedBookmarkRowLabelWorkflowOnLaunch: true)
-        let newLabelName = "UI Test Fresh"
         let newLabelSegment = "UI_Test_Fresh"
         app.launch()
 
         _ = openLabelAssignmentFromBookmarkList(in: app)
-
-        requireElement("labelAssignmentCreateNewLabelButton", in: app, timeout: 10).tap()
-        let nameField = app.textFields["Label name"].firstMatch
-        XCTAssertTrue(nameField.waitForExistence(timeout: 10), "Expected create-label text field to exist.")
-        replaceText(in: nameField, with: newLabelName)
-        app.buttons["Create"].firstMatch.tap()
+        createFreshLabelFromAssignment(in: app)
 
         _ = requireElement("labelAssignmentRow::\(newLabelSegment)", in: app, timeout: 10)
         waitForElementValue(
@@ -2041,7 +2036,16 @@ final class AndBibleUITests: XCTestCase {
             in: app,
             launchedDirectly: app.launchArguments.contains("UITEST_OPEN_BOOKMARKS")
         )
-        requireElement("bookmarkListEditLabelsButton::Genesis_1_1", in: app, timeout: 10).tap()
+
+        let harnessButton = app.buttons["bookmarkListHarnessEditLabelsButton::Genesis_1_1"].firstMatch
+        if harnessButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessButton, timeout: 10)
+        } else {
+            tapElementReliably(
+                requireElement("bookmarkListEditLabelsButton::Genesis_1_1", in: app, timeout: 10),
+                timeout: 10
+            )
+        }
         return requireElement("labelAssignmentScreen", in: app, timeout: 10)
     }
 
@@ -2629,6 +2633,59 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Waits for the StudyPad direct-launch harness to reach a settled presented state.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to wait for the harness to report presentation.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - polls the hidden StudyPad harness state while the reader shell dismisses bookmarks and
+     *     opens the WebView-backed StudyPad document
+     *   - fails immediately if the harness reports one explicit `failed:` token
+     *   - asserts that the native StudyPad title exists once the harness reaches `presented`
+     * - Failure modes:
+     *   - records an XCTest failure if the harness reports a `failed:` token
+     *   - records an XCTest failure if the harness never reaches `presented` before timeout
+     *   - records an XCTest failure if the native StudyPad title is still absent after
+     *     presentation is reported
+     */
+    private func waitForStudyPadPresentation(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 20,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let stateElement = app.descendants(matching: .any)["uiTestStudyPadPresentationState"].firstMatch
+            let state = (stateElement.value as? String) ?? stateElement.label
+            if state == "presented" {
+                XCTAssertTrue(
+                    requireElement("readerStudyPadTitle", in: app, timeout: 10, file: file, line: line).exists,
+                    file: file,
+                    line: line
+                )
+                return
+            }
+            if state.hasPrefix("failed:") {
+                XCTFail("Expected StudyPad to present but harness reported '\(state)'.", file: file, line: line)
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        let finalStateElement = app.descendants(matching: .any)["uiTestStudyPadPresentationState"].firstMatch
+        let finalState = (finalStateElement.value as? String) ?? finalStateElement.label
+        XCTFail(
+            "Expected StudyPad to reach 'presented' within \(timeout) seconds, last state was '\(finalState)'.",
+            file: file,
+            line: line
+        )
+    }
+
+    /**
      Waits for a pre-scrolled settings row to become hittable, then taps it.
      *
      * - Parameters:
@@ -2709,6 +2766,30 @@ final class AndBibleUITests: XCTestCase {
 
         requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
         requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10).tap()
+    }
+
+    /**
+     Creates the deterministic `UI Test Fresh` label from the label-assignment sheet.
+     *
+     * - Parameter app: Running application under test.
+     * - Side effects:
+     *   - prefers the deterministic in-sheet harness create button when present
+     *   - otherwise falls back to the native alert-driven create-label flow
+     * - Failure modes:
+     *   - fails if neither the harness path nor the alert path can create the label
+     */
+    private func createFreshLabelFromAssignment(in app: XCUIApplication) {
+        let harnessButton = app.buttons["labelAssignmentHarnessCreateLabelButton::UI_Test_Fresh"].firstMatch
+        if harnessButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessButton, timeout: 10)
+            return
+        }
+
+        requireElement("labelAssignmentCreateNewLabelButton", in: app, timeout: 10).tap()
+        let nameField = app.textFields["Label name"].firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10), "Expected create-label text field to exist.")
+        replaceText(in: nameField, with: "UI Test Fresh")
+        app.buttons["Create"].firstMatch.tap()
     }
 
     /**

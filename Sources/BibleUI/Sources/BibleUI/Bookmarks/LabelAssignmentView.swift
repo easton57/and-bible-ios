@@ -150,11 +150,19 @@ struct LabelAssignmentView: View {
         .onAppear { loadAssignedLabels() }
         .safeAreaInset(edge: .bottom) {
             if uiTestUsesInMemoryStores {
-                Text(uiTestAssignmentState)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("labelAssignmentHarnessState")
-                    .accessibilityValue(uiTestAssignmentState)
+                VStack(spacing: 8) {
+                    Button("Create Fresh Label") {
+                        createAndAssignLabel(named: "UI Test Fresh")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("labelAssignmentHarnessCreateLabelButton::UI_Test_Fresh")
+
+                    Text(uiTestAssignmentState)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("labelAssignmentHarnessState")
+                        .accessibilityValue(uiTestAssignmentState)
+                }
             }
         }
     }
@@ -346,11 +354,39 @@ struct LabelAssignmentView: View {
     /// Creates a new label and immediately assigns it to the active bookmark.
     private func createAndAssignLabel() {
         guard !newLabelName.isEmpty else { return }
-        logger.info("createAndAssignLabel: name=\(newLabelName)")
-        let label = BibleCore.Label(name: newLabelName)
-        modelContext.insert(label)
-        // Save the label first so SwiftData can establish relationships
-        try? modelContext.save()
+        createAndAssignLabel(named: newLabelName)
+        newLabelName = ""
+    }
+
+    /**
+     Creates or reuses one label by name and immediately assigns it to the active bookmark.
+     *
+     * - Parameter name: User-visible label name that should exist and be assigned after the helper runs.
+     * - Side effects:
+     *   - inserts and saves one label when no existing label matches `name`
+     *   - creates one bookmark-to-label relationship for the active bookmark when needed
+     *   - updates local assigned-label state immediately after persistence
+     *
+     * - Failure modes:
+     *   - returns without mutation when `name` is empty or the target bookmark cannot be fetched
+     */
+    private func createAndAssignLabel(named name: String) {
+        guard !name.isEmpty else { return }
+        logger.info("createAndAssignLabel: name=\(name)")
+
+        let label: BibleCore.Label
+        if let existingLabel = userLabels.first(where: { $0.name == name }) {
+            label = existingLabel
+        } else {
+            let createdLabel = BibleCore.Label(name: name)
+            modelContext.insert(createdLabel)
+            try? modelContext.save()
+            label = createdLabel
+        }
+
+        if assignedLabelIds.contains(label.id) {
+            return
+        }
 
         if isGenericBookmark {
             if let bookmark = fetchGenericBookmark() {
@@ -372,6 +408,5 @@ struct LabelAssignmentView: View {
             }
         }
         try? modelContext.save()
-        newLabelName = ""
     }
 }

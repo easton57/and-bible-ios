@@ -138,6 +138,11 @@ public struct BookmarkListView: View {
         return refs.isEmpty ? "bookmarkState=empty" : "bookmarkState=\(refs.joined(separator: "|"))"
     }
 
+    /// Seeded `Genesis 1:1` bookmark used by multiple direct-launch bookmark harness workflows.
+    private var uiTestSeedBookmark: BibleBookmark? {
+        filteredBookmarks.first(where: { Self.verseReference(for: $0) == "Genesis 1:1" })
+    }
+
     /**
      Builds the bookmark list screen, empty state, and related sheets.
      */
@@ -361,6 +366,14 @@ public struct BookmarkListView: View {
                         .accessibilityIdentifier("bookmarkListHarnessOpenStudyPadButton::UI_Test_Seed")
                     }
                 }
+            }
+
+            if let seedBookmark = uiTestSeedBookmark {
+                Button("Edit Labels") {
+                    editingLabelsBookmarkId = seedBookmark.id
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("bookmarkListHarnessEditLabelsButton::Genesis_1_1")
             }
 
             Text(uiTestBookmarkState)

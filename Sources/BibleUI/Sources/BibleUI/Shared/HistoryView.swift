@@ -207,6 +207,13 @@ public struct HistoryView: View {
                 ? uiTestHarnessKeys.contains("Exod.2.1")
                 : uiTestHistoryItems.contains(where: { $0.key == "Exod.2.1" }) {
                 HStack(spacing: 8) {
+                    Button("Go Exodus") {
+                        onNavigate?("Exod.2.1")
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("historyHarnessNavigateButton::Exod_2_1")
+
                     Button("Delete Exodus") {
                         deleteUITestHistoryItems(matchingKey: "Exod.2.1")
                     }
