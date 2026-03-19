@@ -130,6 +130,35 @@ def assign_cases_to_shards(cases: Sequence[UITestCase], *, shard_count: int) -> 
     return shards
 
 
+def choose_shard_count(
+    cases: Sequence[UITestCase],
+    *,
+    minimum_shard_count: int,
+    target_shard_duration_seconds: float | None,
+    maximum_shard_count: int | None,
+) -> int:
+    """Choose one effective shard count from suite size and runtime budget."""
+    if minimum_shard_count <= 0:
+        raise ValueError("Minimum shard count must be positive.")
+    if maximum_shard_count is not None and maximum_shard_count <= 0:
+        raise ValueError("Maximum shard count must be positive when provided.")
+    if target_shard_duration_seconds is not None and target_shard_duration_seconds <= 0:
+        raise ValueError("Target shard duration must be positive when provided.")
+    if not cases:
+        raise ValueError("At least one UI test case is required.")
+
+    shard_count = minimum_shard_count
+    if target_shard_duration_seconds is not None:
+        total_estimated_seconds = sum(case.estimated_seconds for case in cases)
+        shard_count = max(
+            shard_count,
+            math.ceil(total_estimated_seconds / target_shard_duration_seconds),
+        )
+    if maximum_shard_count is not None:
+        shard_count = min(shard_count, maximum_shard_count)
+    return min(shard_count, len(cases))
+
+
 def build_matrix(
     shards: Sequence[Sequence[UITestCase]],
     *,
@@ -176,6 +205,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--test-file", required=True, type=Path)
     parser.add_argument("--timings-file", type=Path)
     parser.add_argument("--shard-count", type=int, default=2)
+    parser.add_argument("--target-shard-duration-seconds", type=float)
+    parser.add_argument("--max-shard-count", type=int)
     parser.add_argument("--default-duration-seconds", type=float, default=60.0)
     parser.add_argument("--timeout-minutes", type=int, default=90)
     parser.add_argument("--test-target", default="AndBibleUITests")
@@ -208,7 +239,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         timings,
         default_duration_seconds=args.default_duration_seconds,
     )
-    shards = assign_cases_to_shards(cases, shard_count=args.shard_count)
+    effective_shard_count = choose_shard_count(
+        cases,
+        minimum_shard_count=args.shard_count,
+        target_shard_duration_seconds=args.target_shard_duration_seconds,
+        maximum_shard_count=args.max_shard_count,
+    )
+    shards = assign_cases_to_shards(cases, shard_count=effective_shard_count)
     matrix = build_matrix(shards, timeout_minutes=args.timeout_minutes)
     matrix_json = json.dumps(matrix, separators=(",", ":"), sort_keys=True)
 

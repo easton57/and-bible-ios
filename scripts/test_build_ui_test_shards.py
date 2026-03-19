@@ -9,6 +9,7 @@ from build_ui_test_shards import (
     assign_cases_to_shards,
     build_matrix,
     build_ui_test_cases,
+    choose_shard_count,
     discover_ui_test_identifiers,
     load_timing_manifest,
 )
@@ -105,6 +106,52 @@ class BuildUITestShardsTests(unittest.TestCase):
             "-only-testing:AndBibleUITests/AndBibleUITests/testAlpha\n"
             "-only-testing:AndBibleUITests/AndBibleUITests/testBeta",
         )
+
+    def test_choose_shard_count_expands_from_runtime_target(self) -> None:
+        identifiers = [
+            "AndBibleUITests/AndBibleUITests/testAlpha",
+            "AndBibleUITests/AndBibleUITests/testBeta",
+            "AndBibleUITests/AndBibleUITests/testGamma",
+        ]
+        timings = {
+            "AndBibleUITests/AndBibleUITests/testAlpha": 300.0,
+            "AndBibleUITests/AndBibleUITests/testBeta": 300.0,
+            "AndBibleUITests/AndBibleUITests/testGamma": 300.0,
+        }
+        cases = build_ui_test_cases(identifiers, timings, default_duration_seconds=60.0)
+
+        shard_count = choose_shard_count(
+            cases,
+            minimum_shard_count=2,
+            target_shard_duration_seconds=400.0,
+            maximum_shard_count=None,
+        )
+
+        self.assertEqual(shard_count, 3)
+
+    def test_choose_shard_count_respects_maximum(self) -> None:
+        identifiers = [
+            "AndBibleUITests/AndBibleUITests/testAlpha",
+            "AndBibleUITests/AndBibleUITests/testBeta",
+            "AndBibleUITests/AndBibleUITests/testGamma",
+            "AndBibleUITests/AndBibleUITests/testDelta",
+        ]
+        timings = {
+            "AndBibleUITests/AndBibleUITests/testAlpha": 300.0,
+            "AndBibleUITests/AndBibleUITests/testBeta": 300.0,
+            "AndBibleUITests/AndBibleUITests/testGamma": 300.0,
+            "AndBibleUITests/AndBibleUITests/testDelta": 300.0,
+        }
+        cases = build_ui_test_cases(identifiers, timings, default_duration_seconds=60.0)
+
+        shard_count = choose_shard_count(
+            cases,
+            minimum_shard_count=2,
+            target_shard_duration_seconds=200.0,
+            maximum_shard_count=3,
+        )
+
+        self.assertEqual(shard_count, 3)
 
     def test_assign_cases_to_shards_does_not_emit_empty_shards(self) -> None:
         identifiers = [

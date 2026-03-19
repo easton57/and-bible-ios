@@ -11,7 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  UI_TEST_SHARD_COUNT: "2"
+  UI_TEST_MIN_SHARD_COUNT: "2"
+  UI_TEST_TARGET_SHARD_DURATION_SECONDS: "600"
   UI_TEST_TIMEOUT_MINUTES: "90"
   UI_TEST_TIMINGS_FILE: scripts/ui_test_timings.json
 
@@ -95,7 +96,8 @@ jobs:
           python3 scripts/build_ui_test_shards.py
           --test-file AndBibleUITests/AndBibleUITests.swift
           --timings-file "${UI_TEST_TIMINGS_FILE}"
-          --shard-count "${UI_TEST_SHARD_COUNT}"
+          --shard-count "${UI_TEST_MIN_SHARD_COUNT}"
+          --target-shard-duration-seconds "${UI_TEST_TARGET_SHARD_DURATION_SECONDS}"
           --timeout-minutes "${UI_TEST_TIMEOUT_MINUTES}"
           --github-output "${GITHUB_OUTPUT}"
 
