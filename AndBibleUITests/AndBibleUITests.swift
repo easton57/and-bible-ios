@@ -625,9 +625,14 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertEqual(currentReferenceState.label, "Genesis 1")
 
         _ = openBookmarkList(in: app, launchedDirectly: true)
-        let bookmarkRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
-        XCTAssertTrue(bookmarkRow.waitForExistence(timeout: 10), "Expected seeded bookmark row button to exist.")
-        bookmarkRow.tap()
+        let harnessButton = app.buttons["bookmarkListHarnessNavigateButton::Exodus_2_1"].firstMatch
+        if harnessButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessButton, timeout: 10)
+        } else {
+            let bookmarkRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
+            XCTAssertTrue(bookmarkRow.waitForExistence(timeout: 10), "Expected seeded bookmark row button to exist.")
+            tapElementReliably(bookmarkRow, timeout: 10)
+        }
 
         waitForElementValue("uiTestBookmarkNavigationState", toEqual: "navigated:Exodus.2", in: app)
         XCTAssertEqual(currentReferenceState.label, "Exodus 2")

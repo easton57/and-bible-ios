@@ -143,6 +143,11 @@ public struct BookmarkListView: View {
         filteredBookmarks.first(where: { Self.verseReference(for: $0) == "Genesis 1:1" })
     }
 
+    /// Seeded `Exodus 2:1` bookmark used by the direct-launch bookmark navigation workflow.
+    private var uiTestNavigationBookmark: BibleBookmark? {
+        filteredBookmarks.first(where: { Self.verseReference(for: $0) == "Exodus 2:1" })
+    }
+
     /**
      Builds the bookmark list screen, empty state, and related sheets.
      */
@@ -374,6 +379,16 @@ public struct BookmarkListView: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("bookmarkListHarnessEditLabelsButton::Genesis_1_1")
+            }
+
+            if let navigationBookmark = uiTestNavigationBookmark {
+                Button("Open Exodus 2") {
+                    let chapter = navigationBookmark.ordinalStart / 40 + 1
+                    let bookName = navigationBookmark.book ?? "Genesis"
+                    onNavigate?(bookName, chapter)
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("bookmarkListHarnessNavigateButton::Exodus_2_1")
             }
 
             Text(uiTestBookmarkState)
