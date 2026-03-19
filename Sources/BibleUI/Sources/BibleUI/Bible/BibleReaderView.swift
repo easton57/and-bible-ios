@@ -596,21 +596,24 @@ public struct BibleReaderView: View {
                             .accessibilityIdentifier("uiTestReopenMyNotesButton")
                         }
 
-                        if focusedController?.showingStudyPad == true {
-                            Button("Create StudyPad Note") {
-                                createUITestStudyPadNote()
-                            }
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .accessibilityIdentifier("uiTestCreateStudyPadNoteButton")
-                        }
                     }
                     .padding(.top, 12)
                     .padding(.trailing, 12)
                     .zIndex(10)
                 }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if uiTestUsesInMemoryStores, focusedController?.showingStudyPad == true {
+                Button("Create StudyPad Note") {
+                    createUITestStudyPadNote()
+                }
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.thinMaterial)
+                .accessibilityIdentifier("uiTestCreateStudyPadNoteButton")
             }
         }
         .animation(.easeInOut(duration: 0.25), value: toastMessage)

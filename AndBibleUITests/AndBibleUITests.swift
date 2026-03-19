@@ -156,7 +156,7 @@ final class AndBibleUITests: XCTestCase {
             "Expected bundled whole-Bible hits for 'jesus', got '\(wholeBibleState)'."
         )
 
-        tapButtonLabeled("OT", in: app)
+        tapSearchScope(.oldTestament, in: app)
         waitForSearchState(on: searchScreen, containing: "scope=oldTestament", timeout: 120)
 
         let oldTestamentState = searchScreen.value as? String ?? ""
@@ -170,7 +170,7 @@ final class AndBibleUITests: XCTestCase {
             "Expected no Old Testament hits for 'jesus', got '\(oldTestamentState)'."
         )
 
-        tapButtonLabeled("NT", in: app)
+        tapSearchScope(.newTestament, in: app)
         waitForSearchState(on: searchScreen, containing: "scope=newTestament", timeout: 120)
 
         let newTestamentState = searchScreen.value as? String ?? ""
@@ -847,7 +847,10 @@ final class AndBibleUITests: XCTestCase {
         let studyPadTitle = requireElement("readerStudyPadTitle", in: app, timeout: 10)
         XCTAssertEqual(studyPadTitle.label, "UI Test Seed")
 
-        requireElement("uiTestCreateStudyPadNoteButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("uiTestCreateStudyPadNoteButton", in: app, timeout: 10),
+            timeout: 10
+        )
         waitForElementValue(
             "uiTestStudyPadNoteState",
             toEqual: "created:UI_Test_StudyPad_Note",
@@ -1170,27 +1173,36 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         _ = openBookmarkList(in: app, launchedDirectly: true)
+        waitForElementValue(
+            "bookmarkListHarnessState",
+            toEqual: "bookmarkState=Exodus_2_1|Genesis_1_1",
+            in: app
+        )
+
         let searchField = app.searchFields.firstMatch
         XCTAssertTrue(searchField.waitForExistence(timeout: 10), "Expected bookmark search field to exist.")
 
-        let genesisRow = app.buttons["bookmarkListRowButton::Genesis_1_1"].firstMatch
-        let exodusRow = app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch
-        XCTAssertTrue(genesisRow.waitForExistence(timeout: 10), "Expected Genesis bookmark row button to exist.")
-        XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row button to exist.")
+        let seedFilterButton = app.buttons["bookmarkListHarnessFilterChip::UI_Test_Seed"].firstMatch
+        if seedFilterButton.waitForExistence(timeout: 1) {
+            tapElementReliably(seedFilterButton, timeout: 10)
+        } else {
+            tapElementReliably(
+                requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10),
+                timeout: 10
+            )
+        }
+        waitForElementValue(
+            "bookmarkListHarnessState",
+            toEqual: "bookmarkState=Genesis_1_1",
+            in: app
+        )
 
-        requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
-
-        let hiddenPredicate = NSPredicate(format: "exists == false")
-        expectation(for: hiddenPredicate, evaluatedWith: exodusRow)
-        waitForExpectations(timeout: 10)
-        XCTAssertTrue(genesisRow.exists, "Expected Genesis bookmark row to remain under the seeded label filter.")
-
-        searchField.tap()
-        searchField.typeText("Exodus")
-        app.keyboards.buttons["Search"].firstMatch.tap()
-
-        expectation(for: hiddenPredicate, evaluatedWith: genesisRow)
-        waitForExpectations(timeout: 10)
+        replaceText(in: searchField, with: "Exodus")
+        waitForElementValue(
+            "bookmarkListHarnessState",
+            toEqual: "bookmarkState=empty",
+            in: app
+        )
 
         reopenBookmarkList(in: app, launchedDirectly: true)
         waitForElementValue(
@@ -1905,6 +1917,34 @@ final class AndBibleUITests: XCTestCase {
             "Expected visible button '\(label)' to exist within \(timeout) seconds."
         )
         tapElementReliably(button, timeout: timeout)
+    }
+
+    /**
+     Taps one Search scope button through its stable accessibility identifier.
+     *
+     * - Parameters:
+     *   - scopeToken: Stable Search scope token exported by `SearchView`.
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to wait for the scope button to exist and become
+     *     hittable.
+     * - Side effects:
+     *   - resolves the requested Search scope button from the accessibility hierarchy and taps
+     *     its center point directly
+     * - Failure modes:
+     *   - fails if the requested scope button never appears or never becomes hittable within the
+     *     allotted timeout
+     */
+    private func tapSearchScope(
+        _ scopeToken: SearchScopeToken,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10
+    ) {
+        let identifierElement = app.descendants(matching: .any)["searchScopeButton::\(scopeToken.rawValue)"].firstMatch
+        if identifierElement.waitForExistence(timeout: 1) {
+            tapElementReliably(identifierElement, timeout: timeout)
+            return
+        }
+        tapButtonLabeled(scopeToken.fallbackLabel, in: app, timeout: timeout)
     }
 
     /**
@@ -2781,6 +2821,23 @@ final class AndBibleUITests: XCTestCase {
 
         requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
         requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10).tap()
+    }
+
+    /**
+     Stable Search scope tokens mirrored from `SearchView` accessibility exports.
+     */
+    private enum SearchScopeToken: String {
+        case oldTestament
+        case newTestament
+
+        var fallbackLabel: String {
+            switch self {
+            case .oldTestament:
+                "OT"
+            case .newTestament:
+                "NT"
+            }
+        }
     }
 
     /**
