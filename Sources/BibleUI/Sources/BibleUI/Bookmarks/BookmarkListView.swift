@@ -391,6 +391,18 @@ public struct BookmarkListView: View {
                 .accessibilityIdentifier("bookmarkListHarnessNavigateButton::Exodus_2_1")
             }
 
+            if filteredBookmarks.contains(where: { Self.verseReference(for: $0) == "Exodus 2:1" }) {
+                Button("Delete Exodus 2") {
+                    if let exodusBookmark = filteredBookmarks.first(
+                        where: { Self.verseReference(for: $0) == "Exodus 2:1" }
+                    ) {
+                        deleteBookmark(exodusBookmark)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("bookmarkListHarnessDeleteButton::Exodus_2_1")
+            }
+
             Text(uiTestBookmarkState)
                 .font(.caption2)
                 .foregroundStyle(.secondary)

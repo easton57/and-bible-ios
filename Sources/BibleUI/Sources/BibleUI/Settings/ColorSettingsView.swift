@@ -168,5 +168,26 @@ public struct ColorSettingsView: View {
         .accessibilityIdentifier("colorSettingsScreen")
         .accessibilityValue(uiTestColorStateLabel)
         .navigationTitle(String(localized: "colors"))
+        .safeAreaInset(edge: .bottom) {
+            if uiTestUsesInMemoryStores {
+                VStack(spacing: 8) {
+                    Button("Reset Colors") {
+                        resetThemeColorsToDefaults()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("colorSettingsHarnessResetButton")
+
+                    Text(uiTestColorStateLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("colorSettingsHarnessState")
+                        .accessibilityValue(uiTestColorStateLabel)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.thinMaterial)
+            }
+        }
     }
 }

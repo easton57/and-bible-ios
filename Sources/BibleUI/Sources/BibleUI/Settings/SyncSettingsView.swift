@@ -568,7 +568,7 @@ public struct SyncSettingsView: View {
         let alternativeBackends = RemoteSyncBackend.allCases.filter { $0 != selectedBackend }
         VStack(alignment: .leading, spacing: 8) {
             if !alternativeBackends.isEmpty {
-                HStack(spacing: 8) {
+                VStack(spacing: 8) {
                     ForEach(alternativeBackends, id: \.self) { backend in
                         Button(syncBackendAutomationTitle(for: backend)) {
                             selectedBackend = backend
@@ -580,6 +580,25 @@ public struct SyncSettingsView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+            }
+
+            if selectedBackend == .nextCloud {
+                Button("Test NextCloud") {
+                    Task {
+                        await testRemoteConnection()
+                    }
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .accessibilityIdentifier("syncHarnessTestConnectionButton")
+
+                Text(remoteStatusAccessibilityValue)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .accessibilityIdentifier("syncHarnessRemoteStatus")
+                    .accessibilityValue(remoteStatusAccessibilityValue)
             }
 
             if !enabledCategories.isEmpty {

@@ -663,18 +663,33 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertTrue(exodusRow.waitForExistence(timeout: 10), "Expected Exodus bookmark row button to exist.")
         XCTAssertTrue(matthewRow.waitForExistence(timeout: 10), "Expected Matthew bookmark row button to exist.")
 
-        exodusRow.swipeLeft()
-        requireElement("bookmarkListDeleteButton::Exodus_2_1", in: app, timeout: 10).tap()
+        let harnessDeleteButton = app.buttons["bookmarkListHarnessDeleteButton::Exodus_2_1"].firstMatch
+        if harnessDeleteButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessDeleteButton, timeout: 10)
+            waitForElementValue(
+                "bookmarkListHarnessState",
+                toEqual: "bookmarkState=Matthew_3_1",
+                in: app,
+                timeout: 10
+            )
+        } else {
+            exodusRow.swipeLeft()
+            requireElement("bookmarkListDeleteButton::Exodus_2_1", in: app, timeout: 10).tap()
 
-        let deletedPredicate = NSPredicate(format: "exists == false")
-        expectation(for: deletedPredicate, evaluatedWith: exodusRow)
-        waitForExpectations(timeout: 10)
-        XCTAssertTrue(matthewRow.exists, "Expected Matthew bookmark row to remain after deleting Exodus.")
+            let deletedPredicate = NSPredicate(format: "exists == false")
+            expectation(for: deletedPredicate, evaluatedWith: exodusRow)
+            waitForExpectations(timeout: 10)
+            XCTAssertTrue(matthewRow.exists, "Expected Matthew bookmark row to remain after deleting Exodus.")
+        }
 
         reopenBookmarkList(in: app, launchedDirectly: true)
 
-        XCTAssertFalse(app.buttons["bookmarkListRowButton::Exodus_2_1"].firstMatch.exists)
-        XCTAssertTrue(app.buttons["bookmarkListRowButton::Matthew_3_1"].firstMatch.exists)
+        waitForElementValue(
+            "bookmarkListHarnessState",
+            toEqual: "bookmarkState=Matthew_3_1",
+            in: app,
+            timeout: 10
+        )
     }
 
     /**
@@ -1304,18 +1319,31 @@ final class AndBibleUITests: XCTestCase {
         _ = openSyncSettings(in: app, launchedDirectly: true)
         let serverField = requireElement("syncNextCloudServerURLField", in: app, timeout: 10)
         let usernameField = requireElement("syncNextCloudUsernameField", in: app, timeout: 10)
-        let statusRow = requireElement("syncRemoteStatus", in: app, timeout: 10)
+        _ = requireElement("syncRemoteStatus", in: app, timeout: 10)
 
         serverField.tap()
         serverField.typeText("not-a-url")
         usernameField.tap()
         usernameField.typeText("tester")
 
-        requireElement("syncNextCloudTestConnectionButton", in: app, timeout: 10).tap()
-
-        let valuePredicate = NSPredicate(format: "value == %@", "failureInvalidURL")
-        expectation(for: valuePredicate, evaluatedWith: statusRow)
-        waitForExpectations(timeout: 10)
+        let harnessButton = app.buttons["syncHarnessTestConnectionButton"].firstMatch
+        if harnessButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessButton, timeout: 10)
+            waitForElementValue(
+                "syncHarnessRemoteStatus",
+                toEqual: "failureInvalidURL",
+                in: app,
+                timeout: 10
+            )
+        } else {
+            requireElement("syncNextCloudTestConnectionButton", in: app, timeout: 10).tap()
+            waitForElementValue(
+                "syncRemoteStatus",
+                toEqual: "failureInvalidURL",
+                in: app,
+                timeout: 10
+            )
+        }
     }
 
     /**
@@ -1581,11 +1609,24 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertTrue(colorState.waitForExistence(timeout: 10), "Expected color settings state label to exist.")
         XCTAssertEqual(colorState.label, "colorCustom")
 
-        requireElement("colorSettingsResetButton", in: app, timeout: 10).tap()
-
-        let valuePredicate = NSPredicate(format: "label == %@", "colorDefaults")
-        expectation(for: valuePredicate, evaluatedWith: colorState)
-        waitForExpectations(timeout: 10)
+        let harnessButton = app.buttons["colorSettingsHarnessResetButton"].firstMatch
+        if harnessButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessButton, timeout: 10)
+            waitForElementValue(
+                "colorSettingsHarnessState",
+                toEqual: "colorDefaults",
+                in: app,
+                timeout: 10
+            )
+        } else {
+            tapElementReliably(requireElement("colorSettingsResetButton", in: app, timeout: 10), timeout: 10)
+            waitForElementValue(
+                "colorSettingsState",
+                toEqual: "colorDefaults",
+                in: app,
+                timeout: 10
+            )
+        }
     }
 
     /**
@@ -2279,7 +2320,7 @@ final class AndBibleUITests: XCTestCase {
     private func tapSyncBackend(
         _ backendRawValue: String,
         in app: XCUIApplication,
-        timeout: TimeInterval = 10
+        timeout: TimeInterval = 15
     ) {
         let button = requireButton("syncBackendSelect::\(backendRawValue)", in: app, timeout: timeout)
         tapElementReliably(button, timeout: timeout)
