@@ -341,69 +341,81 @@ public struct BookmarkListView: View {
     @ViewBuilder
     private var uiTestBookmarkHarness: some View {
         VStack(spacing: 8) {
-            Button("Bible") {
-                sortOrder = .bibleOrder
-            }
-            .buttonStyle(.borderedProminent)
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("bookmarkListHarnessSortOption::bibleOrder")
+            HStack(spacing: 8) {
+                uiTestBookmarkHarnessButton(
+                    title: "Bible",
+                    identifier: "bookmarkListHarnessSortOption::bibleOrder",
+                    style: .prominent
+                ) {
+                    sortOrder = .bibleOrder
+                }
 
-            Button("Created") {
-                sortOrder = .createdAtDesc
+                uiTestBookmarkHarnessButton(
+                    title: "Created",
+                    identifier: "bookmarkListHarnessSortOption::createdAtDesc"
+                ) {
+                    sortOrder = .createdAtDesc
+                }
             }
-            .buttonStyle(.bordered)
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("bookmarkListHarnessSortOption::createdAtDesc")
 
             if let seedLabel = userLabels.first(where: { $0.name == "UI Test Seed" }) {
-                Button("Seed") {
-                    selectedLabelId = seedLabel.id
-                }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("bookmarkListHarnessFilterChip::UI_Test_Seed")
-
-                if onOpenStudyPad != nil {
-                    Button("StudyPad") {
-                        onOpenStudyPad?(seedLabel.id)
+                HStack(spacing: 8) {
+                    uiTestBookmarkHarnessButton(
+                        title: "Seed",
+                        identifier: "bookmarkListHarnessFilterChip::UI_Test_Seed"
+                    ) {
+                        selectedLabelId = seedLabel.id
                     }
-                    .buttonStyle(.borderedProminent)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("bookmarkListHarnessOpenStudyPadButton::UI_Test_Seed")
+
+                    if onOpenStudyPad != nil {
+                        uiTestBookmarkHarnessButton(
+                            title: "StudyPad",
+                            identifier: "bookmarkListHarnessOpenStudyPadButton::UI_Test_Seed",
+                            style: .prominent
+                        ) {
+                            onOpenStudyPad?(seedLabel.id)
+                        }
+                    }
                 }
             }
 
-            if let seedBookmark = uiTestSeedBookmark {
-                Button("Edit Labels") {
-                    editingLabelsBookmarkId = seedBookmark.id
+            HStack(spacing: 8) {
+                if let seedBookmark = uiTestSeedBookmark {
+                    uiTestBookmarkHarnessButton(
+                        title: "Edit Labels",
+                        identifier: "bookmarkListHarnessEditLabelsButton::Genesis_1_1"
+                    ) {
+                        editingLabelsBookmarkId = seedBookmark.id
+                    }
                 }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("bookmarkListHarnessEditLabelsButton::Genesis_1_1")
-            }
 
-            if let navigationBookmark = uiTestNavigationBookmark {
-                Button("Open Exodus 2") {
-                    let chapter = navigationBookmark.ordinalStart / 40 + 1
-                    let bookName = navigationBookmark.book ?? "Genesis"
-                    onNavigate?(bookName, chapter)
+                if let navigationBookmark = uiTestNavigationBookmark {
+                    uiTestBookmarkHarnessButton(
+                        title: "Open Exodus 2",
+                        identifier: "bookmarkListHarnessNavigateButton::Exodus_2_1",
+                        style: .prominent
+                    ) {
+                        let chapter = navigationBookmark.ordinalStart / 40 + 1
+                        let bookName = navigationBookmark.book ?? "Genesis"
+                        onNavigate?(bookName, chapter)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("bookmarkListHarnessNavigateButton::Exodus_2_1")
             }
 
             if filteredBookmarks.contains(where: { Self.verseReference(for: $0) == "Exodus 2:1" }) {
-                Button("Delete Exodus 2") {
-                    if let exodusBookmark = filteredBookmarks.first(
-                        where: { Self.verseReference(for: $0) == "Exodus 2:1" }
+                HStack(spacing: 8) {
+                    uiTestBookmarkHarnessButton(
+                        title: "Delete Exodus 2",
+                        identifier: "bookmarkListHarnessDeleteButton::Exodus_2_1"
                     ) {
-                        deleteBookmark(exodusBookmark)
+                        if let exodusBookmark = filteredBookmarks.first(
+                            where: { Self.verseReference(for: $0) == "Exodus 2:1" }
+                        ) {
+                            deleteBookmark(exodusBookmark)
+                        }
                     }
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("bookmarkListHarnessDeleteButton::Exodus_2_1")
             }
 
             Text(uiTestBookmarkState)
@@ -417,6 +429,37 @@ public struct BookmarkListView: View {
         .padding(.top, 10)
         .padding(.bottom, 6)
         .background(.thinMaterial)
+    }
+
+    /// Builds one compact XCUITest-only bookmark harness button.
+    @ViewBuilder
+    private func uiTestBookmarkHarnessButton(
+        title: String,
+        identifier: String,
+        style: BorderButtonStyle = .regular,
+        action: @escaping () -> Void
+    ) -> some View {
+        if style == .prominent {
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .accessibilityIdentifier(identifier)
+        } else {
+            Button(title, action: action)
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .accessibilityIdentifier(identifier)
+        }
+    }
+
+    /// Visual variants used by the compact bookmark harness buttons.
+    private enum BorderButtonStyle {
+        case regular
+        case prominent
     }
 
     /**

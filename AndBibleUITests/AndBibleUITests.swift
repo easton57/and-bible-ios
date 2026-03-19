@@ -1036,12 +1036,16 @@ final class AndBibleUITests: XCTestCase {
         let importExportScreen = openImportExport(in: app, launchedDirectly: true)
         XCTAssertTrue(importExportScreen.exists)
 
-        let fullBackupButton = requireElement("importExportFullBackupButton", in: app, timeout: 10)
-        fullBackupButton.tap()
+        let harnessButton = app.buttons["importExportHarnessFullBackupButton"].firstMatch
+        if harnessButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessButton, timeout: 10)
+            waitForElementValue("importExportHarnessState", toEqual: "shareSheetPresented", in: app, timeout: 20)
+            return
+        }
 
-        let valuePredicate = NSPredicate(format: "value == %@", "shareSheetPresented")
-        expectation(for: valuePredicate, evaluatedWith: importExportScreen)
-        waitForExpectations(timeout: 15)
+        let fullBackupButton = requireElement("importExportFullBackupButton", in: app, timeout: 10)
+        tapElementReliably(fullBackupButton, timeout: 10)
+        waitForElementValue("importExportScreen", toEqual: "shareSheetPresented", in: app, timeout: 20)
     }
 
     /**
@@ -1061,12 +1065,16 @@ final class AndBibleUITests: XCTestCase {
         let importExportScreen = openImportExport(in: app, launchedDirectly: true)
         XCTAssertTrue(importExportScreen.exists)
 
-        let importButton = requireElement("importExportImportButton", in: app, timeout: 10)
-        importButton.tap()
+        let harnessButton = app.buttons["importExportHarnessImportButton"].firstMatch
+        if harnessButton.waitForExistence(timeout: 1) {
+            tapElementReliably(harnessButton, timeout: 10)
+            waitForElementValue("importExportHarnessState", toEqual: "importPickerPresented", in: app, timeout: 20)
+            return
+        }
 
-        let valuePredicate = NSPredicate(format: "value == %@", "importPickerPresented")
-        expectation(for: valuePredicate, evaluatedWith: importExportScreen)
-        waitForExpectations(timeout: 15)
+        let importButton = requireElement("importExportImportButton", in: app, timeout: 10)
+        tapElementReliably(importButton, timeout: 10)
+        waitForElementValue("importExportScreen", toEqual: "importPickerPresented", in: app, timeout: 20)
     }
 
     /**
@@ -2856,13 +2864,13 @@ final class AndBibleUITests: XCTestCase {
      */
     private func openSeedStudyPadFromBookmarkList(in app: XCUIApplication) {
         let harnessButton = app.buttons["bookmarkListHarnessOpenStudyPadButton::UI_Test_Seed"].firstMatch
-        if harnessButton.waitForExistence(timeout: 1) {
+        if harnessButton.waitForExistence(timeout: 1), harnessButton.isHittable {
             tapElementReliably(harnessButton, timeout: 10)
             return
         }
 
-        requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
-        requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10).tap()
+        tapElementReliably(requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10), timeout: 10)
+        tapElementReliably(requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10), timeout: 10)
     }
 
     /**
