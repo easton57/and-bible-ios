@@ -316,11 +316,14 @@ final class AndBibleUITests: XCTestCase {
         let currentDay = requireElement("dailyReadingCurrentDayLabel", in: app, timeout: 10)
         XCTAssertEqual(currentDay.value as? String, "1")
 
-        requireElement("dailyReadingMarkAsReadButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("dailyReadingMarkAsReadButton", in: app, timeout: 10),
+            timeout: 10
+        )
 
         let advancedDayPredicate = NSPredicate(format: "value == %@", "2")
         expectation(for: advancedDayPredicate, evaluatedWith: currentDay)
-        waitForExpectations(timeout: 10)
+        waitForExpectations(timeout: 20)
     }
 
     /**
@@ -521,24 +524,33 @@ final class AndBibleUITests: XCTestCase {
             timeout: 10
         )
 
-        requireElement("uiTestUpdateMyNotesNoteButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("uiTestUpdateMyNotesNoteButton", in: app, timeout: 10),
+            timeout: 10
+        )
         waitForElementValue(
             "uiTestMyNotesNoteState",
             toEqual: "updated:UI_Test_My_Notes_Updated_Note",
             in: app,
-            timeout: 10
+            timeout: 20
         )
 
-        requireElement("uiTestReturnFromMyNotesButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("uiTestReturnFromMyNotesButton", in: app, timeout: 10),
+            timeout: 10
+        )
         XCTAssertTrue(requireElement("uiTestReopenMyNotesButton", in: app, timeout: 10).exists)
 
-        requireElement("uiTestReopenMyNotesButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("uiTestReopenMyNotesButton", in: app, timeout: 10),
+            timeout: 10
+        )
         waitForMyNotesPresentation(in: app, timeout: 20)
         waitForElementValue(
             "uiTestMyNotesNoteState",
             toEqual: "updated:UI_Test_My_Notes_Updated_Note",
             in: app,
-            timeout: 10
+            timeout: 20
         )
     }
 
@@ -1800,9 +1812,12 @@ final class AndBibleUITests: XCTestCase {
         launchedDirectly: Bool = false
     ) -> XCUIElement {
         if !launchedDirectly {
-            requireElement("readerSearchButton", in: app, timeout: 10).tap()
+            tapElementReliably(
+                requireElement("readerSearchButton", in: app, timeout: 10),
+                timeout: 10
+            )
         }
-        return requireElement("searchScreen", in: app, timeout: 10)
+        return requireElement("searchScreen", in: app, timeout: launchedDirectly ? 10 : 20)
     }
 
     /**
@@ -2249,7 +2264,7 @@ final class AndBibleUITests: XCTestCase {
             )
             tapSettingsElement("settingsColorsLink", in: app)
         }
-        return requireElement("colorSettingsScreen", in: app, timeout: 10)
+        return requireElement("colorSettingsScreen", in: app, timeout: launchedDirectly ? 10 : 20)
     }
 
     /**

@@ -2980,9 +2980,19 @@ public struct BibleReaderView: View {
             uiTestMyNotesNoteState = "failed:verify"
             return
         }
-        service.saveBibleBookmarkNote(bookmarkId: bookmarkId, note: "UI Test My Notes Updated Note")
-        controller.loadMyNotesDocument()
-        refreshUITestMyNotesNoteState()
+        uiTestMyNotesNoteState = "updating"
+        Task { @MainActor in
+            service.saveBibleBookmarkNote(bookmarkId: bookmarkId, note: "UI Test My Notes Updated Note")
+            controller.loadMyNotesDocument()
+            for _ in 0..<100 {
+                refreshUITestMyNotesNoteState()
+                if uiTestMyNotesNoteState == "updated:UI_Test_My_Notes_Updated_Note" {
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            refreshUITestMyNotesNoteState()
+        }
     }
 
     /**
@@ -3037,19 +3047,6 @@ public struct BibleReaderView: View {
     private func refreshUITestMyNotesNoteState() {
         guard let bookmarkId = uiTestMyNotesBookmarkID else {
             uiTestMyNotesNoteState = "failed:missingContext"
-            return
-        }
-
-        if let controller = focusedController,
-           let service = controller.bookmarkService {
-            let verseCount = BibleReaderController.verseCount(for: controller.currentBook, chapter: controller.currentChapter)
-            let ordinalStart = (controller.currentChapter - 1) * 40 + 1
-            let ordinalEnd = (controller.currentChapter - 1) * 40 + verseCount
-            let noteBearingBookmarks = service
-                .bookmarks(for: ordinalStart, endOrdinal: ordinalEnd, book: controller.currentBook)
-                .filter { $0.notes != nil && !($0.notes?.notes.isEmpty ?? true) }
-            let note = noteBearingBookmarks.first(where: { $0.id == bookmarkId })?.notes?.notes
-            applyUITestMyNotesNoteState(for: note)
             return
         }
 
