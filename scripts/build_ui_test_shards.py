@@ -57,7 +57,12 @@ def normalize_test_identifier(
             return f"{test_target}/{test_case_class}/{method}"
     if "/" not in normalized and normalized.startswith("test"):
         return f"{test_target}/{test_case_class}/{normalized}"
-    return normalized
+    raise ValueError(
+        "Unsupported test identifier format "
+        f"'{raw_identifier}'. Expected one of: "
+        f"'{test_target}/{test_case_class}/testMethod', "
+        f"'{test_target}/testMethod', or 'testMethod'."
+    )
 
 
 def load_timing_manifest(
@@ -80,11 +85,14 @@ def load_timing_manifest(
             raise ValueError("Timing manifest keys must be strings.")
         if not isinstance(duration, (int, float)):
             raise ValueError("Timing manifest values must be numbers.")
-        normalized = normalize_test_identifier(
-            raw_identifier,
-            test_target=test_target,
-            test_case_class=test_case_class,
-        )
+        try:
+            normalized = normalize_test_identifier(
+                raw_identifier,
+                test_target=test_target,
+                test_case_class=test_case_class,
+            )
+        except ValueError as error:
+            raise ValueError(f"Invalid timing manifest key '{raw_identifier}': {error}") from error
         timings[normalized] = float(duration)
     return timings
 

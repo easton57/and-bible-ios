@@ -67,6 +67,18 @@ class BuildUITestShardsTests(unittest.TestCase):
             },
         )
 
+    def test_load_timing_manifest_rejects_unknown_identifier_formats(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "timings.json"
+            manifest_path.write_text(json.dumps({"not-a-test-id": 12.5}))
+
+            with self.assertRaisesRegex(ValueError, "Invalid timing manifest key 'not-a-test-id'"):
+                load_timing_manifest(
+                    manifest_path,
+                    test_target="AndBibleUITests",
+                    test_case_class="AndBibleUITests",
+                )
+
     def test_assign_cases_to_shards_balances_estimated_runtime(self) -> None:
         identifiers = [
             "AndBibleUITests/AndBibleUITests/testSlow",

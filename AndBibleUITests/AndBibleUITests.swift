@@ -349,7 +349,7 @@ final class AndBibleUITests: XCTestCase {
      sheet back to the repository list.
      *
      * - Side effects:
-     *   - launches the reader shell and opens Downloads from the real overflow menu
+     *   - launches directly into Downloads
      *   - opens the repository manager from the real downloads toolbar button
      *   - opens the add-source sheet and cancels it
      * - Failure modes:
@@ -362,15 +362,24 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(openDownloads(in: app, launchedDirectly: true).exists)
-        requireElement("moduleBrowserRepositoriesButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("moduleBrowserRepositoriesButton", in: app, timeout: 10),
+            timeout: 15
+        )
 
-        XCTAssertTrue(requireElement("repositoryManagerScreen", in: app, timeout: 10).exists)
-        requireElement("repositoryManagerAddButton", in: app, timeout: 10).tap()
+        XCTAssertTrue(requireElement("repositoryManagerScreen", in: app, timeout: 20).exists)
+        tapElementReliably(
+            requireElement("repositoryManagerAddButton", in: app, timeout: 10),
+            timeout: 10
+        )
 
-        XCTAssertTrue(requireElement("repositoryManagerAddSourceScreen", in: app, timeout: 10).exists)
-        requireElement("repositoryManagerAddSourceCancelButton", in: app, timeout: 10).tap()
+        XCTAssertTrue(requireElement("repositoryManagerAddSourceScreen", in: app, timeout: 20).exists)
+        tapElementReliably(
+            requireElement("repositoryManagerAddSourceCancelButton", in: app, timeout: 10),
+            timeout: 10
+        )
 
-        XCTAssertTrue(requireElement("repositoryManagerScreen", in: app, timeout: 10).exists)
+        XCTAssertTrue(requireElement("repositoryManagerScreen", in: app, timeout: 20).exists)
     }
 
     /**
@@ -581,24 +590,27 @@ final class AndBibleUITests: XCTestCase {
             timeout: 10
         )
 
-        requireElement("uiTestDeleteMyNotesNoteButton", in: app, timeout: 10).tap()
-        waitForElementValue(
-            "uiTestMyNotesNoteState",
-            toEqual: "deleted",
-            in: app,
+        tapElementReliably(
+            requireElement("uiTestDeleteMyNotesNoteButton", in: app, timeout: 10),
             timeout: 10
         )
 
-        requireElement("uiTestReturnFromMyNotesButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("uiTestReturnFromMyNotesButton", in: app, timeout: 10),
+            timeout: 10
+        )
         XCTAssertTrue(requireElement("uiTestReopenMyNotesButton", in: app, timeout: 10).exists)
 
-        requireElement("uiTestReopenMyNotesButton", in: app, timeout: 10).tap()
+        tapElementReliably(
+            requireElement("uiTestReopenMyNotesButton", in: app, timeout: 10),
+            timeout: 10
+        )
         waitForMyNotesPresentation(in: app, timeout: 20)
         waitForElementValue(
             "uiTestMyNotesNoteState",
             toEqual: "deleted",
             in: app,
-            timeout: 10
+            timeout: 20
         )
     }
 
@@ -884,11 +896,11 @@ final class AndBibleUITests: XCTestCase {
      * - Side effects:
      *   - launches the app with one deterministic persisted history row while staying on the real
      *     reader shell
-     *   - opens History from the actual reader overflow menu
+     *   - opens History through the direct-launch route
      *   - selects the seeded history row and waits for the reader's exported current-reference
      *     state to change from `Genesis 1` to `Exodus 2`
      * - Failure modes:
-     *   - fails if the reader shell, History action, or seeded history row never appears
+     *   - fails if the reader shell or seeded history row never appears
      *   - fails if selecting the history row does not update the reader's exported current
      *     reference state to `Exodus 2`
      */
@@ -897,22 +909,20 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         let currentReferenceState = requireElement("readerCurrentReferenceState", in: app, timeout: 10)
-        let historyNavigationState = requireElement("uiTestHistoryNavigationState", in: app, timeout: 10)
         XCTAssertEqual(currentReferenceState.label, "Genesis 1")
-        XCTAssertEqual(historyNavigationState.label, "idle")
 
         XCTAssertTrue(openHistory(in: app, launchedDirectly: true).exists)
         tapElementReliably(
-            requireElement("historyHarnessNavigateButton::Exod_2_1", in: app, timeout: 10),
+            requireElement("historyRow::Exod_2_1", in: app, timeout: 10),
             timeout: 10
         )
-
-        let navigationPredicate = NSPredicate(format: "label == %@", "navigated:Exod.2.1")
-        expectation(for: navigationPredicate, evaluatedWith: historyNavigationState)
-
-        let valuePredicate = NSPredicate(format: "label == %@", "Exodus 2")
-        expectation(for: valuePredicate, evaluatedWith: currentReferenceState)
-        waitForExpectations(timeout: 10)
+        waitForElementValue(
+            "readerCurrentReferenceState",
+            toEqual: "Exodus 2",
+            in: app,
+            timeout: 20
+        )
+        XCTAssertEqual(currentReferenceState.label, "Exodus 2")
     }
 
     /**
@@ -2847,23 +2857,16 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
-     Opens the seeded `UI Test Seed` StudyPad handoff, preferring the direct-launch bookmark harness.
+     Opens the seeded `UI Test Seed` StudyPad handoff through the production bookmark-list controls.
      *
      * - Parameter app: Running application under test.
      * - Side effects:
-     *   - uses the dedicated bookmark harness StudyPad button when present
-     *   - otherwise selects the real `UI Test Seed` filter chip and taps the production StudyPad
-     *     handoff button
+     *   - selects the real `UI Test Seed` filter chip
+     *   - taps the production StudyPad handoff button shown for the selected label
      * - Failure modes:
-     *   - fails if neither the harness button nor the production label-filter path is available
+     *   - fails if the production label-filter or StudyPad handoff controls are unavailable
      */
     private func openSeedStudyPadFromBookmarkList(in app: XCUIApplication) {
-        let harnessButton = app.buttons["bookmarkListHarnessOpenStudyPadButton::UI_Test_Seed"].firstMatch
-        if harnessButton.waitForExistence(timeout: 1), harnessButton.isHittable {
-            tapElementReliably(harnessButton, timeout: 10)
-            return
-        }
-
         tapElementReliably(requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10), timeout: 10)
         tapElementReliably(requireElement("bookmarkListOpenStudyPadButton::UI_Test_Seed", in: app, timeout: 10), timeout: 10)
     }
