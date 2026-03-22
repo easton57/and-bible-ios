@@ -140,7 +140,7 @@ jobs:
             libsword/sword-src
             libsword/build
             libsword/libsword.xcframework
-          key: ${{ runner.os }}-xcode-16.4-libsword-${{ hashFiles('libsword/build-ios.sh') }}
+          key: ${{ runner.os }}-xcode-16.4-libsword-iosonly-${{ hashFiles('libsword/build-ios.sh') }}
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -168,7 +168,7 @@ jobs:
         env:
           INCLUDE_MACOS_SLICE: "0"
         run: |
-          if [ -f libsword.xcframework/Info.plist ] && find libsword.xcframework -name libsword.a -print -quit | grep -q .; then
+          if [ -f libsword.xcframework/ios-arm64/libsword.a ] && [ -f libsword.xcframework/ios-arm64_x86_64-simulator/libsword.a ]; then
             echo "Using cached libsword.xcframework"
           else
             ./build-ios.sh
@@ -259,7 +259,7 @@ jobs:
             libsword/sword-src
             libsword/build
             libsword/libsword.xcframework
-          key: ${{ runner.os }}-xcode-16.4-libsword-${{ hashFiles('libsword/build-ios.sh') }}
+          key: ${{ runner.os }}-xcode-16.4-libsword-hosttool-${{ hashFiles('libsword/build-ios.sh') }}
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -285,9 +285,9 @@ jobs:
       - name: Build libsword XCFramework
         working-directory: libsword
         env:
-          INCLUDE_MACOS_SLICE: "0"
+          INCLUDE_MACOS_SLICE: "1"
         run: |
-          if [ -f libsword.xcframework/Info.plist ] && find libsword.xcframework -name libsword.a -print -quit | grep -q .; then
+          if [ -f libsword.xcframework/macos-arm64_x86_64/libsword.a ] && [ -f libsword.xcframework/ios-arm64/libsword.a ] && [ -f libsword.xcframework/ios-arm64_x86_64-simulator/libsword.a ]; then
             echo "Using cached libsword.xcframework"
           else
             ./build-ios.sh
