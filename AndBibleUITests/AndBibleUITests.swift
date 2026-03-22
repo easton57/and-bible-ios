@@ -935,7 +935,7 @@ final class AndBibleUITests: XCTestCase {
         requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
 
         let hiddenPredicate = NSPredicate(format: "exists == false")
-        let bookmarkRow = requireBookmarkRow("Genesis_1_1", in: app, timeout: 10)
+        let bookmarkRow = app.descendants(matching: .any)["bookmarkListRowButton::Genesis_1_1"].firstMatch
         expectation(for: hiddenPredicate, evaluatedWith: bookmarkRow)
         waitForExpectations(timeout: 10)
     }
@@ -3128,7 +3128,7 @@ final class AndBibleUITests: XCTestCase {
     ) {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            let screen = app.otherElements["textDisplaySettingsScreen"].firstMatch
+            let screen = app.descendants(matching: .any)["textDisplaySettingsScreen"].firstMatch
             let toggle = app.switches["textDisplayJustifyTextToggle"].firstMatch
             let tableCell = app.tables.cells.containing(.switch, identifier: "textDisplayJustifyTextToggle").firstMatch
             let genericCell = app.cells.containing(.switch, identifier: "textDisplayJustifyTextToggle").firstMatch
