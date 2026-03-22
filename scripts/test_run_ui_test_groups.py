@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -21,6 +22,7 @@ from run_ui_test_groups import (
     load_fixture_manifest,
     main,
     selection_arg_to_identifier,
+    terminate_app_if_running,
 )
 
 
@@ -110,6 +112,30 @@ class PathDerivationTests(unittest.TestCase):
                 scheme="AndBible",
             ),
             pathlib.Path(".derivedData/Build/Products/Debug-iphonesimulator/AndBible.app"),
+        )
+
+
+class SimctlTerminationTests(unittest.TestCase):
+    def test_terminate_app_if_running_continues_after_timeout(self) -> None:
+        with mock.patch(
+            "run_ui_test_groups.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd=["xcrun", "simctl", "terminate"], timeout=15),
+        ) as run_mock:
+            with mock.patch("run_ui_test_groups.print") as print_mock:
+                terminate_app_if_running(
+                    simulator_id="SIM-1",
+                    bundle_identifier="org.andbible.ios",
+                    timeout_seconds=15,
+                )
+
+        run_mock.assert_called_once()
+        print_mock.assert_any_call(
+            "Running: xcrun simctl terminate SIM-1 org.andbible.ios (best-effort)",
+            flush=True,
+        )
+        print_mock.assert_any_call(
+            "simctl terminate timed out after 15s for org.andbible.ios; continuing.",
+            flush=True,
         )
 
 

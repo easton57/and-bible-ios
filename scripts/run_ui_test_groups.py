@@ -19,6 +19,7 @@ from run_xcodebuild_with_test_selection import (
 
 ONLY_TEST_PREFIX = "-only-testing:"
 DEFAULT_BUNDLE_IDENTIFIER = "org.andbible.ios"
+SIMCTL_TERMINATE_TIMEOUT_SECONDS = 15
 
 
 def selection_arg_to_identifier(selection_arg: str) -> str:
@@ -122,6 +123,32 @@ def run_command(
     )
 
 
+def terminate_app_if_running(
+    *,
+    simulator_id: str,
+    bundle_identifier: str,
+    timeout_seconds: int = SIMCTL_TERMINATE_TIMEOUT_SECONDS,
+) -> None:
+    """Best-effort terminate the app on the target simulator without allowing indefinite hangs."""
+    command = ["xcrun", "simctl", "terminate", simulator_id, bundle_identifier]
+    print(f"Running: {shlex.join(command)} (best-effort)", flush=True)
+    try:
+        subprocess.run(
+            command,
+            check=False,
+            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            "simctl terminate timed out after "
+            f"{timeout_seconds}s for {bundle_identifier}; continuing.",
+            flush=True,
+        )
+
+
 def ensure_app_installed(
     *,
     simulator_id: str,
@@ -134,12 +161,13 @@ def ensure_app_installed(
             f"Built app was not found at '{app_path}'. Run build-for-testing first."
         )
 
-    subprocess.run(
-        ["xcrun", "simctl", "terminate", simulator_id, bundle_identifier],
-        check=False,
-        text=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+    print(
+        f"Preparing simulator app install for {bundle_identifier} from {app_path}",
+        flush=True,
+    )
+    terminate_app_if_running(
+        simulator_id=simulator_id,
+        bundle_identifier=bundle_identifier,
     )
     run_command(["xcrun", "simctl", "install", simulator_id, str(app_path)])
     container = run_command(
@@ -232,12 +260,9 @@ def run_grouped_ui_tests(
             f"({len(group_selection_args)} test(s))",
             flush=True,
         )
-        subprocess.run(
-            ["xcrun", "simctl", "terminate", simulator_id, bundle_identifier],
-            check=False,
-            text=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        terminate_app_if_running(
+            simulator_id=simulator_id,
+            bundle_identifier=bundle_identifier,
         )
         reset_and_seed_fixture(
             fixture_tool_path=fixture_tool_path,
