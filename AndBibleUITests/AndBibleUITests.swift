@@ -2996,7 +2996,18 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) {
         let button = requireReaderActionControl(identifier, in: app, timeout: timeout, file: file, line: line)
-        tapElementReliably(button, timeout: timeout, file: file, line: line)
+        switch button.elementType {
+        case .button, .staticText:
+            XCTAssertTrue(
+                button.waitForExistence(timeout: timeout),
+                "Expected reader action '\(identifier)' to exist before tapping.",
+                file: file,
+                line: line
+            )
+            button.tap()
+        default:
+            tapElementReliably(button, timeout: timeout, file: file, line: line)
+        }
     }
 
     /**
@@ -3096,6 +3107,97 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Maps one reader overflow action identifier to the visible English menu title exported by the
+     production `Menu` rows.
+     *
+     * - Parameter identifier: Stable accessibility identifier attached in `BibleReaderView`.
+     * - Returns: User-visible menu title that XCTest can use as a fallback query surface.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func readerActionTitle(for identifier: String) -> String {
+        switch identifier {
+        case "readerOpenBookmarksAction":
+            return "Bookmarks"
+        case "readerOpenHistoryAction":
+            return "History"
+        case "readerOpenReadingPlansAction":
+            return "Reading Plans"
+        case "readerOpenSettingsAction":
+            return "Settings"
+        case "readerOpenWorkspacesAction":
+            return "Workspaces"
+        case "readerOpenDownloadsAction":
+            return "Downloads"
+        case "readerOpenAboutAction":
+            return "About"
+        default:
+            return identifier
+        }
+    }
+
+    /**
+     Resolves the largest currently visible container that can reveal additional reader overflow
+     actions when swiped.
+     *
+     * - Parameter app: Running application under test.
+     * - Returns: Best candidate container, preferring the largest visible frame.
+     * - Side effects: none.
+     * - Failure modes: returns `nil` when XCTest exposes no suitable visible container.
+     */
+    private func largestVisibleReaderActionContainer(in app: XCUIApplication) -> XCUIElement? {
+        let candidates = [
+            app.sheets.firstMatch,
+            app.scrollViews.firstMatch,
+            app.tables.firstMatch,
+            app.collectionViews.firstMatch,
+        ].filter { $0.exists && !$0.frame.isEmpty }
+
+        return candidates.max { lhs, rhs in
+            (lhs.frame.width * lhs.frame.height) < (rhs.frame.width * rhs.frame.height)
+        }
+    }
+
+    /**
+     Resolves one reader overflow action from either its stable accessibility identifier or its
+     visible menu title.
+     *
+     * - Parameters:
+     *   - identifier: Stable accessibility identifier attached in `BibleReaderView`.
+     *   - app: Running application under test.
+     * - Returns: Best-effort live XCUI element for the action.
+     * - Side effects: none.
+     * - Failure modes: returns a non-existing identifier-backed element when no live match exists.
+     */
+    private func resolveReaderActionElement(
+        _ identifier: String,
+        in app: XCUIApplication
+    ) -> XCUIElement {
+        let title = readerActionTitle(for: identifier)
+        let titledCell = app.collectionViews.cells.containing(.staticText, identifier: title).firstMatch
+        if titledCell.exists {
+            return titledCell
+        }
+
+        let buttonMatch = app.buttons[title].firstMatch
+        if buttonMatch.exists {
+            return buttonMatch
+        }
+
+        let staticTextMatch = app.staticTexts[title].firstMatch
+        if staticTextMatch.exists {
+            return staticTextMatch
+        }
+
+        let identifierMatch = app.descendants(matching: .any)[identifier].firstMatch
+        if identifierMatch.exists {
+            return identifierMatch
+        }
+
+        return identifierMatch
+    }
+
+    /**
      Resolves one reader-shell menu action, scrolling the live menu surface when the requested
      action starts below the fold.
      *
@@ -3119,34 +3221,11 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
-        let action = app.descendants(matching: .button)[identifier].firstMatch
-        let swipeContainerCandidates = [
-            app.sheets.firstMatch,
-            app.scrollViews.firstMatch,
-            app.tables.firstMatch,
-            app.collectionViews.firstMatch,
-        ]
-
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            let remaining = deadline.timeIntervalSinceNow
-            if remaining > 0, action.waitForExistence(timeout: min(0.75, remaining)) {
-                if let container = swipeContainerCandidates.first(where: { $0.exists && !$0.frame.isEmpty }),
-                   !action.frame.isEmpty {
-                    let visibleTapRegion = container.frame.insetBy(dx: 0, dy: 16)
-                    let actionMidPoint = CGPoint(x: action.frame.midX, y: action.frame.midY)
-                    if visibleTapRegion.contains(actionMidPoint) {
-                        return action
-                    }
-                    container.swipeUp()
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-                    continue
-                }
-                return action
-            }
-
+            let action = resolveReaderActionElement(identifier, in: app)
             if action.exists {
-                if let container = swipeContainerCandidates.first(where: { $0.exists && !$0.frame.isEmpty }),
+                if let container = largestVisibleReaderActionContainer(in: app),
                    !action.frame.isEmpty {
                     let visibleTapRegion = container.frame.insetBy(dx: 0, dy: 16)
                     let actionMidPoint = CGPoint(x: action.frame.midX, y: action.frame.midY)
@@ -3160,7 +3239,15 @@ final class AndBibleUITests: XCTestCase {
                 return action
             }
 
-            if let container = swipeContainerCandidates.first(where: { $0.exists && !$0.frame.isEmpty }) {
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining > 0 {
+                _ = action.waitForExistence(timeout: min(0.5, remaining))
+                if action.exists {
+                    continue
+                }
+            }
+
+            if let container = largestVisibleReaderActionContainer(in: app) {
                 container.swipeUp()
             } else {
                 app.swipeUp()
@@ -3169,13 +3256,14 @@ final class AndBibleUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
+        let finalAction = resolveReaderActionElement(identifier, in: app)
         XCTAssertTrue(
-            action.exists,
+            finalAction.exists,
             "Expected reader action '\(identifier)' to exist within \(timeout) seconds.",
             file: file,
             line: line
         )
-        return action
+        return finalAction
     }
 
     /**
