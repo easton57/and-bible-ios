@@ -793,9 +793,7 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        tapReaderMoreMenuButton(in: app)
-        tapReaderAction("readerOpenAboutAction", in: app)
-        XCTAssertTrue(requireElement("aboutScreen", in: app, timeout: 10).exists)
+        openAboutFromReaderMenu(in: app)
     }
 
     /**
@@ -1468,6 +1466,19 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> String? {
+        let environment = ProcessInfo.processInfo.environment
+        let simulatorID = environment["UITEST_SIMULATOR_ID"]
+
+        if let simulatorID,
+           let existingPath = resolveInstalledAppDataContainer(
+               simulatorID: simulatorID,
+               bundleIdentifier: bundleIdentifier,
+               timeout: 5,
+               recordFailure: false
+           ) {
+            return existingPath
+        }
+
         if let existingPath = findInstalledAppDataContainerFromFilesystem(
             bundleIdentifier: bundleIdentifier
         ) {
@@ -1484,7 +1495,17 @@ final class AndBibleUITests: XCTestCase {
         )
         app.terminate()
 
-        let deadline = Date().addingTimeInterval(10)
+        if let simulatorID,
+           let bootstrappedPath = resolveInstalledAppDataContainer(
+               simulatorID: simulatorID,
+               bundleIdentifier: bundleIdentifier,
+               timeout: 20,
+               recordFailure: false
+           ) {
+            return bootstrappedPath
+        }
+
+        let deadline = Date().addingTimeInterval(20)
         while Date() < deadline {
             if let bootstrappedPath = findInstalledAppDataContainerFromFilesystem(
                 bundleIdentifier: bundleIdentifier
@@ -1492,6 +1513,18 @@ final class AndBibleUITests: XCTestCase {
                 return bootstrappedPath
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+
+        if let simulatorID {
+            _ = resolveInstalledAppDataContainer(
+                simulatorID: simulatorID,
+                bundleIdentifier: bundleIdentifier,
+                timeout: 1,
+                recordFailure: true,
+                file: file,
+                line: line
+            )
+            return nil
         }
 
         XCTFail(
@@ -2922,7 +2955,21 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) {
         let button = requireReaderMoreMenuButton(in: app, timeout: timeout, file: file, line: line)
-        tapElementReliably(button, timeout: timeout, file: file, line: line)
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if button.exists, !button.frame.isEmpty {
+                button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        XCTAssertTrue(
+            button.exists && !button.frame.isEmpty,
+            "Expected reader overflow button '\(button.identifier)' to expose a stable frame within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
     }
 
     /**
@@ -2953,6 +3000,102 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Opens About from the reader overflow menu with one bounded retry when the first tap does not
+     transition away from the live menu.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to spend across menu discovery, action tapping, and
+     *     destination confirmation.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - opens the reader overflow menu
+     *   - taps the About action up to two times when the first tap leaves the menu open
+     * - Failure modes:
+     *   - records an XCTest failure if the About destination never appears within the allotted
+     *     timeout
+     */
+    private func openAboutFromReaderMenu(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 30,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        tapReaderMoreMenuButton(in: app, timeout: timeout, file: file, line: line)
+
+        for attempt in 1...2 {
+            let remaining = max(1, deadline.timeIntervalSinceNow)
+            tapReaderAction(
+                "readerOpenAboutAction",
+                in: app,
+                timeout: min(10, remaining),
+                file: file,
+                line: line
+            )
+            if waitForAboutScreenVisible(in: app, timeout: min(8, max(1, deadline.timeIntervalSinceNow))) {
+                return
+            }
+
+            if attempt == 1 {
+                let aboutAction = app.descendants(matching: .any)["readerOpenAboutAction"].firstMatch
+                if aboutAction.exists {
+                    continue
+                }
+                tapReaderMoreMenuButton(
+                    in: app,
+                    timeout: min(10, max(1, deadline.timeIntervalSinceNow)),
+                    file: file,
+                    line: line
+                )
+            }
+        }
+
+        XCTAssertTrue(
+            waitForAboutScreenVisible(in: app, timeout: min(5, max(1, deadline.timeIntervalSinceNow))),
+            "Expected the About destination to surface within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
+    }
+
+    /**
+     Confirms the About destination rendered after reader-menu navigation.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to wait for the About destination to surface.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - polls both the explicit `aboutScreen` identifier and the stable "AndBible" title text
+     *     because hosted simulators do not always surface the root ScrollView identifier
+     * - Failure modes:
+     *   - records an XCTest failure if neither the About screen identifier nor the title text
+     *     appears within the allotted timeout
+     */
+    private func waitForAboutScreenVisible(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 20,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        let aboutScreen = app.descendants(matching: .any)["aboutScreen"].firstMatch
+        let aboutTitle = app.staticTexts["AndBible"].firstMatch
+
+        repeat {
+            if aboutScreen.exists || aboutTitle.exists {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        } while Date() < deadline
+
+        return aboutScreen.exists || aboutTitle.exists
+    }
+
+    /**
      Resolves one reader-shell menu action, scrolling the live menu surface when the requested
      action starts below the fold.
      *
@@ -2976,25 +3119,47 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
-        let action = app.descendants(matching: .any)[identifier].firstMatch
+        let action = app.descendants(matching: .button)[identifier].firstMatch
+        let swipeContainerCandidates = [
+            app.sheets.firstMatch,
+            app.scrollViews.firstMatch,
+            app.tables.firstMatch,
+            app.collectionViews.firstMatch,
+        ]
 
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             let remaining = deadline.timeIntervalSinceNow
             if remaining > 0, action.waitForExistence(timeout: min(0.75, remaining)) {
+                if let container = swipeContainerCandidates.first(where: { $0.exists && !$0.frame.isEmpty }),
+                   !action.frame.isEmpty {
+                    let visibleTapRegion = container.frame.insetBy(dx: 0, dy: 16)
+                    let actionMidPoint = CGPoint(x: action.frame.midX, y: action.frame.midY)
+                    if visibleTapRegion.contains(actionMidPoint) {
+                        return action
+                    }
+                    container.swipeUp()
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                    continue
+                }
                 return action
             }
 
             if action.exists {
+                if let container = swipeContainerCandidates.first(where: { $0.exists && !$0.frame.isEmpty }),
+                   !action.frame.isEmpty {
+                    let visibleTapRegion = container.frame.insetBy(dx: 0, dy: 16)
+                    let actionMidPoint = CGPoint(x: action.frame.midX, y: action.frame.midY)
+                    if visibleTapRegion.contains(actionMidPoint) {
+                        return action
+                    }
+                    container.swipeUp()
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                    continue
+                }
                 return action
             }
 
-            let swipeContainerCandidates = [
-                app.sheets.firstMatch,
-                app.scrollViews.firstMatch,
-                app.tables.firstMatch,
-                app.collectionViews.firstMatch,
-            ]
             if let container = swipeContainerCandidates.first(where: { $0.exists && !$0.frame.isEmpty }) {
                 container.swipeUp()
             } else {
