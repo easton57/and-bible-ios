@@ -181,7 +181,7 @@ def provision_simulator(
     *,
     reuse_existing: bool = True,
     device_name_prefix: str = "AndBible CI",
-) -> str | None:
+) -> tuple[str, str, str] | None:
     runtimes_payload = read_simctl_json("runtimes", "available")
     runtime = choose_runtime(runtimes_payload)
     if runtime is None:
@@ -197,7 +197,11 @@ def provision_simulator(
                 "Reusing existing simulator: "
                 f"{existing_device.get('name')} ({runtime.get('name', runtime.get('version', 'unknown runtime'))})"
             )
-            return str(existing_device.get("udid", ""))
+            return (
+                str(existing_device.get("udid", "")),
+                str(existing_device.get("name", "")),
+                str(runtime.get("version", "")),
+            )
 
     device_type = choose_device_type(runtime, preferred_order)
     if device_type is None:
@@ -222,7 +226,11 @@ def provision_simulator(
 
     simulator_id = result.stdout.strip()
     print(f"Created simulator: {device_name} ({runtime.get('name', runtime.get('version', 'unknown runtime'))})")
-    return simulator_id or None
+    return (
+        simulator_id,
+        str(device_type["name"]),
+        str(runtime.get("version", "")),
+    ) if simulator_id else None
 
 
 def find_candidate_by_simulator_id(
@@ -267,7 +275,7 @@ def print_resolved_output(
     print(f"simulator_created={'true' if simulator_created else 'false'}")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", default="AndBible.xcodeproj", help="Xcode project path")
     parser.add_argument("--scheme", default="AndBible", help="Xcode scheme name")
@@ -288,19 +296,19 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("GITHUB_OUTPUT"),
         help="Path to the GitHub Actions output file; defaults to GITHUB_OUTPUT",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> int:
-    args = parse_args()
-    created_simulator_id: str | None = None
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    created_simulator: tuple[str, str, str] | None = None
 
     if args.create_dedicated_device:
-        created_simulator_id = provision_simulator(
+        created_simulator = provision_simulator(
             reuse_existing=False,
             device_name_prefix=args.device_name_prefix,
         )
-        if created_simulator_id:
+        if created_simulator:
             time.sleep(args.delay_seconds)
 
     candidates, output_text = discover_candidates(
@@ -310,9 +318,10 @@ def main() -> int:
         delay_seconds=args.delay_seconds,
     )
 
-    if not candidates and has_simulator_placeholder(output_text) and created_simulator_id is None:
+    if not candidates and has_simulator_placeholder(output_text) and created_simulator is None:
         print("No concrete iPhone simulator destinations were available; attempting to provision one.")
-        if provision_simulator():
+        provisioned = provision_simulator()
+        if provisioned:
             time.sleep(args.delay_seconds)
             candidates, output_text = discover_candidates(
                 project=args.project,
@@ -327,15 +336,14 @@ def main() -> int:
         return 1
 
     selected_candidate = None
-    if created_simulator_id is not None:
-        selected_candidate = find_candidate_by_simulator_id(candidates, created_simulator_id)
+    if created_simulator is not None:
+        selected_candidate = find_candidate_by_simulator_id(candidates, created_simulator[0])
         if selected_candidate is None:
             print(
-                "Created simulator did not appear in xcodebuild -showdestinations output:"
-                f" {created_simulator_id}"
+                "Created simulator did not appear in xcodebuild -showdestinations output; "
+                "using the created simulator directly."
             )
-            print(output_text)
-            return 1
+            selected_candidate = created_simulator[1], created_simulator[2], created_simulator[0]
 
     name, os_version, simulator_id = selected_candidate or choose_candidate(candidates)
     destination = f"id={simulator_id}"
@@ -348,14 +356,14 @@ def main() -> int:
             destination,
             name,
             os_version,
-            simulator_created=created_simulator_id is not None,
+            simulator_created=created_simulator is not None,
         )
     else:
         print_resolved_output(
             destination,
             name,
             os_version,
-            simulator_created=created_simulator_id is not None,
+            simulator_created=created_simulator is not None,
         )
     return 0
 

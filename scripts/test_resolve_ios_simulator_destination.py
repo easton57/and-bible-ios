@@ -13,6 +13,7 @@ from resolve_ios_simulator_destination import (
     choose_runtime,
     find_candidate_by_simulator_id,
     has_simulator_placeholder,
+    main,
     parse_candidates,
     print_resolved_output,
 )
@@ -115,6 +116,28 @@ class ResolveIosSimulatorDestinationTests(unittest.TestCase):
             "os_version=18.2\n"
             "simulator_created=true\n",
         )
+
+    def test_main_uses_created_simulator_when_showdestinations_has_not_caught_up(self) -> None:
+        with patch(
+            "resolve_ios_simulator_destination.provision_simulator",
+            return_value=("SIM-1", "iPhone 17", "26.2"),
+        ):
+            with patch(
+                "resolve_ios_simulator_destination.discover_candidates",
+                return_value=([("iPhone 16 Pro", "26.2", "OTHER-SIM")], ""),
+            ):
+                with patch("resolve_ios_simulator_destination.time.sleep"):
+                    with patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                        self.assertEqual(
+                            main(["--create-dedicated-device"]),
+                            0,
+                        )
+
+        self.assertIn(
+            "Created simulator did not appear in xcodebuild -showdestinations output; using the created simulator directly.",
+            stdout.getvalue(),
+        )
+        self.assertIn("destination=id=SIM-1\n", stdout.getvalue())
 
 
 if __name__ == "__main__":
