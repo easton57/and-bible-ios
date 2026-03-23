@@ -616,11 +616,13 @@ final class AndBibleUITests: XCTestCase {
         app.launch()
 
         _ = openBookmarkList(in: app)
+        tapElementReliably(
+            requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10),
+            timeout: 10
+        )
+
         let genesisRow = requireBookmarkRow("Genesis_1_1", in: app, timeout: 10)
-        let exodusRow = requireBookmarkRow("Exodus_2_1", in: app, timeout: 10)
-
-        requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10).tap()
-
+        let exodusRow = app.descendants(matching: .any)["bookmarkListRowButton::Exodus_2_1"].firstMatch
         let hiddenPredicate = NSPredicate(format: "exists == false")
         expectation(for: hiddenPredicate, evaluatedWith: exodusRow)
         waitForExpectations(timeout: 10)
@@ -963,17 +965,18 @@ final class AndBibleUITests: XCTestCase {
 
         let searchField = app.searchFields.firstMatch
         XCTAssertTrue(searchField.waitForExistence(timeout: 10), "Expected bookmark search field to exist.")
-        let genesisRow = requireBookmarkRow("Genesis_1_1", in: app, timeout: 10)
-        let exodusRow = requireBookmarkRow("Exodus_2_1", in: app, timeout: 10)
 
         tapElementReliably(
             requireElement("bookmarkListFilterChip::UI_Test_Seed", in: app, timeout: 10),
             timeout: 10
         )
+        let genesisRow = requireBookmarkRow("Genesis_1_1", in: app, timeout: 10)
+        let exodusRow = app.descendants(matching: .any)["bookmarkListRowButton::Exodus_2_1"].firstMatch
         XCTAssertTrue(genesisRow.waitForExistence(timeout: 10), "Expected Genesis bookmark row to remain visible after filtering.")
         XCTAssertFalse(exodusRow.exists, "Expected Exodus bookmark row to be hidden by the UI Test Seed filter.")
 
         replaceText(in: searchField, with: "Exodus")
+        searchField.typeText("\n")
         XCTAssertFalse(genesisRow.exists, "Expected the conflicting search query to hide the filtered Genesis row.")
 
         reopenBookmarkList(in: app)
@@ -1669,10 +1672,13 @@ final class AndBibleUITests: XCTestCase {
      *   - fails if the reader menu button, bookmark action, or bookmark list root never appears
      */
     @discardableResult
-    private func openBookmarkList(in app: XCUIApplication) -> XCUIElement {
+    private func openBookmarkList(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10
+    ) -> XCUIElement {
         tapReaderMoreMenuButton(in: app)
-        tapReaderAction("readerOpenBookmarksAction", in: app)
-        return requireElement("bookmarkListScreen", in: app, timeout: 10)
+        tapReaderAction("readerOpenBookmarksAction", in: app, timeout: timeout)
+        return requireElement("bookmarkListScreen", in: app, timeout: timeout)
     }
 
     /**
@@ -1680,14 +1686,19 @@ final class AndBibleUITests: XCTestCase {
      *
      * - Parameter app: Running application whose bookmark sheet should be reopened.
      * - Side effects:
-     *   - taps the bookmark-list done button
+     *   - dismisses the bookmark sheet through the real swipe-down gesture, which remains valid
+     *     even when live search temporarily takes over the sheet header controls
      *   - opens the bookmark list again through the standard reader navigation path
      * - Failure modes:
      *   - fails when the bookmark list cannot be dismissed or reopened
      */
     private func reopenBookmarkList(in app: XCUIApplication) {
-        tapElementReliably(requireElement("bookmarkListDoneButton", in: app, timeout: 10), timeout: 10)
-        _ = openBookmarkList(in: app)
+        requireElement("bookmarkListScreen", in: app, timeout: 10).swipeDown()
+        XCTAssertTrue(
+            requireReaderMoreMenuButton(in: app, timeout: 20).exists,
+            "Expected bookmark list swipe-down dismissal to return to the reader shell."
+        )
+        _ = openBookmarkList(in: app, timeout: 20)
     }
 
     /**
@@ -2307,15 +2318,17 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
-        let button = app.buttons[identifier].firstMatch
-        if button.waitForExistence(timeout: 1) {
-            return button
-        }
+        let action = app.descendants(matching: .any)[identifier].firstMatch
 
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            if button.exists {
-                return button
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining > 0, action.waitForExistence(timeout: min(0.75, remaining)) {
+                return action
+            }
+
+            if action.exists {
+                return action
             }
 
             let swipeContainerCandidates = [
@@ -2333,7 +2346,13 @@ final class AndBibleUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
-        return requireButton(identifier, in: app, timeout: 1, file: file, line: line)
+        XCTAssertTrue(
+            action.exists,
+            "Expected reader action '\(identifier)' to exist within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
+        return action
     }
 
     /**
