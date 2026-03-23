@@ -6,7 +6,7 @@
   "AndBibleUITests/AndBibleUITests/testBookmarkListLabelFilterNarrowsAndClearsVisibleRows": "bookmark-filter",
   "AndBibleUITests/AndBibleUITests/testBookmarkListOpensLabelAssignmentForSeededBookmark": "bookmark-row-label",
   "AndBibleUITests/AndBibleUITests/testBookmarkListOpensStudyPadForSelectedLabel": "bookmark-studypad",
-  "AndBibleUITests/AndBibleUITests/testBookmarkListSearchNarrowsAndClearsVisibleRows": "bookmark-filter",
+  "AndBibleUITests/AndBibleUITests/testBookmarkListSearchNarrowsAndClearsVisibleRows": "bookmark-multirow",
   "AndBibleUITests/AndBibleUITests/testBookmarkListSortMenuReordersRows": "bookmark-multirow",
   "AndBibleUITests/AndBibleUITests/testBookmarkRowDeletePreservesOtherRowsAcrossReopen": "bookmark-multirow",
   "AndBibleUITests/AndBibleUITests/testBookmarkSelectionNavigatesReaderToSeededReference": "bookmark-navigation",

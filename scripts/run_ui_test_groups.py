@@ -116,6 +116,7 @@ def run_command(
     *,
     capture_output: bool = False,
     timeout_seconds: int | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run one subprocess and echo the exact command line."""
     print("Running:", shlex.join(command), flush=True)
@@ -124,6 +125,7 @@ def run_command(
         check=True,
         text=True,
         capture_output=capture_output,
+        env=env,
         timeout=timeout_seconds,
     )
 
@@ -329,17 +331,6 @@ def run_grouped_ui_tests(
 
     fixture_manifest = load_fixture_manifest(fixture_manifest_path)
     groups = group_selection_args_by_fixture(selection_args, fixture_manifest)
-    resolved_app_path = app_path or infer_app_path(
-        derived_data_path=derived_data_path,
-        configuration=configuration,
-        scheme=scheme,
-    )
-    data_container_path = ensure_app_installed(
-        simulator_id=simulator_id,
-        bundle_identifier=bundle_identifier,
-        app_path=resolved_app_path,
-    )
-
     total_groups = len(groups)
     for group_index, (scenario, group_selection_args) in enumerate(groups, start=1):
         print(
@@ -347,22 +338,17 @@ def run_grouped_ui_tests(
             f"({len(group_selection_args)} test(s))",
             flush=True,
         )
-        terminate_app_if_running(
-            simulator_id=simulator_id,
-            bundle_identifier=bundle_identifier,
-        )
-        reset_and_seed_fixture(
-            fixture_tool_path=fixture_tool_path,
-            data_container_path=data_container_path,
-            bundle_identifier=bundle_identifier,
-            scenario=scenario,
-        )
         group_result_bundle_path = derive_group_result_bundle_path(
             result_bundle_path,
             scenario=scenario,
             group_index=group_index,
             total_groups=total_groups,
         )
+        group_env = os.environ.copy()
+        group_env["UITEST_FIXTURE_SCENARIO"] = scenario
+        group_env["UITEST_FIXTURE_TOOL_PATH"] = str(fixture_tool_path.resolve())
+        group_env["UITEST_BUNDLE_ID"] = bundle_identifier
+        group_env["UITEST_SIMULATOR_ID"] = simulator_id
         command = build_xcodebuild_command(
             project=project,
             scheme=scheme,
@@ -374,7 +360,7 @@ def run_grouped_ui_tests(
             selection_args_text="\n".join(group_selection_args),
             action="test-without-building",
         )
-        run_command(command)
+        run_command(command, env=group_env)
     return 0
 
 

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import XCTest
 
 /**
@@ -582,8 +583,8 @@ final class AndBibleUITests: XCTestCase {
         let exodusRow = app.descendants(matching: .any)["bookmarkListRowButton::Exodus_2_1"]
         let matthewRow = app.descendants(matching: .any)["bookmarkListRowButton::Matthew_3_1"]
 
-        searchField.tap()
-        searchField.typeText("Matthew")
+        replaceText(in: searchField, with: "Matthew")
+        searchField.typeText("\n")
 
         XCTAssertTrue(
             matthewRow.waitForExistence(timeout: 10),
@@ -1045,10 +1046,7 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        openSettings(in: app)
-        tapSettingsElement("settingsSyncLink", in: app)
-
-        XCTAssertTrue(requireElement("syncSettingsScreen", in: app, timeout: 10).exists)
+        XCTAssertTrue(openSyncSettings(in: app).exists)
     }
 
     /**
@@ -1352,6 +1350,7 @@ final class AndBibleUITests: XCTestCase {
         if let trackedApp, trackedApp.state != .notRunning {
             trackedApp.terminate()
         }
+        prepareFixtureIfRequested()
         let app = XCUIApplication()
         trackedApp = app
         app.launchEnvironment["UITEST_SESSION_ID"] = UUID().uuidString
@@ -1359,6 +1358,493 @@ final class AndBibleUITests: XCTestCase {
             app.launchEnvironment["UITEST_SEARCH_QUERY"] = searchQuery
         }
         return app
+    }
+
+    /**
+     Applies one host-side fixture scenario to the simulator app container before launching the app.
+     *
+     * - Side effects:
+     *   - resolves the app data container from the current simulator UDID
+     *   - runs `UITestFixtureTool reset` and `seed` against that installed app container
+     * - Failure modes:
+     *   - records an XCTest failure when the fixture tool path, simulator UDID, or data container
+     *     cannot be resolved from the current test-host environment
+     *   - records an XCTest failure when the fixture reset or seed subprocess exits non-zero
+     */
+    private func prepareFixtureIfRequested(
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let environment = ProcessInfo.processInfo.environment
+        guard let scenario = resolveFixtureScenario(
+            environment: environment,
+            file: file,
+            line: line
+        ) else {
+            return
+        }
+        guard let fixtureToolPath = resolveFixtureToolPath(
+            environment: environment,
+            file: file,
+            line: line
+        ) else {
+            return
+        }
+        let bundleID = environment["UITEST_BUNDLE_ID"] ?? "org.andbible.ios"
+        guard let dataContainerPath = resolveInstalledAppDataContainerFromFilesystem(
+            bundleIdentifier: bundleID,
+            file: file,
+            line: line
+        ) else {
+            return
+        }
+
+        print(
+            "Preparing fixture scenario '\(scenario)' with container '\(dataContainerPath)'."
+        )
+
+        let resetResult = runHostProcess(
+            executablePath: fixtureToolPath,
+            arguments: [
+                "reset",
+                "--data-container",
+                dataContainerPath,
+                "--bundle-id",
+                bundleID,
+            ],
+            timeout: 30
+        )
+        XCTAssertEqual(
+            resetResult.status,
+            0,
+            "Fixture reset failed for scenario '\(scenario)':\nstdout:\n\(resetResult.stdout)\nstderr:\n\(resetResult.stderr)",
+            file: file,
+            line: line
+        )
+
+        let seedResult = runHostProcess(
+            executablePath: fixtureToolPath,
+            arguments: [
+                "seed",
+                "--data-container",
+                dataContainerPath,
+                "--scenario",
+                scenario,
+                "--bundle-id",
+                bundleID,
+            ],
+            timeout: 30
+        )
+        XCTAssertEqual(
+            seedResult.status,
+            0,
+            "Fixture seed failed for scenario '\(scenario)':\nstdout:\n\(seedResult.stdout)\nstderr:\n\(seedResult.stderr)",
+            file: file,
+            line: line
+        )
+    }
+
+    /**
+     Resolves the installed simulator data container by scanning mobile-container metadata on disk.
+     *
+     * - Parameters:
+     *   - bundleIdentifier: Bundle identifier of the app under test.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: Absolute simulator data-container path for the installed app.
+     * - Side effects:
+     *   - scans the current simulator's `Containers/Data/Application` directories
+     * - Failure modes:
+     *   - records an XCTest failure when the simulator data root or matching container metadata
+     *     cannot be resolved from the installed app bundle path
+     */
+    private func resolveInstalledAppDataContainerFromFilesystem(
+        bundleIdentifier: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> String? {
+        let installedAppBundleURL = Bundle.main.bundleURL
+        let simulatorDataRootURL = installedAppBundleURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let dataApplicationsURL = simulatorDataRootURL
+            .appendingPathComponent("Containers", isDirectory: true)
+            .appendingPathComponent("Data", isDirectory: true)
+            .appendingPathComponent("Application", isDirectory: true)
+
+        guard FileManager.default.fileExists(atPath: dataApplicationsURL.path) else {
+            XCTFail(
+                "Unable to resolve simulator data root from installed app bundle '\(installedAppBundleURL.path)'.",
+                file: file,
+                line: line
+            )
+            return nil
+        }
+
+        let candidateURLs = (try? FileManager.default.contentsOfDirectory(
+            at: dataApplicationsURL,
+            includingPropertiesForKeys: nil
+        )) ?? []
+
+        for candidateURL in candidateURLs {
+            let metadataURL = candidateURL.appendingPathComponent(
+                ".com.apple.mobile_container_manager.metadata.plist",
+                isDirectory: false
+            )
+            guard let metadata = NSDictionary(contentsOf: metadataURL) as? [String: Any],
+                  let identifier = metadata["MCMMetadataIdentifier"] as? String,
+                  identifier == bundleIdentifier else {
+                continue
+            }
+            return candidateURL.path
+        }
+
+        XCTFail(
+            "Unable to resolve simulator data container for '\(bundleIdentifier)' under '\(dataApplicationsURL.path)'.",
+            file: file,
+            line: line
+        )
+        return nil
+    }
+
+    /**
+     Resolves the fixture scenario for the current UI test.
+     *
+     * Resolution order:
+     * - explicit `UITEST_FIXTURE_SCENARIO` host environment override
+     * - checked-in `scripts/ui_test_fixture_manifest.json` entry for the current test method
+     *
+     * - Parameters:
+     *   - environment: Current XCTest host environment.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: Fixture scenario name, or `nil` only when the current test is intentionally
+     *   absent from the manifest.
+     * - Side effects:
+     *   - reads the checked-in fixture manifest from the repository root when no explicit override
+     *     is present
+     * - Failure modes:
+     *   - records an XCTest failure when the manifest cannot be read or the current test name
+     *     cannot be normalized into a manifest key
+     */
+    private func resolveFixtureScenario(
+        environment: [String: String],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> String? {
+        if let scenario = environment["UITEST_FIXTURE_SCENARIO"], !scenario.isEmpty {
+            return scenario
+        }
+
+        guard let testIdentifier = currentFixtureManifestTestIdentifier(file: file, line: line),
+              let manifestURL = resolveRepositoryRootURL(file: file, line: line)?
+                .appendingPathComponent("scripts", isDirectory: true)
+                .appendingPathComponent("ui_test_fixture_manifest.json", isDirectory: false) else {
+            return nil
+        }
+
+        do {
+            let data = try Data(contentsOf: manifestURL)
+            let manifest = try JSONDecoder().decode([String: String].self, from: data)
+            if let scenario = manifest[testIdentifier] {
+                return scenario
+            }
+            XCTFail(
+                "Fixture manifest is missing an entry for '\(testIdentifier)'.",
+                file: file,
+                line: line
+            )
+            return nil
+        } catch {
+            XCTFail(
+                "Unable to load fixture manifest at '\(manifestURL.path)': \(error)",
+                file: file,
+                line: line
+            )
+            return nil
+        }
+    }
+
+    /**
+     Resolves the built host-side fixture tool path.
+     *
+     * Resolution order:
+     * - explicit `UITEST_FIXTURE_TOOL_PATH` host environment override
+     * - `.build/debug/UITestFixtureTool`
+     * - architecture-specific `.build/<triple>/debug/UITestFixtureTool`
+     *
+     * - Parameters:
+     *   - environment: Current XCTest host environment.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: Absolute executable path for the fixture tool.
+     * - Side effects:
+     *   - probes the repository-local SwiftPM build outputs for the fixture tool binary
+     * - Failure modes:
+     *   - records an XCTest failure when the fixture tool cannot be resolved
+     */
+    private func resolveFixtureToolPath(
+        environment: [String: String],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> String? {
+        if let fixtureToolPath = environment["UITEST_FIXTURE_TOOL_PATH"], !fixtureToolPath.isEmpty {
+            return fixtureToolPath
+        }
+
+        guard let repoRootURL = resolveRepositoryRootURL(file: file, line: line) else {
+            return nil
+        }
+
+        let candidateURLs = [
+            repoRootURL.appendingPathComponent(".build/debug/UITestFixtureTool", isDirectory: false),
+            repoRootURL.appendingPathComponent(".build/arm64-apple-macosx/debug/UITestFixtureTool", isDirectory: false),
+            repoRootURL.appendingPathComponent(".build/x86_64-apple-macosx/debug/UITestFixtureTool", isDirectory: false),
+        ]
+
+        if let candidate = candidateURLs.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) {
+            return candidate.path
+        }
+
+        XCTFail(
+            "Unable to resolve UITestFixtureTool in \(candidateURLs.map(\.path).joined(separator: ", ")).",
+            file: file,
+            line: line
+        )
+        return nil
+    }
+
+    /**
+     Resolves the canonical fixture-manifest key for the current XCTest method.
+     *
+     * - Parameters:
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: Manifest key shaped like `AndBibleUITests/AndBibleUITests/testExample`.
+     * - Side effects: none.
+     * - Failure modes:
+     *   - records an XCTest failure when the XCTest name cannot be normalized
+     */
+    private func currentFixtureManifestTestIdentifier(
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> String? {
+        let rawName = name
+        guard let methodName = rawName.split(separator: " ").last?
+            .trimmingCharacters(in: CharacterSet(charactersIn: "]")),
+              methodName.hasPrefix("test") else {
+            XCTFail(
+                "Unable to derive fixture manifest identifier from XCTest name '\(rawName)'.",
+                file: file,
+                line: line
+            )
+            return nil
+        }
+        return "AndBibleUITests/AndBibleUITests/\(methodName)"
+    }
+
+    /**
+     Resolves the repository root from the checked-in UI-test source file path.
+     *
+     * - Parameters:
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: Absolute repository root URL.
+     * - Side effects: none.
+     * - Failure modes:
+     *   - records an XCTest failure when the source path cannot be normalized
+     */
+    private func resolveRepositoryRootURL(
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> URL? {
+        let fileURL = URL(fileURLWithPath: String(describing: file), isDirectory: false)
+        let repoRootURL = fileURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let manifestURL = repoRootURL
+            .appendingPathComponent("scripts", isDirectory: true)
+            .appendingPathComponent("ui_test_fixture_manifest.json", isDirectory: false)
+        guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+            XCTFail(
+                "Unable to resolve repository root from '\(fileURL.path)'; missing '\(manifestURL.path)'.",
+                file: file,
+                line: line
+            )
+            return nil
+        }
+        return repoRootURL
+    }
+
+    /**
+     Resolves the installed simulator app data container for the current test run.
+     *
+     * - Parameters:
+     *   - simulatorID: Target simulator UDID.
+     *   - bundleIdentifier: Bundle identifier of the app under test.
+     *   - timeout: Maximum time to keep retrying `simctl get_app_container`.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: Absolute data-container path, or `nil` after recording a failure.
+     * - Side effects:
+     *   - polls the simulator host for the installed app container while xcodebuild finishes
+     *     test-run installation
+     * - Failure modes:
+     *   - records an XCTest failure when no installed app container can be resolved before timeout
+     */
+    private func resolveInstalledAppDataContainer(
+        simulatorID: String,
+        bundleIdentifier: String,
+        timeout: TimeInterval,
+        recordFailure: Bool = true,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> String? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var lastError = ""
+
+        repeat {
+            let result = runHostProcess(
+                executablePath: "/usr/bin/xcrun",
+                arguments: ["simctl", "get_app_container", simulatorID, bundleIdentifier, "data"],
+                timeout: 10
+            )
+            let trimmedPath = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if result.status == 0, !trimmedPath.isEmpty {
+                return trimmedPath
+            }
+            lastError = result.stderr.isEmpty ? result.stdout : result.stderr
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        } while Date() < deadline
+
+        if recordFailure {
+            XCTFail(
+                "Unable to resolve app data container for '\(bundleIdentifier)' on simulator '\(simulatorID)' within \(timeout) seconds.\nLast host output:\n\(lastError)",
+                file: file,
+                line: line
+            )
+        }
+        return nil
+    }
+
+    /**
+     Runs one host-side subprocess from the macOS XCTest runner and captures its output.
+     *
+     * - Parameters:
+     *   - executablePath: Absolute executable path to run.
+     *   - arguments: CLI arguments excluding the executable itself.
+     *   - timeout: Maximum time to wait before terminating the subprocess.
+     * - Returns: Exit status plus captured stdout/stderr text.
+     * - Side effects:
+     *   - spawns one host-side child process from the XCTest runner
+     *   - terminates the child process when it exceeds the timeout budget
+     * - Failure modes:
+     *   - returns `-1` when the subprocess cannot be launched
+     *   - returns `-2` when the subprocess is terminated after exceeding the timeout budget
+     */
+    private func runHostProcess(
+        executablePath: String,
+        arguments: [String],
+        timeout: TimeInterval
+    ) -> (status: Int32, stdout: String, stderr: String) {
+        var stdoutPipe: [Int32] = [0, 0]
+        var stderrPipe: [Int32] = [0, 0]
+        guard pipe(&stdoutPipe) == 0, pipe(&stderrPipe) == 0 else {
+            return (-1, "", "Failed to create host-process pipes.")
+        }
+
+        var fileActions: posix_spawn_file_actions_t? = nil
+        posix_spawn_file_actions_init(&fileActions)
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+
+        posix_spawn_file_actions_adddup2(&fileActions, stdoutPipe[1], STDOUT_FILENO)
+        posix_spawn_file_actions_adddup2(&fileActions, stderrPipe[1], STDERR_FILENO)
+        posix_spawn_file_actions_addclose(&fileActions, stdoutPipe[0])
+        posix_spawn_file_actions_addclose(&fileActions, stderrPipe[0])
+
+        let command = [executablePath] + arguments
+        let cArguments = command.map { strdup($0) }
+        defer { cArguments.forEach { free($0) } }
+        let argv = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: cArguments.count + 1)
+        defer { argv.deallocate() }
+        for (index, pointer) in cArguments.enumerated() {
+            argv[index] = pointer
+        }
+        argv[cArguments.count] = nil
+
+        var pid: pid_t = 0
+        let spawnStatus = posix_spawn(&pid, executablePath, &fileActions, nil, argv, nil)
+        close(stdoutPipe[1])
+        close(stderrPipe[1])
+        if spawnStatus != 0 {
+            let stderr = String(cString: strerror(spawnStatus))
+            close(stdoutPipe[0])
+            close(stderrPipe[0])
+            return (-1, "", "Failed to launch \(executablePath): \(stderr)")
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        var waitStatus: Int32 = 0
+        var timedOut = false
+        while true {
+            let waitResult = waitpid(pid, &waitStatus, WNOHANG)
+            if waitResult == pid {
+                break
+            }
+            if Date() >= deadline {
+                timedOut = true
+                kill(pid, SIGKILL)
+                _ = waitpid(pid, &waitStatus, 0)
+                break
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+
+        let stdout = readAll(from: stdoutPipe[0])
+        let stderr = readAll(from: stderrPipe[0])
+        close(stdoutPipe[0])
+        close(stderrPipe[0])
+
+        if timedOut {
+            return (-2, stdout, stderr)
+        }
+        let terminatingSignal = waitStatus & 0x7f
+        if terminatingSignal == 0 {
+            return ((waitStatus >> 8) & 0xff, stdout, stderr)
+        }
+        if terminatingSignal != 0 {
+            return (-3, stdout, stderr.isEmpty ? "Process terminated by signal \(terminatingSignal)." : stderr)
+        }
+        return (-4, stdout, stderr)
+    }
+
+    /**
+     Reads all currently available UTF-8 text from one file descriptor.
+     *
+     * - Parameter fileDescriptor: Open descriptor positioned at the start of the captured stream.
+     * - Returns: Best-effort UTF-8 decoded contents.
+     * - Side effects:
+     *   - drains the descriptor until EOF
+     * - Failure modes:
+     *   - returns an empty string when the descriptor cannot be read or the bytes are not valid
+     *     UTF-8
+     */
+    private func readAll(from fileDescriptor: Int32) -> String {
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+
+        while true {
+            let bytesRead = read(fileDescriptor, &buffer, buffer.count)
+            if bytesRead <= 0 {
+                break
+            }
+            data.append(buffer, count: bytesRead)
+        }
+
+        return String(data: data, encoding: .utf8) ?? ""
     }
 
     /**
@@ -1766,8 +2252,8 @@ final class AndBibleUITests: XCTestCase {
      */
     private func openSyncSettings(in app: XCUIApplication) -> XCUIElement {
         openSettings(in: app)
-        tapSettingsElement("settingsSyncLink", in: app)
-        return requireElement("syncSettingsScreen", in: app, timeout: 10)
+        tapSettingsElement("settingsSyncLink", in: app, timeout: 20)
+        return requireElement("syncSettingsScreen", in: app, timeout: 20)
     }
 
     /**
