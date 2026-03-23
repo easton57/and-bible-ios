@@ -316,8 +316,9 @@ final class AndBibleUITests: XCTestCase {
         tapElementReliably(requireElement("readingPlanStartButton", in: app, timeout: 10), timeout: 10)
         XCTAssertTrue(requireElement("availablePlansScreen", in: app, timeout: 10).exists)
         tapElementReliably(app.buttons.matching(identifier: "readingPlanTemplateButton").firstMatch, timeout: 10)
-        XCTAssertTrue(requireElement("dailyReadingScreen", in: app, timeout: 15).exists)
-        let currentDay = requireElement("dailyReadingCurrentDayLabel", in: app, timeout: 10)
+        XCTAssertTrue(requireElement("readingPlanListScreen", in: app, timeout: 15).exists)
+        tapElementReliably(requireElement("readingPlanActivePlanLink", in: app, timeout: 15), timeout: 10)
+        let currentDay = requireElement("dailyReadingCurrentDayLabel", in: app, timeout: 15)
         XCTAssertEqual(currentDay.value as? String, "1")
 
         tapElementReliably(
@@ -410,17 +411,28 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertTrue(openWorkspaceSelector(in: app).exists)
         let originalActiveWorkspaceName = requireActiveWorkspaceRow(in: app, timeout: 10).label
 
-        requireElement("workspaceSelectorAddButton", in: app, timeout: 10).tap()
+        tapElementReliably(requireElement("workspaceSelectorAddButton", in: app, timeout: 10), timeout: 10)
         replaceText(in: app.textFields.firstMatch, with: createdName)
-        app.buttons["Create"].firstMatch.tap()
+        tapElementReliably(app.buttons["Create"].firstMatch, timeout: 10)
 
-        _ = requireWorkspaceRow(named: createdName, in: app, timeout: 10)
+        XCTAssertTrue(
+            requireReaderMoreMenuButton(in: app, timeout: 20).exists,
+            "Expected creating a workspace to return to the reader shell."
+        )
+
+        _ = openWorkspaceSelector(in: app)
+        _ = requireWorkspaceRow(named: createdName, in: app, timeout: 15)
+        XCTAssertEqual(
+            requireActiveWorkspaceRow(in: app, timeout: 10).label,
+            createdName,
+            "Expected the new workspace to become active after creation."
+        )
 
         let createdRow = requireWorkspaceRow(named: createdName, in: app, timeout: 10)
         createdRow.press(forDuration: 1.0)
         tapElementReliably(requireElement("workspaceSelectorRenameAction", in: app, timeout: 10), timeout: 10)
         replaceText(in: app.textFields.firstMatch, with: renamedName)
-        app.buttons["Save"].firstMatch.tap()
+        tapElementReliably(app.buttons["Save"].firstMatch, timeout: 10)
 
         _ = requireWorkspaceRow(named: renamedName, in: app, timeout: 10)
 
@@ -428,14 +440,28 @@ final class AndBibleUITests: XCTestCase {
         renamedRow.press(forDuration: 1.0)
         tapElementReliably(requireElement("workspaceSelectorCloneAction", in: app, timeout: 10), timeout: 10)
         replaceText(in: app.textFields.firstMatch, with: cloneName)
-        app.buttons["Create"].firstMatch.tap()
+        tapElementReliably(app.buttons["Create"].firstMatch, timeout: 10)
 
         _ = requireWorkspaceRow(named: cloneName, in: app, timeout: 10)
+
+        tapElementReliably(requireWorkspaceRow(named: originalActiveWorkspaceName, in: app, timeout: 10), timeout: 10)
+        XCTAssertTrue(
+            requireReaderMoreMenuButton(in: app, timeout: 20).exists,
+            "Expected switching workspaces to return to the reader shell."
+        )
+
+        _ = openWorkspaceSelector(in: app)
+        XCTAssertEqual(
+            requireActiveWorkspaceRow(in: app, timeout: 10).label,
+            originalActiveWorkspaceName,
+            "Expected the original workspace to be active before cleanup."
+        )
 
         let cloneRow = requireWorkspaceRow(named: cloneName, in: app, timeout: 10)
         cloneRow.swipeLeft()
         tapElementReliably(requireElement("workspaceSelectorDeleteAction", in: app, timeout: 10), timeout: 10)
-        renamedRow.swipeLeft()
+        let renamedRowToDelete = requireWorkspaceRow(named: renamedName, in: app, timeout: 10)
+        renamedRowToDelete.swipeLeft()
         tapElementReliably(requireElement("workspaceSelectorDeleteAction", in: app, timeout: 10), timeout: 10)
 
         let deletedPredicate = NSPredicate(format: "exists == false")
@@ -1008,7 +1034,7 @@ final class AndBibleUITests: XCTestCase {
 
         XCTAssertTrue(openLabelManager(in: app).exists)
 
-        requireElement("labelManagerAddButton", in: app, timeout: 10).tap()
+        tapElementReliably(requireElement("labelManagerAddButton", in: app, timeout: 10), timeout: 10)
         replaceText(in: requireLabelManagerNewLabelField(in: app, timeout: 10), with: originalName)
         tapElementReliably(requireLabelManagerCreateButton(in: app, timeout: 10), timeout: 10)
         XCTAssertTrue(requireLabelRow(named: originalName, in: app, timeout: 10).exists)
@@ -1282,7 +1308,7 @@ final class AndBibleUITests: XCTestCase {
         let textDisplayScreen = openTextDisplaySettings(in: app)
         XCTAssertTrue(textDisplayScreen.exists)
         let fontFamilyButton = requireElement("textDisplayFontFamilyButton", in: app, timeout: 10)
-        fontFamilyButton.tap()
+        tapElementReliably(fontFamilyButton, timeout: 10)
 
         let valuePredicate = NSPredicate(format: "value CONTAINS %@", "fontPickerPresented")
         expectation(for: valuePredicate, evaluatedWith: textDisplayScreen)
@@ -1940,7 +1966,7 @@ final class AndBibleUITests: XCTestCase {
      */
     private func openSearch(in app: XCUIApplication) -> XCUIElement {
         tapElementReliably(
-            requireElement("readerSearchButton", in: app, timeout: 10),
+            requireButton("readerSearchButton", in: app, timeout: 10),
             timeout: 10
         )
         let searchScreen = requireElement("searchScreen", in: app, timeout: 20)
@@ -2177,7 +2203,7 @@ final class AndBibleUITests: XCTestCase {
     private func openWorkspaceSelector(in app: XCUIApplication) -> XCUIElement {
         tapReaderMoreMenuButton(in: app)
         tapReaderAction("readerOpenWorkspacesAction", in: app)
-        return requireElement("workspaceSelectorScreen", in: app, timeout: 10)
+        return requireElement("workspaceSelectorAddButton", in: app, timeout: 15)
     }
 
     /**
@@ -2191,9 +2217,13 @@ final class AndBibleUITests: XCTestCase {
      *   - fails when the Label Manager screen never appears
      */
     private func openLabelManager(in app: XCUIApplication) -> XCUIElement {
-        openSettings(in: app)
-        tapSettingsElement("settingsLabelsLink", in: app, timeout: 20)
-        return requireElement("labelManagerAddButton", in: app, timeout: 20)
+        openSettingsDestination(
+            linkIdentifier: "settingsLabelsLink",
+            destinationIdentifier: "labelManagerScreen",
+            readinessIdentifiers: ["labelManagerAddButton"],
+            in: app,
+            destinationTimeout: 20
+        )
     }
 
     /**
@@ -2317,6 +2347,7 @@ final class AndBibleUITests: XCTestCase {
         openSettingsDestination(
             linkIdentifier: "settingsImportExportLink",
             destinationIdentifier: "importExportScreen",
+            readinessIdentifiers: ["importExportImportButton", "importExportFullBackupButton"],
             in: app,
             destinationTimeout: 20
         )
@@ -2388,6 +2419,7 @@ final class AndBibleUITests: XCTestCase {
         openSettingsDestination(
             linkIdentifier: "settingsColorsLink",
             destinationIdentifier: "colorSettingsScreen",
+            readinessIdentifiers: ["colorSettingsResetButton"],
             in: app,
             destinationTimeout: 20
         )
@@ -2407,6 +2439,7 @@ final class AndBibleUITests: XCTestCase {
         openSettingsDestination(
             linkIdentifier: "settingsTextDisplayLink",
             destinationIdentifier: "textDisplaySettingsScreen",
+            readinessIdentifiers: ["textDisplayFontFamilyButton"],
             in: app,
             destinationTimeout: 20
         )
@@ -2425,14 +2458,17 @@ final class AndBibleUITests: XCTestCase {
      *   - fails when the settings form never appears
      */
     private func openSettings(in app: XCUIApplication) {
-        tapReaderMoreMenuButton(in: app)
-        tapReaderAction("readerOpenSettingsAction", in: app)
-        XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
-        let okButton = app.buttons["OK"]
-        if okButton.exists {
-            okButton.tap()
-            XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
+        for attempt in 1...2 {
+            tapReaderMoreMenuButton(in: app)
+            tapReaderAction("readerOpenSettingsAction", in: app, timeout: 15)
+            if waitForSettingsReady(in: app, timeout: 20) {
+                return
+            }
+            if attempt == 1 {
+                continue
+            }
         }
+        XCTFail("Expected the Settings screen to become ready after opening it from the reader menu.")
     }
 
     /**
@@ -2460,7 +2496,9 @@ final class AndBibleUITests: XCTestCase {
         let settingsForm = requireElement("settingsForm", in: app, timeout: timeout, file: file, line: line)
         let element = app.descendants(matching: .any)[identifier].firstMatch
         let title = settingsNavigationTitle(for: identifier)
-        let titledFallback = app.staticTexts[title].firstMatch
+        let titledFallback = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", title))
+            .firstMatch
 
         func resolvedControlIfPresent() -> XCUIElement? {
             if element.exists {
@@ -2557,6 +2595,7 @@ final class AndBibleUITests: XCTestCase {
     private func openSettingsDestination(
         linkIdentifier: String,
         destinationIdentifier: String,
+        readinessIdentifiers: [String] = [],
         in app: XCUIApplication,
         rowTimeout: TimeInterval = 10,
         destinationTimeout: TimeInterval = 10,
@@ -2565,18 +2604,33 @@ final class AndBibleUITests: XCTestCase {
     ) -> XCUIElement {
         openSettings(in: app)
         let destination = app.descendants(matching: .any)[destinationIdentifier].firstMatch
+        let readinessCandidates = [destinationIdentifier] + readinessIdentifiers
 
         for attempt in 0..<2 {
             tapSettingsElement(linkIdentifier, in: app, timeout: rowTimeout, file: file, line: line)
-            if destination.waitForExistence(timeout: destinationTimeout) {
-                return destination
+            if waitForAnyElement(
+                readinessCandidates,
+                in: app,
+                timeout: destinationTimeout,
+                file: file,
+                line: line
+            ) != nil {
+                if destination.exists || destination.waitForExistence(timeout: 1) {
+                    return destination
+                }
+                if let readyElement = waitForAnyElement(
+                    readinessIdentifiers,
+                    in: app,
+                    timeout: 1,
+                    file: file,
+                    line: line
+                ) {
+                    return readyElement
+                }
             }
 
-            if attempt == 0 {
-                let settingsForm = app.descendants(matching: .any)["settingsForm"].firstMatch
-                if settingsForm.exists {
-                    continue
-                }
+            if attempt == 0, waitForSettingsReady(in: app, timeout: 3) {
+                continue
             }
         }
 
@@ -2620,6 +2674,41 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
         return element
+    }
+
+    /**
+     Waits for the first accessibility-identified element in a candidate set to appear.
+     *
+     * - Parameters:
+     *   - identifiers: Ordered accessibility identifiers to probe.
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to keep polling.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: The first matching visible element, or `nil` when none appear before timeout.
+     * - Side effects:
+     *   - repeatedly re-queries the live XCUI hierarchy across the provided identifiers
+     * - Failure modes: This helper does not fail directly.
+     */
+    private func waitForAnyElement(
+        _ identifiers: [String],
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            for identifier in identifiers {
+                let candidate = app.descendants(matching: .any)[identifier].firstMatch
+                if candidate.exists || candidate.waitForExistence(timeout: 0.2) {
+                    return candidate
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        return nil
     }
 
     /**
@@ -2705,6 +2794,10 @@ final class AndBibleUITests: XCTestCase {
         containing fragment: String,
         in app: XCUIApplication
     ) -> XCUIElement {
+        let referenceButton = app.buttons["bookChooserButton"].firstMatch
+        if referenceButton.exists || referenceButton.waitForExistence(timeout: 0.5) {
+            return referenceButton
+        }
         let predicate = NSPredicate(format: "label CONTAINS[c] %@", fragment)
         return app.descendants(matching: .any).matching(predicate).firstMatch
     }
@@ -2732,12 +2825,24 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) -> XCUIElement {
         let element = readerReferenceElement(containing: fragment, in: app)
-        XCTAssertTrue(
-            element.waitForExistence(timeout: timeout),
-            "Expected a visible reader reference containing '\(fragment)' within \(timeout) seconds.",
-            file: file,
-            line: line
-        )
+        if element.identifier == "bookChooserButton" {
+            let predicate = NSPredicate(format: "value CONTAINS[c] %@", fragment)
+            expectation(for: predicate, evaluatedWith: element)
+            waitForExpectations(timeout: timeout)
+            XCTAssertTrue(
+                predicate.evaluate(with: element),
+                "Expected the reader reference to contain '\(fragment)' within \(timeout) seconds.",
+                file: file,
+                line: line
+            )
+        } else {
+            XCTAssertTrue(
+                element.waitForExistence(timeout: timeout),
+                "Expected a visible reader reference containing '\(fragment)' within \(timeout) seconds.",
+                file: file,
+                line: line
+            )
+        }
         return element
     }
 
@@ -2763,15 +2868,27 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) {
         let element = readerReferenceElement(containing: fragment, in: app)
-        let predicate = NSPredicate(format: "exists == false")
-        expectation(for: predicate, evaluatedWith: element)
-        waitForExpectations(timeout: timeout)
-        XCTAssertFalse(
-            element.exists,
-            "Expected reader reference containing '\(fragment)' to disappear within \(timeout) seconds.",
-            file: file,
-            line: line
-        )
+        if element.identifier == "bookChooserButton" {
+            let predicate = NSPredicate(format: "NOT (value CONTAINS[c] %@)", fragment)
+            expectation(for: predicate, evaluatedWith: element)
+            waitForExpectations(timeout: timeout)
+            XCTAssertTrue(
+                predicate.evaluate(with: element),
+                "Expected the reader reference to stop containing '\(fragment)' within \(timeout) seconds.",
+                file: file,
+                line: line
+            )
+        } else {
+            let predicate = NSPredicate(format: "exists == false")
+            expectation(for: predicate, evaluatedWith: element)
+            waitForExpectations(timeout: timeout)
+            XCTAssertFalse(
+                element.exists,
+                "Expected reader reference containing '\(fragment)' to disappear within \(timeout) seconds.",
+                file: file,
+                line: line
+            )
+        }
     }
 
     /**
@@ -3295,20 +3412,25 @@ final class AndBibleUITests: XCTestCase {
             file: file,
             line: line
         )
-        let hittablePredicate = NSPredicate(format: "hittable == true")
-        let expectation = XCTNSPredicateExpectation(predicate: hittablePredicate, object: element)
-        let result = XCTWaiter().wait(for: [expectation], timeout: timeout)
-        if result == .completed, element.isHittable {
-            element.tap()
-            return
-        }
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if element.exists, !element.frame.isEmpty {
+                if element.isHittable {
+                    element.tap()
+                } else {
+                    element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                }
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
         XCTAssertFalse(
             element.frame.isEmpty,
             "Expected element '\(element.identifier)' to expose a non-empty frame before tapping.",
             file: file,
             line: line
         )
-        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     /**
@@ -3396,7 +3518,7 @@ final class AndBibleUITests: XCTestCase {
         timeout: TimeInterval = 10,
         file: StaticString = #filePath,
         line: UInt = #line
-    ) -> XCUIElement {
+        ) -> XCUIElement {
         let alert = app.alerts.firstMatch
         XCTAssertTrue(
             alert.waitForExistence(timeout: timeout),
@@ -3405,7 +3527,7 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
 
-        let identifiedField = app.descendants(matching: .any)["labelManagerNewLabelNameField"].firstMatch
+        let identifiedField = alert.descendants(matching: .any)["labelManagerNewLabelNameField"].firstMatch
         if identifiedField.exists || identifiedField.waitForExistence(timeout: 0.5) {
             return identifiedField
         }
@@ -3445,7 +3567,7 @@ final class AndBibleUITests: XCTestCase {
         timeout: TimeInterval = 10,
         file: StaticString = #filePath,
         line: UInt = #line
-    ) -> XCUIElement {
+        ) -> XCUIElement {
         let alert = app.alerts.firstMatch
         XCTAssertTrue(
             alert.waitForExistence(timeout: timeout),
@@ -3454,7 +3576,7 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
 
-        let identifiedButton = app.descendants(matching: .any)["labelManagerCreateButton"].firstMatch
+        let identifiedButton = alert.descendants(matching: .any)["labelManagerCreateButton"].firstMatch
         if identifiedButton.exists || identifiedButton.waitForExistence(timeout: 0.5) {
             return identifiedButton
         }
@@ -3472,6 +3594,51 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
         return fallbackButton
+    }
+
+    /**
+     Waits for the Settings screen to expose at least one stable production control.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to wait before giving up.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Returns: `true` when Settings is ready for interaction, otherwise `false`.
+     * - Side effects:
+     *   - dismisses the language restart confirmation when it appears during navigation
+     *   - polls the Settings screen for both the form root and stable row identifiers
+     * - Failure modes: This helper does not fail directly.
+     */
+    private func waitForSettingsReady(
+        in app: XCUIApplication,
+        timeout: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let readyIdentifiers = [
+            "settingsForm",
+            "settingsImportExportLink",
+            "settingsSyncLink",
+            "settingsLabelsLink",
+            "settingsColorsLink",
+            "settingsTextDisplayLink",
+        ]
+        let deadline = Date().addingTimeInterval(timeout)
+
+        repeat {
+            let okButton = app.buttons["OK"].firstMatch
+            if okButton.exists, !okButton.frame.isEmpty {
+                tapElementReliably(okButton, timeout: 2, file: file, line: line)
+                continue
+            }
+            if waitForAnyElement(readyIdentifiers, in: app, timeout: 0.5, file: file, line: line) != nil {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        return false
     }
 
     /**
