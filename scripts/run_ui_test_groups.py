@@ -242,8 +242,8 @@ def delete_simulator_if_present(
         )
 
 
-def resolve_simulator_runtime_and_device_name(simulator_id: str) -> tuple[str, str]:
-    """Resolve the runtime identifier and device name for one existing simulator."""
+def resolve_simulator_runtime_and_device_metadata(simulator_id: str) -> tuple[str, str, str]:
+    """Resolve the runtime identifier, device-type identifier, and display name for a simulator."""
     payload = read_simctl_json("devices", "available")
     for runtime_identifier, devices in payload.get("devices", {}).items():
         if not isinstance(runtime_identifier, str) or not isinstance(devices, list):
@@ -252,19 +252,12 @@ def resolve_simulator_runtime_and_device_name(simulator_id: str) -> tuple[str, s
             if not isinstance(device, dict):
                 continue
             if str(device.get("udid", "")) == simulator_id:
-                return runtime_identifier, str(device.get("name", ""))
+                return (
+                    runtime_identifier,
+                    str(device.get("deviceTypeIdentifier", "")),
+                    str(device.get("name", "")),
+                )
     raise ValueError(f"Unable to resolve runtime metadata for simulator '{simulator_id}'.")
-
-
-def resolve_device_type_identifier(device_name: str) -> str:
-    """Resolve the CoreSimulator device-type identifier for one iPhone name."""
-    payload = read_simctl_json("devicetypes")
-    for device_type in payload.get("devicetypes", []):
-        if not isinstance(device_type, dict):
-            continue
-        if str(device_type.get("name", "")) == device_name:
-            return str(device_type.get("identifier", ""))
-    raise ValueError(f"Unable to resolve device type identifier for '{device_name}'.")
 
 
 def create_group_simulator(
@@ -274,10 +267,18 @@ def create_group_simulator(
     group_index: int,
 ) -> tuple[str, str]:
     """Create a fresh simulator for one grouped UI-test invocation."""
-    runtime_identifier, device_name = resolve_simulator_runtime_and_device_name(base_simulator_id)
-    device_type_identifier = resolve_device_type_identifier(device_name)
+    runtime_identifier, device_type_identifier, device_name = (
+        resolve_simulator_runtime_and_device_metadata(base_simulator_id)
+    )
+    if not device_type_identifier:
+        raise ValueError(
+            f"Simulator '{base_simulator_id}' did not expose a deviceTypeIdentifier."
+        )
     scenario_slug = re.sub(r"[^A-Za-z0-9]+", "-", scenario).strip("-") or "scenario"
-    group_device_name = f"AndBible Group {group_index} {scenario_slug} {device_name}"
+    display_device_name = device_type_identifier.rsplit(".", 1)[-1].replace("-", " ")
+    if not display_device_name or display_device_name == device_type_identifier:
+        display_device_name = device_name or "iPhone"
+    group_device_name = f"AndBible Group {group_index} {scenario_slug} {display_device_name}"
     result = run_command(
         [
             "xcrun",

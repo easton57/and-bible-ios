@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from run_ui_test_groups import (
     DEFAULT_BUNDLE_IDENTIFIER,
+    create_group_simulator,
     create_argument_parser,
     derive_group_result_bundle_path,
     group_selection_args_by_fixture,
@@ -119,6 +120,51 @@ class PathDerivationTests(unittest.TestCase):
 
 
 class SimctlTerminationTests(unittest.TestCase):
+    def test_create_group_simulator_uses_device_type_identifier_from_base_simulator(self) -> None:
+        with mock.patch(
+            "run_ui_test_groups.read_simctl_json",
+            return_value={
+                "devices": {
+                    "com.apple.CoreSimulator.SimRuntime.iOS-18-5": [
+                        {
+                            "udid": "BASE",
+                            "name": "AndBible CI UI iPhone 17",
+                            "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17",
+                        }
+                    ]
+                }
+            },
+        ):
+            with mock.patch(
+                "run_ui_test_groups.run_command",
+                return_value=subprocess.CompletedProcess(
+                    args=["xcrun", "simctl", "create"],
+                    returncode=0,
+                    stdout="SIM-GROUP-1\n",
+                    stderr="",
+                ),
+            ) as run_command_mock:
+                simulator_id, destination = create_group_simulator(
+                    base_simulator_id="BASE",
+                    scenario="baseline",
+                    group_index=1,
+                )
+
+        self.assertEqual(simulator_id, "SIM-GROUP-1")
+        self.assertEqual(destination, "id=SIM-GROUP-1")
+        run_command_mock.assert_called_once_with(
+            [
+                "xcrun",
+                "simctl",
+                "create",
+                "AndBible Group 1 baseline iPhone 17",
+                "com.apple.CoreSimulator.SimDeviceType.iPhone-17",
+                "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+            ],
+            capture_output=True,
+            timeout_seconds=30,
+        )
+
     def test_read_simctl_json_retries_after_transient_failure(self) -> None:
         success = subprocess.CompletedProcess(
             args=["xcrun", "simctl", "list", "devices", "available", "-j"],
