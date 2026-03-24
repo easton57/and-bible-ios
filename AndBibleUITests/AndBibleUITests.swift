@@ -2502,18 +2502,20 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) -> XCUIElement {
         let settingsForm = requireElement("settingsForm", in: app, timeout: timeout, file: file, line: line)
-        let element = settingsForm.descendants(matching: .any)[identifier].firstMatch
         let title = settingsNavigationTitle(for: identifier)
-        let titledFallback = settingsForm.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", title))
-            .firstMatch
+        let identifiedButton = settingsForm.buttons[identifier].firstMatch
+        let titledButton = settingsForm.buttons[title].firstMatch
+        let identifiedElement = settingsForm.descendants(matching: .any)[identifier].firstMatch
 
         func resolvedControlIfPresent() -> XCUIElement? {
-            if element.exists {
-                return element
+            if identifiedButton.exists, !identifiedButton.frame.isEmpty {
+                return identifiedButton
             }
-            if titledFallback.exists {
-                return titledFallback
+            if titledButton.exists, !titledButton.frame.isEmpty {
+                return titledButton
+            }
+            if identifiedElement.exists, !identifiedElement.frame.isEmpty {
+                return identifiedElement
             }
             return nil
         }
@@ -2536,11 +2538,14 @@ final class AndBibleUITests: XCTestCase {
             }
         }
 
-        if element.waitForExistence(timeout: timeout) {
-            return element
+        if identifiedButton.waitForExistence(timeout: timeout) {
+            return identifiedButton
         }
-        if titledFallback.waitForExistence(timeout: timeout) {
-            return titledFallback
+        if titledButton.waitForExistence(timeout: timeout) {
+            return titledButton
+        }
+        if identifiedElement.waitForExistence(timeout: timeout) {
+            return identifiedElement
         }
 
         XCTAssertTrue(
@@ -2549,7 +2554,7 @@ final class AndBibleUITests: XCTestCase {
             file: file,
             line: line
         )
-        return element
+        return identifiedButton
     }
 
     /**
@@ -3321,20 +3326,6 @@ final class AndBibleUITests: XCTestCase {
             return buttonMatch
         }
 
-        let staticTextMatch = (container?.staticTexts[title].firstMatch) ?? app.staticTexts[title].firstMatch
-        if staticTextMatch.exists {
-            return staticTextMatch
-        }
-
-        if let container {
-            let titledMatch = container.descendants(matching: .any)
-                .matching(NSPredicate(format: "label == %@", title))
-                .firstMatch
-            if titledMatch.exists {
-                return titledMatch
-            }
-        }
-
         return identifierMatch
     }
 
@@ -3430,12 +3421,6 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        XCTAssertTrue(
-            element.waitForExistence(timeout: timeout),
-            "Expected element '\(element.identifier)' to exist within \(timeout) seconds before tapping.",
-            file: file,
-            line: line
-        )
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             if element.exists, !element.frame.isEmpty {
@@ -3446,9 +3431,19 @@ final class AndBibleUITests: XCTestCase {
                 }
                 return
             }
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining > 0 {
+                _ = element.waitForExistence(timeout: min(0.2, remaining))
+            }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
+        XCTAssertTrue(
+            element.exists,
+            "Expected element '\(element.identifier)' to exist within \(timeout) seconds before tapping.",
+            file: file,
+            line: line
+        )
         XCTAssertFalse(
             element.frame.isEmpty,
             "Expected element '\(element.identifier)' to expose a non-empty frame before tapping.",
