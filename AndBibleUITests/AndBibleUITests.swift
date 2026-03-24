@@ -3271,12 +3271,21 @@ final class AndBibleUITests: XCTestCase {
      * - Failure modes: returns `nil` when XCTest exposes no suitable visible container.
      */
     private func largestVisibleReaderActionContainer(in app: XCUIApplication) -> XCUIElement? {
-        let candidates = [
-            app.sheets.firstMatch,
-            app.scrollViews.firstMatch,
-            app.tables.firstMatch,
-            app.collectionViews.firstMatch,
-        ].filter { $0.exists && !$0.frame.isEmpty }
+        let collectionView = app.collectionViews.firstMatch
+        if collectionView.exists && !collectionView.frame.isEmpty {
+            return collectionView
+        }
+
+        let table = app.tables.firstMatch
+        if table.exists && !table.frame.isEmpty {
+            return table
+        }
+
+        let candidates = app.scrollViews.allElementsBoundByIndex.filter {
+            $0.exists &&
+            !$0.frame.isEmpty &&
+            $0.frame.height >= 200
+        }
 
         return candidates.max { lhs, rhs in
             (lhs.frame.width * lhs.frame.height) < (rhs.frame.width * rhs.frame.height)
@@ -4161,12 +4170,8 @@ final class AndBibleUITests: XCTestCase {
      */
     private func replaceText(in element: XCUIElement, with text: String) {
         tapElementReliably(element, timeout: 10)
-        if let existingText = element.value as? String {
-            let deleteSequence = String(repeating: XCUIKeyboardKey.delete.rawValue, count: existingText.count)
-            element.typeText(deleteSequence + text)
-        } else {
-            element.typeText(text)
-        }
+        let deleteSequence = String(repeating: XCUIKeyboardKey.delete.rawValue, count: 64)
+        element.typeText(deleteSequence + text)
     }
 
     /**
