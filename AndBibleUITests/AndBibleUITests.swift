@@ -112,8 +112,8 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp(searchQuery: "earth")
         app.launch()
 
-        let searchScreen = openSearch(in: app)
-        waitForSearchState(on: searchScreen, containing: "query=earth", timeout: 20)
+        _ = openSearch(in: app)
+        waitForSearchState(containing: "query=earth", in: app, timeout: 20)
         XCTAssertTrue(
             requireElement("searchResultRow::Genesis_1_2", in: app, timeout: 20).exists,
             "Expected bundled Search results for 'earth' to include Genesis 1:2."
@@ -138,14 +138,14 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp(searchQuery: "jesus")
         app.launch()
 
-        let searchScreen = openSearch(in: app)
+        _ = openSearch(in: app)
         XCTAssertTrue(
             requireElement("searchResultRow::Matthew_1_1", in: app, timeout: 20).exists,
             "Expected whole-Bible Search hits for 'jesus' to include Matthew 1:1."
         )
 
         tapSearchScope(.oldTestament, in: app)
-        waitForSearchState(on: searchScreen, containing: "scope=oldTestament", timeout: 20)
+        waitForSearchState(containing: "scope=oldTestament", in: app, timeout: 20)
         waitForSearchResultRow(
             "searchResultRow::Matthew_1_1",
             in: app,
@@ -154,7 +154,7 @@ final class AndBibleUITests: XCTestCase {
         )
 
         tapSearchScope(.newTestament, in: app)
-        waitForSearchState(on: searchScreen, containing: "scope=newTestament", timeout: 20)
+        waitForSearchState(containing: "scope=newTestament", in: app, timeout: 20)
         XCTAssertTrue(
             requireElement("searchResultRow::Matthew_1_1", in: app, timeout: 20).exists,
             "Expected New Testament Search hits for 'jesus' to restore Matthew 1:1."
@@ -177,14 +177,14 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp(searchQuery: "earth void")
         app.launch()
 
-        let searchScreen = openSearch(in: app)
+        _ = openSearch(in: app)
         XCTAssertTrue(
             requireElement("searchResultRow::Genesis_1_2", in: app, timeout: 20).exists,
             "Expected all-word Search hits for 'earth void' to include Genesis 1:2."
         )
 
         tapSearchWordMode("Phrase", in: app, timeout: 10)
-        waitForSearchState(on: searchScreen, containing: "wordMode=phrase", timeout: 20)
+        waitForSearchState(containing: "wordMode=phrase", in: app, timeout: 20)
         waitForSearchResultRow(
             "searchResultRow::Genesis_1_2",
             in: app,
@@ -193,7 +193,7 @@ final class AndBibleUITests: XCTestCase {
         )
 
         tapSearchWordMode("Any Word", in: app, timeout: 10)
-        waitForSearchState(on: searchScreen, containing: "wordMode=anyWord", timeout: 20)
+        waitForSearchState(containing: "wordMode=anyWord", in: app, timeout: 20)
         XCTAssertTrue(
             requireElement("searchResultRow::Genesis_1_2", in: app, timeout: 20).exists,
             "Expected any-word Search hits for 'earth void' to restore Genesis 1:2."
@@ -1979,17 +1979,8 @@ final class AndBibleUITests: XCTestCase {
      *   - fails the test if the Search screen never reports `state=ready;searching=false`
      *     before the timeout
      */
-    private func waitForSearchToFinish(on searchScreen: XCUIElement, timeout: TimeInterval) {
-        let predicate = NSPredicate { evaluated, _ in
-            guard let element = evaluated as? XCUIElement,
-                  let value = element.value as? String else {
-                return false
-            }
-            return value.contains("state=ready") && value.contains("searching=false")
-        }
-
-        expectation(for: predicate, evaluatedWith: searchScreen)
-        waitForExpectations(timeout: timeout)
+    private func waitForSearchToFinish(in app: XCUIApplication, timeout: TimeInterval) {
+        waitForSearchState(containing: "", in: app, timeout: timeout)
     }
 
     /**
@@ -2045,33 +2036,37 @@ final class AndBibleUITests: XCTestCase {
      Waits for the Search screen to report a settled state containing one expected semantic token.
      *
      * - Parameters:
-     *   - searchScreen: Search root element exporting deterministic state in its accessibility
-     *     value.
      *   - token: State fragment expected once the current search rerun has completed.
+     *   - app: Running application under test.
      *   - timeout: Maximum time to wait for `state=ready;searching=false` with the requested token.
      * - Side effects:
-     *   - blocks the current XCTest method until the Search state export reports the requested
-     *     token or the timeout expires
+     *   - re-resolves the live `searchScreen` element until its accessibility value reports the
+     *     requested settled state or the timeout expires
      * - Failure modes:
      *   - fails the test if the Search screen never reaches the requested settled state
      */
     private func waitForSearchState(
-        on searchScreen: XCUIElement,
         containing token: String,
+        in app: XCUIApplication,
         timeout: TimeInterval
     ) {
-        let predicate = NSPredicate { evaluated, _ in
-            guard let element = evaluated as? XCUIElement,
-                  let value = element.value as? String else {
-                return false
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let searchScreen = resolvedElement("searchScreen", in: app),
+               let value = searchScreen.value as? String,
+               value.contains("state=ready"),
+               value.contains("searching=false"),
+               value.contains(token) {
+                return
             }
-            return value.contains("state=ready")
-                && value.contains("searching=false")
-                && value.contains(token)
-        }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        } while Date() < deadline
 
-        expectation(for: predicate, evaluatedWith: searchScreen)
-        waitForExpectations(timeout: timeout)
+        let searchScreen = requireSearchScreen(in: app, timeout: 1)
+        let lastValue = searchScreen.value.map { "\($0)" } ?? "nil"
+        XCTFail(
+            "Expected Search state to contain '\(token)' within \(timeout) seconds; last value was '\(lastValue)'."
+        )
     }
 
     /**
@@ -3514,10 +3509,8 @@ final class AndBibleUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
-        let button = app.buttons["readerMoreMenuButton"].firstMatch
-        XCTAssertTrue(
-            !button.frame.isEmpty,
-            "Expected reader overflow button '\(button.identifier)' to expose a stable frame within \(timeout) seconds.",
+        XCTFail(
+            "Expected the reader overflow menu to appear after tapping readerMoreMenuButton within \(timeout) seconds.",
             file: file,
             line: line
         )

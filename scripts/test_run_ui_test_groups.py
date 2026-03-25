@@ -346,6 +346,66 @@ class GroupedExecutionTests(unittest.TestCase):
         )
         sleep_mock.assert_called_once_with(15)
 
+    def test_run_grouped_ui_tests_continues_after_group_failure_and_returns_one(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = pathlib.Path(temp_dir) / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "AndBibleUITests/AndBibleUITests/testOne": "alpha",
+                        "AndBibleUITests/AndBibleUITests/testTwo": "beta",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            fixture_tool_path = pathlib.Path(temp_dir) / "UITestFixtureTool"
+            fixture_tool_path.write_text("", encoding="utf-8")
+
+            with mock.patch(
+                "run_ui_test_groups.build_xcodebuild_command",
+                side_effect=[["xcodebuild", "alpha"], ["xcodebuild", "beta"]],
+            ):
+                with mock.patch(
+                    "run_ui_test_groups.run_command",
+                    side_effect=[
+                        subprocess.CalledProcessError(returncode=65, cmd=["xcodebuild", "alpha"]),
+                        subprocess.CompletedProcess(args=["xcodebuild", "beta"], returncode=0),
+                    ],
+                ) as run_command_mock:
+                    with mock.patch("run_ui_test_groups.terminate_app_if_running") as terminate_mock:
+                        with mock.patch("run_ui_test_groups.time.sleep") as sleep_mock:
+                            result = run_grouped_ui_tests(
+                                project="AndBible.xcodeproj",
+                                scheme="AndBible",
+                                configuration="Debug",
+                                destination="id=SIM-1",
+                                simulator_id="SIM-1",
+                                derived_data_path=pathlib.Path(".derivedData"),
+                                result_bundle_path=pathlib.Path(".artifacts/AndBibleTests-ui.xcresult"),
+                                code_signing_allowed="NO",
+                                selection_args_text=(
+                                    "-only-testing:AndBibleUITests/AndBibleUITests/testOne\n"
+                                    "-only-testing:AndBibleUITests/AndBibleUITests/testTwo"
+                                ),
+                                fixture_manifest_path=manifest_path,
+                                fixture_tool_path=fixture_tool_path,
+                                bundle_identifier="org.andbible.ios",
+                                app_path=None,
+                            )
+
+        self.assertEqual(result, 1)
+        self.assertEqual(run_command_mock.call_count, 2)
+        self.assertEqual(
+            terminate_mock.call_args_list,
+            [
+                mock.call(simulator_id="SIM-1", bundle_identifier="org.andbible.ios"),
+                mock.call(simulator_id="SIM-1", bundle_identifier="org.andbible.AndBibleUITests.xctrunner"),
+                mock.call(simulator_id="SIM-1", bundle_identifier="org.andbible.ios"),
+                mock.call(simulator_id="SIM-1", bundle_identifier="org.andbible.AndBibleUITests.xctrunner"),
+            ],
+        )
+        sleep_mock.assert_called_once_with(15)
+
     def test_run_grouped_ui_tests_can_create_fresh_simulator_per_group(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = pathlib.Path(temp_dir) / "manifest.json"

@@ -477,6 +477,8 @@ def run_grouped_ui_tests(
     groups = group_selection_args_by_fixture(selection_args, fixture_manifest)
     total_groups = len(groups)
     test_runner_bundle_identifier = f"{bundle_identifier.removesuffix('.ios')}.AndBibleUITests.xctrunner"
+    failed_groups: list[tuple[int, str, int]] = []
+
     for group_index, (scenario, group_selection_args) in enumerate(groups, start=1):
         print(
             f"Running fixture group {group_index}/{total_groups}: {scenario} "
@@ -517,6 +519,13 @@ def run_grouped_ui_tests(
         )
         try:
             run_command(command, env=group_env)
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"Fixture group {group_index}/{total_groups} ({scenario}) failed with exit code "
+                f"{exc.returncode}. Continuing to the next group.",
+                flush=True,
+            )
+            failed_groups.append((group_index, scenario, exc.returncode))
         finally:
             terminate_app_if_running(
                 simulator_id=group_simulator_id,
@@ -537,6 +546,14 @@ def run_grouped_ui_tests(
                 flush=True,
             )
             time.sleep(GROUP_TRANSITION_DELAY_SECONDS)
+    if failed_groups:
+        print("One or more fixture groups failed:", flush=True)
+        for group_index, scenario, returncode in failed_groups:
+            print(
+                f"- group {group_index}/{total_groups} ({scenario}) exit code {returncode}",
+                flush=True,
+            )
+        return 1
     return 0
 
 

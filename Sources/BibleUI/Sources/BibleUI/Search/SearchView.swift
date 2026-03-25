@@ -217,6 +217,7 @@ public struct SearchView: View {
                 searchContent
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("searchScreen")
         .accessibilityValue(searchAccessibilityValue)
         .navigationTitle(navigationTitle)
