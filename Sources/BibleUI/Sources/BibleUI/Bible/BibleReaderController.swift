@@ -2674,7 +2674,7 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
      Build a MultiFragmentDocument JSON from Strong's numbers and Robinson codes.
      Returns nil if no definitions were found.
      */
-    func buildStrongsMultiDocJSON(strongs: [String], robinson: [String]) -> String? {
+    func buildStrongsMultiDocJSON(strongs: [String], robinson: [String], stateJSON: String? = nil) -> String? {
         logger.info("buildStrongsMultiDocJSON: strongs=\(strongs), robinson=\(robinson), swordManager=\(self.swordManager == nil ? "nil" : "alive")")
         var fragments: [(xml: String, key: String, keyName: String, bookInitials: String, bookAbbreviation: String, features: String)] = []
 
@@ -2737,7 +2737,11 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
             return nil
         }
 
-        return buildMultiFragmentJSON(fragments: fragments)
+        return buildMultiFragmentJSON(
+            fragments: fragments,
+            contentType: "strongs",
+            stateJSON: stateJSON
+        )
     }
 
     /// Handle "Find all occurrences" links: ab-find-all://?type=hebrew&name=H05775
@@ -2837,8 +2841,12 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
         return result
     }
 
-    /// Build a MultiFragmentDocument JSON string for rendering in Vue.js MultiDocument.vue.
-    private func buildMultiFragmentJSON(fragments: [(xml: String, key: String, keyName: String, bookInitials: String, bookAbbreviation: String, features: String)]) -> String {
+    /// Build a MultiFragmentDocument JSON string for rendering in Vue.js document views.
+    private func buildMultiFragmentJSON(
+        fragments: [(xml: String, key: String, keyName: String, bookInitials: String, bookAbbreviation: String, features: String)],
+        contentType: String? = nil,
+        stateJSON: String? = nil
+    ) -> String {
         let id = "strongs-multi-\(UUID().uuidString)"
         var osisFragmentsJSON: [String] = []
 
@@ -2858,7 +2866,10 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
             """)
         }
 
-        return "{\"id\":\"\(id)\",\"type\":\"multi\",\"osisFragments\":[\(osisFragmentsJSON.joined(separator: ","))],\"compare\":false}"
+        let escapedContentType = contentType?.replacingOccurrences(of: "\"", with: "\\\"")
+        let contentTypeField = escapedContentType.map { ",\"contentType\":\"\($0)\"" } ?? ""
+        let stateField = stateJSON.map { ",\"state\":\($0)" } ?? ""
+        return "{\"id\":\"\(id)\",\"type\":\"multi\",\"osisFragments\":[\(osisFragmentsJSON.joined(separator: ","))],\"compare\":false\(contentTypeField)\(stateField)}"
     }
 
     /// Escape special XML characters in text content.
