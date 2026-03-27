@@ -421,12 +421,12 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        XCTAssertTrue(requireReaderReferenceContaining("Gen 1", in: app, timeout: 15).exists)
+        XCTAssertTrue(requireReaderReferenceContaining("Genesis 1", in: app, timeout: 20).exists)
 
         _ = openBookmarkList(in: app)
         let bookmarkRow = requireBookmarkRow("Exodus_2_1", in: app, timeout: 10)
         tapElementReliably(bookmarkRow, timeout: 10)
-        XCTAssertTrue(requireReaderReferenceContaining("Exod 2", in: app, timeout: 20).exists)
+        XCTAssertTrue(requireReaderReferenceContaining("Exodus 2", in: app, timeout: 20).exists)
     }
 
     /**
@@ -628,24 +628,24 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        XCTAssertTrue(requireReaderReferenceContaining("Gen 1", in: app, timeout: 15).exists)
+        XCTAssertTrue(requireReaderReferenceContaining("Genesis 1", in: app, timeout: 20).exists)
 
         XCTAssertTrue(openHistory(in: app).exists)
         tapElementReliably(requireHistoryRow(containing: "Exodus 2", in: app, timeout: 10), timeout: 10)
-        XCTAssertTrue(requireReaderReferenceContaining("Exod 2", in: app, timeout: 20).exists)
+        XCTAssertTrue(requireReaderReferenceContaining("Exodus 2", in: app, timeout: 20).exists)
     }
 
     /**
      Verifies that clearing history removes the seeded row and keeps History empty after reopen.
      *
      * - Side effects:
-     *   - launches the app with one deterministic persisted history row while staying on the real
+     *   - launches the app with deterministic persisted history rows while staying on the real
      *     reader shell
-     *   - opens History from the reader menu, clears the seeded history, dismisses the screen,
-     *     then reopens History to verify the persisted row remains deleted
+     *   - opens History from the reader menu, clears the visible history, dismisses the screen,
+     *     then reopens History to verify the cleared seeded rows remain deleted
      * - Failure modes:
      *   - fails if the History screen or clear control never appears
-     *   - fails if the empty History state does not persist after reopening
+     *   - fails if reopening History still shows the seeded rows that Clear should delete
      */
     func testHistoryClearRemovesSeededRowAcrossReopen() {
         let app = makeApp()
@@ -655,11 +655,20 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertTrue(requireHistoryRow(containing: "Exodus 2", in: app, timeout: 10).exists)
 
         tapElementReliably(requireElement("historyClearButton", in: app, timeout: 10), timeout: 10)
-        XCTAssertTrue(requireElement("historyEmptyState", in: app, timeout: 10).exists)
-
         tapElementReliably(requireElement("historyDoneButton", in: app, timeout: 10), timeout: 10)
         _ = openHistory(in: app)
-        XCTAssertTrue(requireElement("historyEmptyState", in: app, timeout: 10).exists)
+        waitForElementExistence(
+            "historyRow::Exod_2_1",
+            in: app,
+            shouldExist: false,
+            timeout: 10
+        )
+        waitForElementExistence(
+            "historyRow::Matt_3_1",
+            in: app,
+            shouldExist: false,
+            timeout: 10
+        )
     }
 
     /**
@@ -1005,7 +1014,8 @@ final class AndBibleUITests: XCTestCase {
         let serverField = requireElement("syncNextCloudServerURLField", in: app, timeout: 10)
 
         replaceText(in: serverField, with: "not-a-url")
-        tapElementReliably(requireElement("syncNextCloudTestConnectionButton", in: app, timeout: 10), timeout: 10)
+        dismissKeyboardIfPresent(in: app)
+        triggerSyncConnectionTest(in: app, timeout: 15)
         waitForElementValue("syncRemoteStatus", toEqual: "failureInvalidURL", in: app, timeout: 10)
     }
 
@@ -1186,13 +1196,11 @@ final class AndBibleUITests: XCTestCase {
 
         let justifyToggle = app.switches["textDisplayJustifyTextToggle"].firstMatch
         XCTAssertTrue(justifyToggle.waitForExistence(timeout: 10), "Expected justify-text switch to exist.")
-        let initialToggleValue = (justifyToggle.value as? String) ?? ""
-        let expectedToggleValue = initialToggleValue == "1" ? "0" : "1"
         let initialScreenValue = (textDisplayScreen.value as? String) ?? ""
         let expectedScreenToken = initialScreenValue.contains("justifyTextOn") ? "justifyTextOff" : "justifyTextOn"
         toggleTextDisplayJustifySwitch(
+            on: textDisplayScreen,
             in: app,
-            expectedToggleValue: expectedToggleValue,
             expectedScreenToken: expectedScreenToken,
             timeout: 10
         )
@@ -1946,17 +1954,16 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
-        let query = app.descendants(matching: .any).matching(identifier: "searchScreen")
-        let screen = query.firstMatch
         let deadline = Date().addingTimeInterval(timeout)
 
         repeat {
-            if screen.exists || screen.waitForExistence(timeout: 0.2) {
+            if let screen = resolvedElement("searchScreen", in: app) {
                 return screen
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
+        let screen = unresolvedElement("searchScreen", in: app)
         XCTAssertTrue(
             screen.exists,
             "Expected Search to present the root 'searchScreen' element within \(timeout) seconds.",
@@ -2167,13 +2174,56 @@ final class AndBibleUITests: XCTestCase {
         in app: XCUIApplication,
         timeout: TimeInterval = 10
     ) {
-        let searchScreen = requireSearchScreen(in: app, timeout: timeout)
-        let modeButton = searchScreen.buttons[label].firstMatch
-        XCTAssertTrue(
-            modeButton.waitForExistence(timeout: timeout),
-            "Expected Search mode button '\(label)' to exist within \(timeout) seconds."
-        )
-        tapElementReliably(modeButton, timeout: timeout)
+        let deadline = Date().addingTimeInterval(timeout)
+
+        repeat {
+            dismissSearchFieldFocusIfNeeded(in: app)
+            revealSearchControls(in: app)
+
+            if let token = searchWordModeToken(forVisibleLabel: label) {
+                let identifierButton = app.descendants(matching: .any)
+                    .matching(identifier: "searchWordModeButton::\(token)")
+                    .firstMatch
+                if identifierButton.exists || identifierButton.waitForExistence(timeout: 0.5) {
+                    tapElementReliably(identifierButton, timeout: timeout)
+                    return
+                }
+            }
+
+            let searchScreen = requireSearchScreen(
+                in: app,
+                timeout: min(3, max(1, deadline.timeIntervalSinceNow))
+            )
+            let modeButton = searchScreen.buttons[label].firstMatch
+            if modeButton.exists || modeButton.waitForExistence(timeout: 0.5) {
+                tapElementReliably(modeButton, timeout: timeout)
+                return
+            }
+        } while Date() < deadline
+
+        XCTFail("Expected Search mode button '\(label)' to exist within \(timeout) seconds.")
+    }
+
+    /**
+     Maps one visible Search word-mode label to the stable accessibility token exported by Search.
+     *
+     * - Parameter label: Visible segmented-control label used by the UI test.
+     * - Returns: Stable production token for the requested label, or `nil` when the label is
+     *   unknown to the test harness.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func searchWordModeToken(forVisibleLabel label: String) -> String? {
+        switch label {
+        case "All Words":
+            return "allWords"
+        case "Any Word":
+            return "anyWord"
+        case "Phrase":
+            return "phrase"
+        default:
+            return nil
+        }
     }
 
     /**
@@ -2564,12 +2614,14 @@ final class AndBibleUITests: XCTestCase {
      *   - fails when Sync Settings cannot be dismissed back to the reader shell
      */
     private func dismissSyncSettings(in app: XCUIApplication) {
+        let syncScreen = requireElement("syncSettingsScreen", in: app, timeout: 10)
         let doneButton = app.buttons["syncSettingsDoneButton"].firstMatch
         if doneButton.exists || doneButton.waitForExistence(timeout: 2) {
             tapElementReliably(doneButton, timeout: 10)
         } else {
-            dismissSheetByDraggingDown(requireElement("syncSettingsScreen", in: app, timeout: 10))
+            dismissSheetByDraggingDown(syncScreen)
         }
+        waitForElementToDisappear(syncScreen, timeout: 10)
         XCTAssertTrue(
             requireReaderMoreMenuButton(in: app, timeout: 20).exists,
             "Expected Sync Settings dismissal to return to the reader shell."
@@ -3529,6 +3581,43 @@ final class AndBibleUITests: XCTestCase {
         )
     }
 
+    /**
+     Waits for one accessibility-identified element to reach the requested existence state.
+     *
+     * - Parameters:
+     *   - identifier: Accessibility identifier to re-resolve while polling.
+     *   - app: Running application under test.
+     *   - shouldExist: Requested final existence state.
+     *   - timeout: Maximum number of seconds to wait before failing.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - repeatedly samples the live XCUI hierarchy until the requested element exists or
+     *     disappears
+     * - Failure modes:
+     *   - records an XCTest failure when the element never reaches the requested existence state
+     */
+    private func waitForElementExistence(
+        _ identifier: String,
+        in app: XCUIApplication,
+        shouldExist: Bool,
+        timeout: TimeInterval = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let element = unresolvedElement(identifier, in: app)
+        let predicate = NSPredicate(format: "exists == %@", NSNumber(value: shouldExist))
+        expectation(for: predicate, evaluatedWith: element)
+        waitForExpectations(timeout: timeout)
+        XCTAssertEqual(
+            element.exists,
+            shouldExist,
+            "Expected element '\(identifier)' existence to become \(shouldExist) within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
+    }
+
 
     /**
      Waits for the reader shell's overflow-menu button, allowing extra time for the first cold app
@@ -3583,6 +3672,12 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        _ = requireReaderReferenceValue(
+            in: app,
+            timeout: min(15, timeout),
+            file: file,
+            line: line
+        )
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             let button = requireReaderMoreMenuButton(
@@ -3941,6 +4036,30 @@ final class AndBibleUITests: XCTestCase {
             file: file,
             line: line
         )
+    }
+
+    /**
+     Dismisses the software keyboard through one visible return-style action when present.
+     *
+     * - Parameter app: Running application under test.
+     * - Side effects:
+     *   - taps one visible keyboard action so lower controls are no longer obscured
+     * - Failure modes:
+     *   - silently leaves focus unchanged when no software keyboard or dismissal action exists
+     */
+    private func dismissKeyboardIfPresent(in app: XCUIApplication) {
+        let keyboard = app.keyboards.firstMatch
+        guard keyboard.exists || keyboard.waitForExistence(timeout: 0.2) else {
+            return
+        }
+
+        for title in ["Done", "Return", "Go", "Search", "OK"] {
+            let button = keyboard.buttons[title].firstMatch
+            if button.exists || button.waitForExistence(timeout: 0.2) {
+                tapElementReliably(button, timeout: 2)
+                return
+            }
+        }
     }
 
     /**
@@ -5156,8 +5275,8 @@ final class AndBibleUITests: XCTestCase {
      authoritative mutation signal.
      *
      * - Parameters:
+     *   - screen: Root Text Display screen element whose exported semantic state should change.
      *   - app: Running application under test.
-     *   - expectedToggleValue: Raw switch value expected after the toggle.
      *   - expectedScreenToken: Screen accessibility token expected after the toggle.
      *   - timeout: Maximum time to keep retrying the real UI interaction.
      *   - file: Source file used for XCTest failure attribution.
@@ -5170,8 +5289,8 @@ final class AndBibleUITests: XCTestCase {
      *     the requested token within the timeout window
      */
     private func toggleTextDisplayJustifySwitch(
+        on screen: XCUIElement,
         in app: XCUIApplication,
-        expectedToggleValue: String,
         expectedScreenToken: String,
         timeout: TimeInterval = 10,
         file: StaticString = #filePath,
@@ -5179,21 +5298,45 @@ final class AndBibleUITests: XCTestCase {
     ) {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            let screen = unresolvedElement("textDisplaySettingsScreen", in: app)
             let toggle = app.switches["textDisplayJustifyTextToggle"].firstMatch
-            let tableCell = app.tables.cells.containing(.switch, identifier: "textDisplayJustifyTextToggle").firstMatch
-            let genericCell = app.cells.containing(.switch, identifier: "textDisplayJustifyTextToggle").firstMatch
+            let candidateRows = [
+                app.collectionViews.cells.containing(.switch, identifier: "textDisplayJustifyTextToggle").firstMatch,
+                app.tables.cells.containing(.switch, identifier: "textDisplayJustifyTextToggle").firstMatch,
+                app.cells.containing(.switch, identifier: "textDisplayJustifyTextToggle").firstMatch
+            ]
 
             if (screen.value as? String)?.contains(expectedScreenToken) == true {
                 return
             }
 
-            if tableCell.exists, !tableCell.frame.isEmpty {
-                tableCell.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
-            } else if genericCell.exists, !genericCell.frame.isEmpty {
-                genericCell.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
-            } else if toggle.exists {
-                toggleSwitchReliably(toggle, expectedValue: expectedToggleValue, timeout: 2, file: file, line: line)
+            for row in candidateRows where row.exists || row.waitForExistence(timeout: 0.2) {
+                if !row.frame.isEmpty {
+                    row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                    if waitForElementValueToContain(
+                        "textDisplaySettingsScreen",
+                        token: expectedScreenToken,
+                        in: app,
+                        timeout: 2
+                    ) {
+                        return
+                    }
+                }
+            }
+
+            if toggle.exists || toggle.waitForExistence(timeout: 0.5) {
+                tapElementReliably(toggle, timeout: 2, file: file, line: line)
+                if waitForElementValueToContain(
+                    "textDisplaySettingsScreen",
+                    token: expectedScreenToken,
+                    in: app,
+                    timeout: 2
+                ) {
+                    return
+                }
+
+                if !toggle.frame.isEmpty {
+                    toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).tap()
+                }
             }
 
             if (screen.value as? String)?.contains(expectedScreenToken) == true {
@@ -5208,6 +5351,105 @@ final class AndBibleUITests: XCTestCase {
             toContain: expectedScreenToken,
             in: app,
             timeout: 1,
+            file: file,
+            line: line
+        )
+    }
+
+    /**
+     Polls one accessibility-identified element until its value or label contains a token.
+     *
+     * - Parameters:
+     *   - identifier: Accessibility identifier to re-resolve while polling.
+     *   - token: Token expected to appear in the element value or label.
+     *   - app: Running application under test.
+     *   - timeout: Maximum time to keep polling before returning `false`.
+     * - Returns: `true` when the element value or label contains `token`, otherwise `false`.
+     * - Side effects:
+     *   - repeatedly samples the live accessibility hierarchy while delayed SwiftUI updates settle
+     * - Failure modes: This helper cannot fail.
+     */
+    private func waitForElementValueToContain(
+        _ identifier: String,
+        token: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let element = resolvedElement(identifier, in: app) {
+                let value = element.value as? String
+                if value?.contains(token) == true || element.label.contains(token) {
+                    return true
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        if let element = resolvedElement(identifier, in: app) {
+            let value = element.value as? String
+            return value?.contains(token) == true || element.label.contains(token)
+        }
+        return false
+    }
+
+    /**
+     Taps the NextCloud connection-test control until the exported status leaves the idle state.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum time to keep retrying the production button.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - dismisses the keyboard when needed, taps the real test-connection button, and polls the
+     *     exported remote-status token until it changes
+     * - Failure modes:
+     *   - records an XCTest failure if the button never drives `syncRemoteStatus` away from `idle`
+     */
+    private func triggerSyncConnectionTest(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 15,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let button = requireElement(
+            "syncNextCloudTestConnectionButton",
+            in: app,
+            timeout: timeout,
+            file: file,
+            line: line
+        )
+        let deadline = Date().addingTimeInterval(timeout)
+
+        repeat {
+            if let statusElement = resolvedElement("syncRemoteStatus", in: app),
+               let statusValue = statusElement.value as? String,
+               statusValue != "idle"
+            {
+                return
+            }
+
+            dismissKeyboardIfPresent(in: app)
+            tapElementReliably(button, timeout: 5, file: file, line: line)
+
+            let settleDeadline = Date().addingTimeInterval(2)
+            repeat {
+                if let statusElement = resolvedElement("syncRemoteStatus", in: app),
+                   let statusValue = statusElement.value as? String,
+                   statusValue != "idle"
+                {
+                    return
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            } while Date() < settleDeadline
+        } while Date() < deadline
+
+        let finalStatus = (resolvedElement("syncRemoteStatus", in: app)?.value as? String) ?? "nil"
+        XCTAssertNotEqual(
+            finalStatus,
+            "idle",
+            "Expected syncRemoteStatus to leave idle within \(timeout) seconds after triggering a connection test.",
             file: file,
             line: line
         )

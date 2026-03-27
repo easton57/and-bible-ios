@@ -129,7 +129,9 @@ struct LabelAssignmentView: View {
         }
         .alert("New Label", isPresented: $showNewLabel) {
             TextField("Label name", text: $newLabelName)
+                .accessibilityIdentifier("labelManagerNewLabelNameField")
             Button("Create") { createAndAssignLabel() }
+                .accessibilityIdentifier("labelManagerCreateButton")
             Button("Cancel", role: .cancel) { newLabelName = "" }
         }
         .onAppear { loadAssignedLabels() }

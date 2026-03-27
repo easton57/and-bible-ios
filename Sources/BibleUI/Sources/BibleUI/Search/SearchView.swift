@@ -429,7 +429,9 @@ public struct SearchView: View {
         VStack(spacing: 12) {
             Picker(String(localized: "search_match"), selection: $wordMode) {
                 ForEach(SearchWordMode.allCases, id: \.self) { mode in
-                    Text(mode.rawValue).tag(mode)
+                    Text(mode.rawValue)
+                        .tag(mode)
+                        .accessibilityIdentifier("searchWordModeButton::\(searchWordModeToken(for: mode))")
                 }
             }
             .pickerStyle(.segmented)
