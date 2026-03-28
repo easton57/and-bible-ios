@@ -1550,20 +1550,24 @@ public struct BibleReaderView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 readerOverflowSection {
-                    Toggle(isOn: Binding(
+                    readerOverflowToggle(
+                        title: String(localized: "fullscreen"),
+                        systemImage: "arrow.up.left.and.arrow.down.right",
+                        isOn: Binding(
                         get: { isFullScreen },
                         set: { newValue in
                             withAnimation(.easeInOut(duration: 0.2)) { isFullScreen = newValue }
                             lastFullScreenByDoubleTap = false
                             resetAutoFullscreenTracking()
                         }
-                    )) {
-                        SwiftUI.Label(String(localized: "fullscreen"), systemImage: "arrow.up.left.and.arrow.down.right")
-                    }
+                    ))
 
                     if isNightModeQuickToggleEnabled {
                         Divider()
-                        Toggle(isOn: Binding(
+                        readerOverflowToggle(
+                            title: String(localized: "night_mode"),
+                            systemImage: "moon.fill",
+                            isOn: Binding(
                             get: { nightMode },
                             set: { newValue in
                                 let store = SettingsStore(modelContext: modelContext)
@@ -1579,14 +1583,15 @@ public struct BibleReaderView: View {
                                     }
                                 }
                             }
-                        )) {
-                            SwiftUI.Label(String(localized: "night_mode"), systemImage: "moon.fill")
-                        }
+                        ))
                     }
 
                     #if os(iOS)
                     Divider()
-                    Toggle(isOn: Binding(
+                    readerOverflowToggle(
+                        title: String(localized: "tilt_to_scroll"),
+                        systemImage: "gyroscope",
+                        isOn: Binding(
                         get: { windowManager.activeWorkspace?.workspaceSettings?.enableTiltToScroll ?? false },
                         set: { newValue in
                             updateWorkspaceSettings { $0.enableTiltToScroll = newValue }
@@ -1596,32 +1601,32 @@ public struct BibleReaderView: View {
                                 tiltScrollService.stop()
                             }
                         }
-                    )) {
-                        SwiftUI.Label(String(localized: "tilt_to_scroll"), systemImage: "gyroscope")
-                    }
+                    ))
                     #endif
 
                     if windowManager.visibleWindows.count > 1 {
                         Divider()
-                        Toggle(isOn: Binding(
+                        readerOverflowToggle(
+                            title: String(localized: "reversed_split_mode"),
+                            systemImage: "rectangle.split.1x2",
+                            isOn: Binding(
                             get: { windowManager.activeWorkspace?.workspaceSettings?.enableReverseSplitMode ?? false },
                             set: { newValue in
                                 updateWorkspaceSettings { $0.enableReverseSplitMode = newValue }
                             }
-                        )) {
-                            SwiftUI.Label(String(localized: "reversed_split_mode"), systemImage: "rectangle.split.1x2")
-                        }
+                        ))
                     }
 
                     Divider()
-                    Toggle(isOn: Binding(
+                    readerOverflowToggle(
+                        title: String(localized: "window_pinning"),
+                        systemImage: "pin.fill",
+                        isOn: Binding(
                         get: { windowManager.activeWorkspace?.workspaceSettings?.autoPin ?? false },
                         set: { newValue in
                             updateWorkspaceSettings { $0.autoPin = newValue }
                         }
-                    )) {
-                        SwiftUI.Label(String(localized: "window_pinning"), systemImage: "pin.fill")
-                    }
+                    ))
                 }
 
                 readerOverflowSection {
@@ -1825,6 +1830,21 @@ public struct BibleReaderView: View {
             SwiftUI.Label(title, systemImage: systemImage)
                 .labelStyle(.titleAndIcon)
             Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+    }
+
+    /** Shared row styling used by the reader overflow sheet toggles. */
+    private func readerOverflowToggle(
+        title: String,
+        systemImage: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            SwiftUI.Label(title, systemImage: systemImage)
+                .labelStyle(.titleAndIcon)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
