@@ -490,7 +490,7 @@ final class StrongsSheetDelegate: NSObject, BibleBridgeDelegate {
     // MARK: - No-op implementations for remaining protocol methods
 
     /// No-op because the Strong's sheet does not react to ordinal-scroll callbacks.
-    func bridge(_ bridge: BibleBridge, didScrollToOrdinal ordinal: Int, key: String) {}
+    func bridge(_ bridge: BibleBridge, didScrollToOrdinal ordinal: Int, key: String, atChapterTop: Bool) {}
 
     /// No-op because the Strong's sheet does not support paged loading toward the beginning.
     func bridge(_ bridge: BibleBridge, requestMoreToBeginning callId: Int) {}
