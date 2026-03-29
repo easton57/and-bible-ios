@@ -1700,8 +1700,10 @@ public struct BibleReaderView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 12) {
                     readerNavigationDrawerHeaderIcon
-                    Text("AndBible")
+                    Text(localizedDrawerString("app_name_medium", default: "Bible Study (AndBible)"))
                         .font(.system(size: 18, weight: .bold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                 }
                 .padding(.top, 24)
                 .padding(.horizontal, 4)
@@ -1709,23 +1711,21 @@ public struct BibleReaderView: View {
                 readerNavigationDrawerSection {
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("chooce_document", default: "Choose Document"),
-                        systemImage: "books.vertical",
+                        icon: .asset("DrawerChooseDocument"),
                         identifier: "readerChooseDocumentAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { showChooseDocumentSheet = true }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: String(localized: "search"),
-                        systemImage: "magnifyingglass",
+                        title: localizedDrawerString("search", default: "Find"),
+                        icon: .asset("DrawerSearch"),
                         identifier: "readerOpenSearchAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { presentSearch() }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: String(localized: "speak"),
-                        systemImage: "headphones",
+                        title: localizedDrawerString("speak", default: "Speak"),
+                        icon: .asset("DrawerSpeak"),
                         identifier: "readerOpenSpeakAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
@@ -1738,42 +1738,37 @@ public struct BibleReaderView: View {
                             }
                         }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: String(localized: "bookmarks"),
-                        systemImage: "bookmark",
+                        title: localizedDrawerString("bookmarks", default: "Bookmarks"),
+                        icon: .asset("DrawerBookmarks"),
                         identifier: "readerOpenBookmarksAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { activeReaderSheet = .bookmarks }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("studypads", default: "StudyPads"),
-                        systemImage: "tag",
+                        icon: .asset("DrawerStudyPads"),
                         identifier: "readerOpenStudyPadsAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { showStudyPadSelector = true }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: String(localized: "my_notes"),
-                        systemImage: "note.text",
+                        icon: .asset("DrawerDocuments"),
                         identifier: "readerOpenMyNotesAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { focusedController?.loadMyNotesDocument() }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: String(localized: "reading_plans"),
-                        systemImage: "calendar",
+                        title: localizedDrawerString("rdg_plan_title", default: "Reading Plan"),
+                        icon: .asset("DrawerReadingPlan"),
                         identifier: "readerOpenReadingPlansAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { activeReaderSheet = .readingPlans }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: String(localized: "history"),
-                        systemImage: "clock",
+                        title: localizedDrawerString("history", default: "History"),
+                        icon: .asset("DrawerHistory"),
                         identifier: "readerOpenHistoryAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { activeReaderSheet = .history }
@@ -1785,31 +1780,28 @@ public struct BibleReaderView: View {
                 ) {
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("download", default: "Download Documents"),
-                        systemImage: "arrow.down.circle",
+                        icon: .asset("DrawerDownloads"),
                         identifier: "readerOpenDownloadsAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { activeReaderSheet = .downloads }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("backup_and_restore", default: "Backup & Restore"),
-                        systemImage: "square.and.arrow.up.on.square",
+                        icon: .asset("DrawerBackupRestore"),
                         identifier: "readerOpenImportExportAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { showImportExport = true }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: String(localized: "cloud_sync_title"),
-                        systemImage: "arrow.triangle.2.circlepath",
+                        title: localizedDrawerString("cloud_sync_title", default: "Device synchronization"),
+                        icon: .asset("DrawerSync"),
                         identifier: "readerOpenSyncSettingsAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { showSyncSettings = true }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: String(localized: "settings"),
-                        systemImage: "gear",
+                        title: localizedDrawerString("settings", default: "Application preferences"),
+                        icon: .asset("DrawerSettings"),
                         identifier: "readerOpenSettingsAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { activeReaderSheet = .settings }
@@ -1821,53 +1813,48 @@ public struct BibleReaderView: View {
                 ) {
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("help_and_tips", default: "Help & Tips"),
-                        systemImage: "questionmark.circle",
+                        icon: .asset("DrawerHelp"),
                         identifier: "readerOpenHelpAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { showHelp = true }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
-                        title: localizedDrawerString("buy_development", default: "Buy development work"),
-                        systemImage: "heart",
+                        title: localizedDrawerString("buy_development", default: "Sponsor app development"),
+                        icon: .asset("DrawerSponsorDevelopment"),
                         identifier: "readerSponsorDevelopmentAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
                             openExternalLink("https://shop.andbible.org")
                         }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("questions_title", default: "Need Help"),
-                        systemImage: "questionmark.bubble",
+                        icon: .system("questionmark.bubble"),
                         identifier: "readerNeedHelpAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
                             openExternalLink("https://github.com/AndBible/and-bible/wiki/Support")
                         }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("how_to_contribute", default: "How to Contribute"),
-                        systemImage: "figure.wave",
+                        icon: .system("figure.wave"),
                         identifier: "readerContributeAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
                             openExternalLink("https://github.com/AndBible/and-bible/wiki/How-to-contribute")
                         }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: String(localized: "about"),
-                        systemImage: "info.circle",
+                        icon: .system("info.circle"),
                         identifier: "readerOpenAboutAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform { activeReaderSheet = .about }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("app_licence_title", default: "App Licence"),
-                        systemImage: "doc.text",
+                        icon: .system("doc.text"),
                         identifier: "readerOpenAppLicenseAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
@@ -1881,17 +1868,16 @@ public struct BibleReaderView: View {
                 ) {
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("tell_friend_title", default: "Recommend to a friend"),
-                        systemImage: "square.and.arrow.up",
+                        icon: .system("square.and.arrow.up"),
                         identifier: "readerTellFriendAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
                             shareText = String(localized: "tell_friend_message")
                         }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("rate_application", default: "Rate & Review"),
-                        systemImage: "star",
+                        icon: .system("star"),
                         identifier: "readerRateAppAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
@@ -1903,10 +1889,9 @@ public struct BibleReaderView: View {
                             #endif
                         }
                     }
-                    Divider()
                     readerNavigationDrawerRow(
                         title: localizedDrawerString("send_bug_report_title", default: "Feedback / bug report"),
-                        systemImage: "ladybug",
+                        icon: .system("ladybug"),
                         identifier: "readerReportBugAction"
                     ) {
                         dismissReaderNavigationDrawerAndPerform {
@@ -1920,7 +1905,7 @@ public struct BibleReaderView: View {
                     Text(readerNavigationDrawerVersionText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.top, 4)
                 .padding(.bottom, 16)
@@ -2021,7 +2006,9 @@ public struct BibleReaderView: View {
     /// Platform-appropriate background fill used by the left navigation drawer.
     private var readerNavigationDrawerBackground: Color {
         #if os(iOS)
-        return Color(uiColor: .systemBackground)
+        return colorScheme == .dark
+            ? Color(red: 48.0 / 255.0, green: 48.0 / 255.0, blue: 48.0 / 255.0)
+            : Color(uiColor: .systemBackground)
         #elseif os(macOS)
         return Color(nsColor: .windowBackgroundColor)
         #endif
@@ -2031,24 +2018,18 @@ public struct BibleReaderView: View {
     @ViewBuilder
     private var readerNavigationDrawerHeaderIcon: some View {
         #if os(iOS)
-        if let icon = UIImage(named: "AppIcon") {
-            Image(uiImage: icon)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 42, height: 42)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        } else {
-            ToolbarAssetIcon(name: "ToolbarBible", size: 28)
-                .foregroundStyle(.primary)
-                .frame(width: 42, height: 42)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        #elseif os(macOS)
-        Image(nsImage: NSApplication.shared.applicationIconImage)
+        Image("DrawerLogo", bundle: .module)
+            .renderingMode(.original)
+            .interpolation(.high)
             .resizable()
-            .scaledToFill()
-            .frame(width: 42, height: 42)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .scaledToFit()
+            .frame(width: 52, height: 52)
+        #elseif os(macOS)
+        Image("DrawerLogo", bundle: .module)
+            .renderingMode(.original)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 52, height: 52)
         #endif
     }
 
@@ -2057,7 +2038,7 @@ public struct BibleReaderView: View {
         title: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             if let title {
                 Text(title)
                     .font(.caption.weight(.semibold))
@@ -2074,38 +2055,63 @@ public struct BibleReaderView: View {
     @ViewBuilder
     private func readerNavigationDrawerRow(
         title: String,
-        systemImage: String,
+        icon: ReaderNavigationDrawerIcon,
         identifier: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         if let identifier {
             Button(action: action) {
-                readerNavigationDrawerRowLabel(title: title, systemImage: systemImage)
+                readerNavigationDrawerRowLabel(title: title, icon: icon)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier(identifier)
         } else {
             Button(action: action) {
-                readerNavigationDrawerRowLabel(title: title, systemImage: systemImage)
+                readerNavigationDrawerRowLabel(title: title, icon: icon)
             }
             .buttonStyle(.plain)
         }
     }
 
+    /// Supported icon sources for one drawer row.
+    private enum ReaderNavigationDrawerIcon {
+        case system(String)
+        case asset(String)
+    }
+
     /// Shared label chrome for drawer rows.
-    private func readerNavigationDrawerRowLabel(title: String, systemImage: String) -> some View {
+    private func readerNavigationDrawerRowLabel(
+        title: String,
+        icon: ReaderNavigationDrawerIcon
+    ) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
+            readerNavigationDrawerRowIcon(icon)
+                .frame(width: 20, height: 20)
             Text(title)
                 .foregroundStyle(.primary)
+                .font(.system(size: 17, weight: .medium))
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
+    }
+
+    /// Resolves one drawer row icon from either asset-catalog vectors or SF Symbols.
+    @ViewBuilder
+    private func readerNavigationDrawerRowIcon(_ icon: ReaderNavigationDrawerIcon) -> some View {
+        switch icon {
+        case .system(let systemName):
+            Image(systemName: systemName)
+                .font(.body)
+                .foregroundStyle(.secondary)
+        case .asset(let assetName):
+            Image(assetName, bundle: .module)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// Human-readable title shown for each choose-document category.
