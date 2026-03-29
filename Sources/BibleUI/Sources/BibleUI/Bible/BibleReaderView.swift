@@ -712,18 +712,6 @@ public struct BibleReaderView: View {
                 }
             }
         }
-        .sheet(isPresented: $showReaderOverflowMenu, onDismiss: presentPendingReaderOverflowPresentation) {
-            NavigationStack {
-                readerOverflowMenu
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(String(localized: "done")) { showReaderOverflowMenu = false }
-                        }
-                    }
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
         .sheet(isPresented: $showTextDisplaySettings) {
             NavigationStack {
                 TextDisplaySettingsView(settings: $displaySettings, onChange: applyDisplaySettingsChange)
@@ -2404,12 +2392,12 @@ public struct BibleReaderView: View {
         }
     }
 
-    /// Whether the reader toolbar should collapse to the compact portrait action budget.
+    /// Whether the reader toolbar should collapse to Android's compact portrait action budget.
     private var usesCompactReaderToolbar: Bool {
         horizontalSizeClass == .compact
     }
 
-    /// Width-aware toolbar action cluster that keeps Search available on compact layouts.
+    /// Width-aware toolbar action cluster that keeps Search available while matching Android's compact-vs-expanded behavior.
     @ViewBuilder
     private func readerToolbarActions(controller: BibleReaderController?) -> some View {
         if usesCompactReaderToolbar {
@@ -2569,15 +2557,25 @@ public struct BibleReaderView: View {
                 .accessibilityLabel(String(localized: "workspaces"))
             }
 
-            Button {
-                showReaderOverflowMenu = true
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.body)
-                    .foregroundStyle(toolbarIconColor())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("readerMoreMenuButton")
+            readerOverflowToolbarButton
+        }
+    }
+
+    /// Trailing overflow trigger that must remain visible even when toolbar actions collapse.
+    private var readerOverflowToolbarButton: some View {
+        Button {
+            showReaderOverflowMenu = true
+        } label: {
+            ToolbarAssetIcon(name: "ToolbarOverflow")
+                .foregroundStyle(toolbarIconColor())
+                .frame(width: 24, height: 22)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("readerMoreMenuButton")
+        .popover(isPresented: $showReaderOverflowMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            readerOverflowMenu
+                .frame(width: 320)
+                .presentationCompactAdaptation(.popover)
         }
     }
 
