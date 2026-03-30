@@ -1180,10 +1180,11 @@ final class AndBibleUITests: XCTestCase {
         dismissSyncSettings(in: app)
         _ = openSyncSettings(in: app)
 
-        let reopenedSyncState = requireElement("syncSettingsState", in: app, timeout: 10)
-        XCTAssertEqual(
-            reopenedSyncState.value as? String,
-            "backend=GOOGLE_DRIVE;enabled=none"
+        waitForElementValue(
+            "syncSettingsState",
+            toEqual: "backend=GOOGLE_DRIVE;enabled=none",
+            in: app,
+            timeout: 10
         )
         XCTAssertTrue(requireElement("syncGoogleDriveSignInButton", in: app, timeout: 10).exists)
     }
@@ -2254,6 +2255,24 @@ final class AndBibleUITests: XCTestCase {
      *   - falls back to a brief run-loop advance when no visible Search scroll surface exists
      */
     private func revealSearchControls(in app: XCUIApplication) {
+        let optionsPanel = app.descendants(matching: .any)
+            .matching(identifier: "searchOptionsPanel")
+            .firstMatch
+        if optionsPanel.exists || optionsPanel.waitForExistence(timeout: 0.2) {
+            return
+        }
+
+        let optionsToggle = app.buttons["searchOptionsToggleButton"].firstMatch
+        if optionsToggle.exists || optionsToggle.waitForExistence(timeout: 0.2) {
+            let toggleValue = String(describing: optionsToggle.value ?? "")
+            if toggleValue.localizedCaseInsensitiveContains("hidden") {
+                tapElementReliably(optionsToggle, timeout: 5)
+                if optionsPanel.waitForExistence(timeout: 2) {
+                    return
+                }
+            }
+        }
+
         let scrollableCandidates: [XCUIElement] = [
             app.descendants(matching: .any).matching(identifier: "searchResultsList").firstMatch,
             app.collectionViews.firstMatch,
@@ -2264,8 +2283,12 @@ final class AndBibleUITests: XCTestCase {
         if let visibleScrollable = scrollableCandidates.first(where: {
             $0.exists && !$0.frame.isEmpty
         }) {
-            visibleScrollable.swipeDown()
-            return
+            for _ in 0..<2 {
+                visibleScrollable.swipeDown()
+                if optionsPanel.exists || optionsPanel.waitForExistence(timeout: 0.5) {
+                    return
+                }
+            }
         }
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.2))

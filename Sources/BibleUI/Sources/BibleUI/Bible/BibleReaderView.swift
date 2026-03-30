@@ -763,6 +763,14 @@ public struct BibleReaderView: View {
                 }
             }
         }
+        .onChange(of: showReaderOverflowMenu) { oldValue, newValue in
+            guard oldValue, !newValue else {
+                return
+            }
+            DispatchQueue.main.async {
+                presentPendingReaderOverflowPresentation()
+            }
+        }
         .onChange(of: colorScheme) { _, _ in
             let store = SettingsStore(modelContext: modelContext)
             let manualNightMode = store.getBool("night_mode")

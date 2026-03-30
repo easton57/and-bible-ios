@@ -235,6 +235,8 @@ public struct SearchView: View {
                     } label: {
                         Image(systemName: showOptions ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
+                    .accessibilityIdentifier("searchOptionsToggleButton")
+                    .accessibilityValue(showOptions ? "visible" : "hidden")
                 }
             }
         }
@@ -470,6 +472,9 @@ public struct SearchView: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.bar)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("searchOptionsPanel")
+        .accessibilityValue("visible")
     }
 
     /**
