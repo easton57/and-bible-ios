@@ -69,6 +69,12 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
+        tapReaderMoreMenuButton(in: app)
+        XCTAssertTrue(requireElement("readerOverflowSectionTitlesToggle", in: app, timeout: 10).exists)
+        XCTAssertTrue(requireElement("readerOverflowStrongsModeAction", in: app, timeout: 10).exists)
+        XCTAssertTrue(requireElement("readerOverflowVerseNumbersToggle", in: app, timeout: 10).exists)
+        tapElementReliably(requireElement("readerOverflowMenuDismissArea", in: app, timeout: 10), timeout: 5)
+
         openSettings(in: app)
         XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
         XCTAssertTrue(requireSettingsNavigationControl("settingsImportExportLink", in: app, timeout: 10).exists)
