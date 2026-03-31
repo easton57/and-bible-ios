@@ -58,8 +58,8 @@ final class AndBibleUITests: XCTestCase {
      * - Side effects:
      *   - launches the app with the calculator gate disabled, in-memory persistence, and one
      *     deterministic seeded bookmark-label pair for stable reader-shell startup
-     *   - opens the reader overflow menu, validates the primary action rows, and pushes the
-     *     settings screen
+     *   - opens the reader overflow menu, validates the primary overflow rows, dismisses the menu,
+     *     and pushes the settings screen
      * - Failure modes:
      *   - fails if any primary overflow-menu action is absent
      *   - fails if settings cannot be reached from the reader shell
@@ -73,7 +73,11 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertTrue(requireElement("readerOverflowSectionTitlesToggle", in: app, timeout: 10).exists)
         XCTAssertTrue(requireElement("readerOverflowStrongsModeAction", in: app, timeout: 10).exists)
         XCTAssertTrue(requireElement("readerOverflowVerseNumbersToggle", in: app, timeout: 10).exists)
-        tapElementReliably(requireElement("readerOverflowMenuDismissArea", in: app, timeout: 10), timeout: 5)
+        dismissReaderOverflowMenu(in: app, timeout: 15)
+        XCTAssertTrue(
+            waitForReaderShellReady(in: app, timeout: 20),
+            "Expected overflow dismissal to restore the reader shell before opening Settings."
+        )
 
         openSettings(in: app)
         XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
@@ -3509,7 +3513,8 @@ final class AndBibleUITests: XCTestCase {
      * - Parameters:
      *   - app: Running application under test.
      *   - timeout: Maximum number of seconds to wait before returning `false`.
-     * - Returns: `true` when both the drawer button and reference control are visible again.
+     * - Returns: `true` when both the drawer button and reference control are visible again and no
+     *   reader action surface still covers the shell.
      * - Side effects:
      *   - polls the live toolbar hierarchy while modal surfaces dismiss back to the reader shell
      * - Failure modes:
@@ -3524,12 +3529,16 @@ final class AndBibleUITests: XCTestCase {
             let drawerButton = app.buttons["readerNavigationDrawerButton"].firstMatch
             let referenceButton = app.buttons["bookChooserButton"].firstMatch
             let referenceValue = referenceButton.value as? String ?? ""
+            let drawerVisible = resolvedElement("readerNavigationDrawer", in: app) != nil
+            let overflowVisible = resolvedElement("readerOverflowMenu", in: app) != nil
 
             if drawerButton.exists,
                !drawerButton.frame.isEmpty,
                referenceButton.exists,
                !referenceButton.frame.isEmpty,
-               !referenceValue.isEmpty {
+               !referenceValue.isEmpty,
+               !drawerVisible,
+               !overflowVisible {
                 return true
             }
 
@@ -3878,6 +3887,77 @@ final class AndBibleUITests: XCTestCase {
 
         XCTFail(
             "Expected the reader overflow menu to appear after tapping readerMoreMenuButton within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
+    }
+
+    /**
+     Dismisses the reader overflow menu and waits until the reader shell is visible again.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to spend dismissing the overflow menu.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - taps the explicit dismiss area when available and falls back to dragging the overflow
+     *     panel down when the overlay ignores the first tap
+     * - Failure modes:
+     *   - records an XCTest failure when the overflow menu never disappears before timeout
+     */
+    private func dismissReaderOverflowMenu(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        repeat {
+            guard let overflowMenu = resolvedElement("readerOverflowMenu", in: app),
+                  !overflowMenu.frame.isEmpty else {
+                if waitForReaderShellReady(in: app, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow))) {
+                    return
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                continue
+            }
+
+            let overflowButton = unresolvedElement("readerMoreMenuButton", in: app)
+            if overflowButton.exists && !overflowButton.frame.isEmpty {
+                tapElementReliably(
+                    overflowButton,
+                    timeout: min(3, max(0.5, deadline.timeIntervalSinceNow)),
+                    file: file,
+                    line: line
+                )
+                if !waitForReaderOverflowMenu(in: app, timeout: 1) &&
+                    waitForReaderShellReady(in: app, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow))) {
+                    return
+                }
+            }
+
+            let dismissArea = unresolvedElement("readerOverflowMenuDismissArea", in: app)
+            if dismissArea.exists && !dismissArea.frame.isEmpty {
+                let backdropTapPoint = dismissArea.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.2))
+                backdropTapPoint.tap()
+                if !waitForReaderOverflowMenu(in: app, timeout: 1) &&
+                    waitForReaderShellReady(in: app, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow))) {
+                    return
+                }
+            }
+
+            dismissSheetByDraggingDown(overflowMenu, file: file, line: line)
+            if !waitForReaderOverflowMenu(in: app, timeout: 1) &&
+                waitForReaderShellReady(in: app, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow))) {
+                return
+            }
+        } while Date() < deadline
+
+        XCTAssertFalse(
+            waitForReaderOverflowMenu(in: app, timeout: 1),
+            "Expected the reader overflow menu to dismiss within \(timeout) seconds.",
             file: file,
             line: line
         )
@@ -4245,12 +4325,12 @@ final class AndBibleUITests: XCTestCase {
                 }
                 if let overflowMenu = resolvedElement("readerOverflowMenu", in: app),
                    !overflowMenu.frame.isEmpty {
-                    let doneButton = app.buttons["Done"].firstMatch
-                    if doneButton.exists && !doneButton.frame.isEmpty {
-                        tapElementReliably(doneButton, timeout: 5, file: file, line: line)
-                    } else {
-                        dismissSheetByDraggingDown(overflowMenu, file: file, line: line)
-                    }
+                    dismissReaderOverflowMenu(
+                        in: app,
+                        timeout: min(5, max(1, deadline.timeIntervalSinceNow)),
+                        file: file,
+                        line: line
+                    )
                 } else {
                     tapReaderNavigationDrawerButton(
                         in: app,
