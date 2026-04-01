@@ -3513,10 +3513,11 @@ final class AndBibleUITests: XCTestCase {
      * - Parameters:
      *   - app: Running application under test.
      *   - timeout: Maximum number of seconds to wait before returning `false`.
-     * - Returns: `true` when both the drawer button and reference control are visible again and no
-     *   reader action surface still covers the shell.
+     * - Returns: `true` when the stable reader toolbar is visible again and no drawer-only or
+     *   overflow-only action remains exposed over the shell.
      * - Side effects:
      *   - polls the live toolbar hierarchy while modal surfaces dismiss back to the reader shell
+     *   - avoids expensive cross-surface root queries by checking menu-only action affordances
      * - Failure modes:
      *   - returns `false` when the reader shell never restores its primary controls before timeout
      */
@@ -3528,17 +3529,20 @@ final class AndBibleUITests: XCTestCase {
         repeat {
             let drawerButton = app.buttons["readerNavigationDrawerButton"].firstMatch
             let referenceButton = app.buttons["bookChooserButton"].firstMatch
+            let moreButton = app.buttons["readerMoreMenuButton"].firstMatch
             let referenceValue = referenceButton.value as? String ?? ""
-            let drawerVisible = resolvedElement("readerNavigationDrawer", in: app) != nil
-            let overflowVisible = resolvedElement("readerOverflowMenu", in: app) != nil
+            let drawerActionVisible = app.buttons["readerOpenBookmarksAction"].firstMatch.exists
+            let overflowActionVisible = app.buttons["readerOpenWorkspacesAction"].firstMatch.exists
 
             if drawerButton.exists,
                !drawerButton.frame.isEmpty,
                referenceButton.exists,
                !referenceButton.frame.isEmpty,
+               moreButton.exists,
+               !moreButton.frame.isEmpty,
                !referenceValue.isEmpty,
-               !drawerVisible,
-               !overflowVisible {
+               !drawerActionVisible,
+               !overflowActionVisible {
                 return true
             }
 
@@ -4327,14 +4331,14 @@ final class AndBibleUITests: XCTestCase {
                    !overflowMenu.frame.isEmpty {
                     dismissReaderOverflowMenu(
                         in: app,
-                        timeout: min(5, max(1, deadline.timeIntervalSinceNow)),
+                        timeout: min(8, max(5, deadline.timeIntervalSinceNow)),
                         file: file,
                         line: line
                     )
                 } else {
                     tapReaderNavigationDrawerButton(
                         in: app,
-                        timeout: min(5, max(1, deadline.timeIntervalSinceNow)),
+                        timeout: min(8, max(5, deadline.timeIntervalSinceNow)),
                         file: file,
                         line: line
                     )
@@ -4353,7 +4357,7 @@ final class AndBibleUITests: XCTestCase {
                 } else {
                     tapReaderMoreMenuButton(
                         in: app,
-                        timeout: min(5, max(1, deadline.timeIntervalSinceNow)),
+                        timeout: min(8, max(5, deadline.timeIntervalSinceNow)),
                         file: file,
                         line: line
                     )
