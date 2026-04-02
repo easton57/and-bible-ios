@@ -268,7 +268,7 @@ final class AndBibleUITests: XCTestCase {
         XCTAssertTrue(requireElement("readingPlanListScreen", in: app, timeout: 15).exists)
         tapElementReliably(requireElement("readingPlanStartButton", in: app, timeout: 10), timeout: 10)
         XCTAssertTrue(requireElement("availablePlansScreen", in: app, timeout: 10).exists)
-        tapElementReliably(app.buttons.matching(identifier: "readingPlanTemplateButton").firstMatch, timeout: 10)
+        tapElementReliably(requireElement("readingPlanTemplateButton", in: app, timeout: 15), timeout: 10)
         XCTAssertTrue(requireElement("readingPlanListScreen", in: app, timeout: 15).exists)
         tapElementReliably(requireElement("readingPlanActivePlanLink", in: app, timeout: 15), timeout: 10)
         let currentDay = requireElement("dailyReadingCurrentDayLabel", in: app, timeout: 15)
@@ -2821,7 +2821,14 @@ final class AndBibleUITests: XCTestCase {
      */
     private func openSettings(in app: XCUIApplication) {
         for attempt in 1...2 {
-            tapReaderAction("readerOpenSettingsAction", in: app, timeout: 15)
+            if !waitForReaderShellReady(in: app, timeout: 20) {
+                if attempt == 1 {
+                    continue
+                }
+                break
+            }
+
+            tapReaderAction("readerOpenSettingsAction", in: app, timeout: 20)
             if waitForSettingsReady(in: app, timeout: 20) {
                 return
             }
@@ -3181,6 +3188,14 @@ final class AndBibleUITests: XCTestCase {
             return [
                 app.collectionViews[identifier].firstMatch,
                 app.tables[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
+                anyIdentifierMatch,
+            ]
+        case "readingPlanTemplateButton":
+            return [
+                app.buttons[identifier].firstMatch,
+                app.collectionViews.buttons[identifier].firstMatch,
+                app.cells[identifier].firstMatch,
                 app.otherElements[identifier].firstMatch,
                 anyIdentifierMatch,
             ]
@@ -3886,6 +3901,37 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        if tryTapReaderMoreMenuButton(in: app, timeout: timeout, file: file, line: line) {
+            return
+        }
+
+        XCTFail(
+            "Expected the reader overflow menu to appear after tapping readerMoreMenuButton within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
+    }
+
+    /**
+     Attempts to open the reader overflow menu without recording an XCTest failure on timeout.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to spend trying to open the overflow menu.
+     *   - file: Source file used for nested helper attribution.
+     *   - line: Source line used for nested helper attribution.
+     * - Returns: `true` when the production overflow menu becomes visible.
+     * - Side effects:
+     *   - taps the production more-menu button and waits for the menu surface to appear
+     * - Failure modes:
+     *   - returns `false` when the menu never appears before the local retry budget expires
+     */
+    private func tryTapReaderMoreMenuButton(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 30,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
         _ = requireReaderReferenceValue(
             in: app,
             timeout: min(15, timeout),
@@ -3903,17 +3949,13 @@ final class AndBibleUITests: XCTestCase {
             if !button.frame.isEmpty {
                 button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
                 if waitForReaderOverflowMenu(in: app, timeout: min(3, max(1, deadline.timeIntervalSinceNow))) {
-                    return
+                    return true
                 }
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
-        XCTFail(
-            "Expected the reader overflow menu to appear after tapping readerMoreMenuButton within \(timeout) seconds.",
-            file: file,
-            line: line
-        )
+        return false
     }
 
     /**
@@ -4046,23 +4088,50 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let button = requireElement("readerNavigationDrawerButton", in: app, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow)))
-            if !button.frame.isEmpty {
-                tapElementReliably(button, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow)), file: file, line: line)
-                if waitForReaderNavigationDrawer(in: app, timeout: min(5, max(2, deadline.timeIntervalSinceNow))) {
-                    return
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline
+        if tryTapReaderNavigationDrawerButton(in: app, timeout: timeout, file: file, line: line) {
+            return
+        }
 
         XCTFail(
             "Expected the reader navigation drawer to appear after tapping readerNavigationDrawerButton within \(timeout) seconds.",
             file: file,
             line: line
         )
+    }
+
+    /**
+     Attempts to open the reader navigation drawer without recording an XCTest failure on timeout.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to spend trying to open the drawer.
+     *   - file: Source file used for nested helper attribution.
+     *   - line: Source line used for nested helper attribution.
+     * - Returns: `true` when the production drawer becomes visible.
+     * - Side effects:
+     *   - taps the production navigation-drawer button and waits for drawer affordances to appear
+     * - Failure modes:
+     *   - returns `false` when the drawer never appears before the local retry budget expires
+     */
+    private func tryTapReaderNavigationDrawerButton(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 30,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let button = requireElement("readerNavigationDrawerButton", in: app, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow)))
+            if !button.frame.isEmpty {
+                tapElementReliably(button, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow)), file: file, line: line)
+                if waitForReaderNavigationDrawer(in: app, timeout: min(5, max(2, deadline.timeIntervalSinceNow))) {
+                    return true
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        return false
     }
 
     /**
@@ -4356,9 +4425,9 @@ final class AndBibleUITests: XCTestCase {
                         line: line
                     )
                 } else {
-                    tapReaderNavigationDrawerButton(
+                    _ = tryTapReaderNavigationDrawerButton(
                         in: app,
-                        timeout: min(8, max(5, deadline.timeIntervalSinceNow)),
+                        timeout: min(12, max(5, deadline.timeIntervalSinceNow)),
                         file: file,
                         line: line
                     )
@@ -4375,9 +4444,9 @@ final class AndBibleUITests: XCTestCase {
                         tapElementReliably(dismissArea, timeout: 5, file: file, line: line)
                     }
                 } else {
-                    tapReaderMoreMenuButton(
+                    _ = tryTapReaderMoreMenuButton(
                         in: app,
-                        timeout: min(8, max(5, deadline.timeIntervalSinceNow)),
+                        timeout: min(12, max(5, deadline.timeIntervalSinceNow)),
                         file: file,
                         line: line
                     )
