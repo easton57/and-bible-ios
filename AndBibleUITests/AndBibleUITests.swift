@@ -459,19 +459,27 @@ final class AndBibleUITests: XCTestCase {
 
         openBookmarkList(in: app)
         let exodusRow = requireBookmarkRow("Exodus_2_1", in: app, timeout: 10)
-        let matthewRow = requireBookmarkRow("Matthew_3_1", in: app, timeout: 10)
+        _ = requireBookmarkRow("Matthew_3_1", in: app, timeout: 10)
 
         exodusRow.swipeLeft()
         requireElement("bookmarkListDeleteButton::Exodus_2_1", in: app, timeout: 10).tap()
 
-        let deletedPredicate = NSPredicate(format: "exists == false")
-        expectation(for: deletedPredicate, evaluatedWith: exodusRow)
-        waitForExpectations(timeout: 10)
-        XCTAssertTrue(matthewRow.exists, "Expected Matthew bookmark row to remain after deleting Exodus.")
+        waitForElementValue("bookmarkListScreen", toContain: "count=1", in: app, timeout: 10)
+        waitForElementValue("bookmarkListScreen", toContain: "rows=Matthew_3_1", in: app, timeout: 10)
+        waitForElementValue("bookmarkListScreen", toNotContain: "Exodus_2_1", in: app, timeout: 10)
+        XCTAssertTrue(
+            requireBookmarkRow("Matthew_3_1", in: app, timeout: 10).exists,
+            "Expected Matthew bookmark row to remain after deleting Exodus."
+        )
 
         reopenBookmarkList(in: app)
-        XCTAssertTrue(matthewRow.waitForExistence(timeout: 10), "Expected Matthew bookmark row to persist after reopening bookmarks.")
-        XCTAssertFalse(exodusRow.exists, "Expected Exodus bookmark row to remain deleted after reopening bookmarks.")
+        waitForElementValue("bookmarkListScreen", toContain: "count=1", in: app, timeout: 10)
+        waitForElementValue("bookmarkListScreen", toContain: "rows=Matthew_3_1", in: app, timeout: 10)
+        waitForElementValue("bookmarkListScreen", toNotContain: "Exodus_2_1", in: app, timeout: 10)
+        XCTAssertTrue(
+            requireBookmarkRow("Matthew_3_1", in: app, timeout: 10).exists,
+            "Expected Matthew bookmark row to persist after reopening bookmarks."
+        )
     }
 
     /**
@@ -1939,17 +1947,59 @@ final class AndBibleUITests: XCTestCase {
      *   - fails when the Search screen never appears
      */
     private func openSearch(in app: XCUIApplication) -> XCUIElement {
-        tapReaderAction("readerOpenSearchAction", in: app, timeout: 15)
+        tapReaderSearchEntry(in: app, timeout: 15)
         let searchScreen = requireSearchScreen(in: app, timeout: 20)
         waitForSearchInteractionReady(on: searchScreen, in: app, timeout: 120)
         if let searchQuery = app.launchEnvironment["UITEST_SEARCH_QUERY"], !searchQuery.isEmpty {
-            let searchField = requireSearchInput(in: app, timeout: 10)
-            focusTextEntryElement(searchField, timeout: 10)
-            searchField.typeText(searchQuery)
-            searchField.typeText("\n")
+            focusTextEntryElement(requireSearchInput(in: app, timeout: 10), timeout: 10)
+            let activeSearchField = requireSearchInput(in: app, timeout: 10)
+            activeSearchField.typeText(searchQuery + "\n")
             app.launchEnvironment.removeValue(forKey: "UITEST_SEARCH_QUERY")
         }
         return searchScreen
+    }
+
+    /**
+     Opens Search from the most stable production reader affordance available on the current shell.
+     *
+     * Search can appear both as a direct toolbar button and as a drawer action. The UI harness
+     * should prefer the direct toolbar button when it is already visible instead of forcing the
+     * drawer path and paying the extra surface-recovery cost.
+     *
+     * - Parameters:
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to wait before failing.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - taps the direct toolbar Search action when it is already visible on the reader shell
+     *   - otherwise falls back to the shared reader-action routing helper
+     * - Failure modes:
+     *   - records an XCTest failure if neither the direct button nor the routed action can be
+     *     opened within the allotted timeout
+     */
+    private func tapReaderSearchEntry(
+        in app: XCUIApplication,
+        timeout: TimeInterval = 15,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        if waitForReaderShellReady(in: app, timeout: min(10, timeout)),
+           resolvedElement("readerNavigationDrawer", in: app) == nil,
+           resolvedElement("readerOverflowMenu", in: app) == nil
+        {
+            let directCandidates = [
+                app.buttons["readerOpenSearchAction"].firstMatch,
+                app.buttons["Search"].firstMatch,
+            ]
+
+            if let directButton = directCandidates.first(where: { $0.exists && !$0.frame.isEmpty }) {
+                tapElementReliably(directButton, timeout: timeout, file: file, line: line)
+                return
+            }
+        }
+
+        tapReaderAction("readerOpenSearchAction", in: app, timeout: timeout, file: file, line: line)
     }
 
     /**
@@ -2349,16 +2399,10 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) {
         let searchScreen = requireSearchScreen(in: app, timeout: timeout, file: file, line: line)
-        let searchField = requireSearchInput(
-            in: app,
-            timeout: timeout,
-            file: file,
-            line: line
-        )
 
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            let currentValue = searchField.value as? String ?? ""
+            let currentValue = resolvedSearchInputValue(in: app)
             let currentState = searchScreen.value as? String ?? ""
             if currentValue.contains(expectedQuery)
                 || currentState.contains("query=\(expectedQuery)")
@@ -2368,7 +2412,7 @@ final class AndBibleUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
-        let finalValue = searchField.value as? String ?? ""
+        let finalValue = resolvedSearchInputValue(in: app)
         let finalState = searchScreen.value as? String ?? ""
         XCTAssertTrue(
             finalValue.contains(expectedQuery) || finalState.contains("query=\(expectedQuery)"),
@@ -4958,6 +5002,32 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
         return searchField
+    }
+
+    /**
+     Reads the current Search input value from a freshly resolved live field.
+     *
+     * - Parameter app: Running application under test.
+     * - Returns: The current Search field value, or an empty string when no live Search field is
+     *   currently exposed.
+     * - Side effects:
+     *   - re-queries the live Search field hierarchy instead of relying on a previously resolved
+     *     XCUI element handle
+     * - Failure modes:
+     *   - returns an empty string when the Search input is temporarily absent or its value is not a
+     *     string
+     */
+    private func resolvedSearchInputValue(in app: XCUIApplication) -> String {
+        let candidates = [
+            app.searchFields.firstMatch,
+            app.textFields.firstMatch,
+        ]
+
+        for candidate in candidates where candidate.exists && !candidate.frame.isEmpty {
+            return candidate.value as? String ?? ""
+        }
+
+        return ""
     }
 
     /**
