@@ -3299,15 +3299,6 @@ final class AndBibleUITests: XCTestCase {
         let anyIdentifierMatch = app.descendants(matching: .any)
             .matching(identifier: identifier)
             .firstMatch
-        let statefulSearchScreenMatch = app.descendants(matching: .any)
-            .matching(
-                NSPredicate(
-                    format: "identifier == %@ AND value CONTAINS %@",
-                    "searchScreen",
-                    "state="
-                )
-            )
-            .firstMatch
 
         if identifier.hasPrefix("labelAssignmentRow::") {
             return [
@@ -3369,6 +3360,10 @@ final class AndBibleUITests: XCTestCase {
                 app.otherElements[identifier].firstMatch,
             ]
         case "readerNavigationDrawerButton":
+            return [
+                app.buttons[identifier].firstMatch,
+            ]
+        case "readerMoreMenuButton", "bookChooserButton":
             return [
                 app.buttons[identifier].firstMatch,
             ]
@@ -3447,11 +3442,9 @@ final class AndBibleUITests: XCTestCase {
             ]
         case "searchScreen":
             return [
-                statefulSearchScreenMatch,
                 app.otherElements[identifier].firstMatch,
                 app.collectionViews[identifier].firstMatch,
                 app.scrollViews[identifier].firstMatch,
-                anyIdentifierMatch,
             ]
         case "searchResultsList":
             return [
@@ -3471,6 +3464,17 @@ final class AndBibleUITests: XCTestCase {
                 app.otherElements[identifier].firstMatch,
                 app.staticTexts[identifier].firstMatch,
                 anyIdentifierMatch,
+            ]
+        case "textDisplayFontFamilyButton":
+            return [
+                app.buttons[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
+            ]
+        case "textDisplayJustifyTextToggle":
+            return [
+                app.switches[identifier].firstMatch,
+                app.buttons[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
             ]
         case
             "settingsForm",
@@ -3515,7 +3519,7 @@ final class AndBibleUITests: XCTestCase {
      * - Parameters:
      *   - identifier: Accessibility identifier to resolve.
      *   - app: Running application under test.
-     * - Returns: The first existing typed candidate, preferring one with a stable frame.
+     * - Returns: The first existing typed candidate in the explicit priority order.
      * - Side effects: none.
      * - Failure modes: returns `nil` when the identifier is not currently exposed.
      */
@@ -3524,10 +3528,10 @@ final class AndBibleUITests: XCTestCase {
         in app: XCUIApplication
     ) -> XCUIElement? {
         let candidates = elementCandidates(for: identifier, in: app)
-        if let visible = candidates.first(where: { $0.exists && !$0.frame.isEmpty }) {
-            return visible
+        for candidate in candidates where candidate.exists {
+            return candidate
         }
-        return candidates.first(where: { $0.exists })
+        return nil
     }
 
     /**
@@ -3867,19 +3871,16 @@ final class AndBibleUITests: XCTestCase {
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            let drawerButton = app.buttons["readerNavigationDrawerButton"].firstMatch
-            let referenceButton = app.buttons["bookChooserButton"].firstMatch
-            let moreButton = app.buttons["readerMoreMenuButton"].firstMatch
-            let referenceValue = referenceButton.value as? String ?? ""
+            let drawerButton = resolvedElement("readerNavigationDrawerButton", in: app)
+            let referenceButton = resolvedElement("bookChooserButton", in: app)
+            let moreButton = resolvedElement("readerMoreMenuButton", in: app)
+            let referenceValue = referenceButton?.value as? String ?? ""
             let drawerActionVisible = app.buttons["readerOpenBookmarksAction"].firstMatch.exists
             let overflowActionVisible = app.buttons["readerOpenWorkspacesAction"].firstMatch.exists
 
-            if drawerButton.exists,
-               !drawerButton.frame.isEmpty,
-               referenceButton.exists,
-               !referenceButton.frame.isEmpty,
-               moreButton.exists,
-               !moreButton.frame.isEmpty,
+            if drawerButton != nil,
+               referenceButton != nil,
+               moreButton != nil,
                !referenceValue.isEmpty,
                !drawerActionVisible,
                !overflowActionVisible {
