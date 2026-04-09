@@ -177,6 +177,27 @@ public struct SettingsView: View {
     /// Tracks whether the debug crash action has already been scheduled.
     @State private var debugCrashScheduled = false
 
+    /// Whether the Downloads destination should be pushed from the Settings form.
+    @State private var showDownloads = false
+
+    /// Whether the Repositories destination should be pushed from the Settings form.
+    @State private var showRepositories = false
+
+    /// Whether the Import/Export destination should be pushed from the Settings form.
+    @State private var showImportExport = false
+
+    /// Whether the Sync Settings destination should be pushed from the Settings form.
+    @State private var showSyncSettings = false
+
+    /// Whether the Labels destination should be pushed from the Settings form.
+    @State private var showLabels = false
+
+    /// Whether the Text Display destination should be pushed from the Settings form.
+    @State private var showTextDisplaySettings = false
+
+    /// Whether the Colors destination should be pushed from the Settings form.
+    @State private var showColorSettings = false
+
     /**
      Locale option mirroring one Android `locale_pref` entry.
      */
@@ -833,41 +854,41 @@ public struct SettingsView: View {
                 }
 
                 Section(String(localized: "settings_data")) {
-                    NavigationLink {
+                    settingsNavigationButton(
+                        title: String(localized: "downloads"),
+                        accessibilityIdentifier: "settingsDownloadsLink",
+                        isPresented: $showDownloads
+                    ) {
                         ModuleBrowserView()
-                    } label: {
-                        settingsNavigationRow(title: String(localized: "downloads"))
                     }
-                    .id("settingsDownloadsLink")
-                    .accessibilityIdentifier("settingsDownloadsLink")
-                    NavigationLink {
+                    settingsNavigationButton(
+                        title: String(localized: "repositories"),
+                        accessibilityIdentifier: "settingsRepositoriesLink",
+                        isPresented: $showRepositories
+                    ) {
                         RepositoryManagerView()
-                    } label: {
-                        settingsNavigationRow(title: String(localized: "repositories"))
                     }
-                    .id("settingsRepositoriesLink")
-                    .accessibilityIdentifier("settingsRepositoriesLink")
-                    NavigationLink {
+                    settingsNavigationButton(
+                        title: String(localized: "import_export"),
+                        accessibilityIdentifier: "settingsImportExportLink",
+                        isPresented: $showImportExport
+                    ) {
                         ImportExportView()
-                    } label: {
-                        settingsNavigationRow(title: String(localized: "import_export"))
                     }
-                    .id("settingsImportExportLink")
-                    .accessibilityIdentifier("settingsImportExportLink")
-                    NavigationLink {
+                    settingsNavigationButton(
+                        title: String(localized: "icloud_sync"),
+                        accessibilityIdentifier: "settingsSyncLink",
+                        isPresented: $showSyncSettings
+                    ) {
                         SyncSettingsView()
-                    } label: {
-                        settingsNavigationRow(title: String(localized: "icloud_sync"))
                     }
-                    .id("settingsSyncLink")
-                    .accessibilityIdentifier("settingsSyncLink")
-                    NavigationLink {
+                    settingsNavigationButton(
+                        title: String(localized: "labels"),
+                        accessibilityIdentifier: "settingsLabelsLink",
+                        isPresented: $showLabels
+                    ) {
                         LabelManagerView()
-                    } label: {
-                        settingsNavigationRow(title: String(localized: "labels"))
                     }
-                    .id("settingsLabelsLink")
-                    .accessibilityIdentifier("settingsLabelsLink")
                 }
 
                 Section(String(localized: "settings_about")) {
@@ -1043,20 +1064,20 @@ public struct SettingsView: View {
      */
     private var lookAndFeelSection: some View {
         Section(String(localized: "prefs_display_customization_cat", defaultValue: "Look & feel")) {
-            NavigationLink {
+            settingsNavigationButton(
+                title: String(localized: "settings_text_display"),
+                accessibilityIdentifier: "settingsTextDisplayLink",
+                isPresented: $showTextDisplaySettings
+            ) {
                 TextDisplaySettingsView(settings: $displaySettings, onChange: onSettingsChanged)
-            } label: {
-                settingsNavigationRow(title: String(localized: "settings_text_display"))
             }
-            .id("settingsTextDisplayLink")
-            .accessibilityIdentifier("settingsTextDisplayLink")
-            NavigationLink {
+            settingsNavigationButton(
+                title: String(localized: "settings_colors"),
+                accessibilityIdentifier: "settingsColorsLink",
+                isPresented: $showColorSettings
+            ) {
                 ColorSettingsView(settings: $displaySettings, onChange: onSettingsChanged)
-            } label: {
-                settingsNavigationRow(title: String(localized: "settings_colors"))
             }
-            .id("settingsColorsLink")
-            .accessibilityIdentifier("settingsColorsLink")
             Picker(
                 String(localized: "prefs_night_mode_title", defaultValue: "Night mode switching"),
                 selection: Binding(
@@ -1368,6 +1389,41 @@ public struct SettingsView: View {
 
     @ViewBuilder
     /**
+     Builds one Settings row button that drives navigation through explicit state.
+     *
+     * This keeps the visible form row behavior identical to `NavigationLink`, while exposing a
+     * deterministic button accessibility surface for both VoiceOver and UI tests.
+     */
+    private func settingsNavigationButton<Destination: View>(
+        title: String,
+        accessibilityIdentifier: String,
+        isPresented: Binding<Bool>,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View {
+        ZStack {
+            settingsNavigationRow(title: title)
+                .accessibilityHidden(true)
+            Button {
+                isPresented.wrappedValue = true
+            } label: {
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(title)
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier(accessibilityIdentifier)
+        }
+        .id(accessibilityIdentifier)
+        .contentShape(Rectangle())
+        .navigationDestination(isPresented: isPresented, destination: destination)
+    }
+
+    @ViewBuilder
+    /**
      Builds a single-line navigation row used by nested settings links.
      *
      * - Parameter title: User-visible title shown in the row.
@@ -1379,7 +1435,11 @@ public struct SettingsView: View {
         HStack {
             Text(title)
             Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
 

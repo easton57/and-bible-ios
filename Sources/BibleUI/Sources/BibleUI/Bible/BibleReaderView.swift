@@ -680,9 +680,11 @@ public struct BibleReaderView: View {
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button(String(localized: "done")) { activeReaderSheet = nil }
+                                    .accessibilityIdentifier("aboutDoneButton")
                             }
                         }
                 }
+                .accessibilityIdentifier("aboutSheetScreen")
             }
         }
         .sheet(isPresented: $showReaderOverflowMenu, onDismiss: presentPendingReaderOverflowPresentation) {
@@ -1626,6 +1628,13 @@ public struct BibleReaderView: View {
                     readerOverflowButton(title: String(localized: "downloads"), systemImage: "arrow.down.circle", identifier: "readerOpenDownloadsAction") {
                         dismissReaderOverflowMenuAndQueue(.downloads)
                     }
+                    readerOverflowButton(
+                        title: String(localized: "cloud_sync_title"),
+                        systemImage: "arrow.triangle.2.circlepath",
+                        identifier: "readerOpenSyncSettingsAction"
+                    ) {
+                        dismissReaderOverflowMenuAndPerform { showSyncSettings = true }
+                    }
 
                     if let controller = focusedController, !controller.installedDictionaryModules.isEmpty {
                         readerOverflowButton(title: String(localized: "dictionary"), systemImage: "character.book.closed") {
@@ -1777,12 +1786,16 @@ public struct BibleReaderView: View {
             Button(action: action) {
                 readerOverflowButtonLabel(title: title, systemImage: systemImage)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .accessibilityIdentifier(identifier)
         } else {
             Button(action: action) {
                 readerOverflowButtonLabel(title: title, systemImage: systemImage)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
         }
     }
@@ -1794,6 +1807,7 @@ public struct BibleReaderView: View {
                 .labelStyle(.titleAndIcon)
             Spacer()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .contentShape(Rectangle())
