@@ -600,7 +600,7 @@ public final class BibleBridge: NSObject, WKScriptMessageHandler {
     }
 
     private func evaluateJavaScript(_ js: String) {
-        DispatchQueue.main.async { [weak self] in
+        let execute = { [weak self] in
             guard let webView = self?.webView else {
                 NSLog("BRIDGE-JS: webView is nil! Cannot evaluate: %@", String(js.prefix(200)))
                 return
@@ -610,6 +610,12 @@ public final class BibleBridge: NSObject, WKScriptMessageHandler {
                     NSLog("BRIDGE-JS ERROR: %@ for JS: %@", error.localizedDescription, String(js.prefix(200)))
                 }
             }
+        }
+
+        if Thread.isMainThread {
+            execute()
+        } else {
+            DispatchQueue.main.async(execute: execute)
         }
     }
 
