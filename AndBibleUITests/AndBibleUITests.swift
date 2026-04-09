@@ -71,9 +71,9 @@ final class AndBibleUITests: XCTestCase {
 
         openSettings(in: app)
         XCTAssertTrue(requireElement("settingsForm", in: app, timeout: 10).exists)
-        XCTAssertTrue(requireSettingsNavigationControl("settingsImportExportLink", in: app, timeout: 20).exists)
-        XCTAssertTrue(requireSettingsNavigationControl("settingsSyncLink", in: app, timeout: 20).exists)
-        XCTAssertTrue(requireSettingsNavigationControl("settingsLabelsLink", in: app, timeout: 20).exists)
+        waitForSettingsState(containing: "settingsImportExportLink", in: app, timeout: 10)
+        waitForSettingsState(containing: "settingsSyncLink", in: app, timeout: 10)
+        waitForSettingsState(containing: "settingsLabelsLink", in: app, timeout: 10)
     }
 
     /**
@@ -1417,18 +1417,10 @@ final class AndBibleUITests: XCTestCase {
         let environment = ProcessInfo.processInfo.environment
         let simulatorID = environment["UITEST_SIMULATOR_ID"] ?? environment["SIMULATOR_UDID"]
 
-        if let simulatorID,
-           let existingPath = resolveInstalledAppDataContainer(
-               simulatorID: simulatorID,
-               bundleIdentifier: bundleIdentifier,
-               timeout: 5,
-               recordFailure: false
-           ) {
-            return existingPath
-        }
-
-        if let existingPath = findInstalledAppDataContainerFromFilesystem(
-            bundleIdentifier: bundleIdentifier
+        if let existingPath = waitForInstalledAppDataContainer(
+            simulatorID: simulatorID,
+            bundleIdentifier: bundleIdentifier,
+            timeout: 5
         ) {
             return existingPath
         }
@@ -1442,6 +1434,18 @@ final class AndBibleUITests: XCTestCase {
                 timeout: 20
             )
             if launchResult.status == 0 {
+                if let bootstrappedPath = waitForInstalledAppDataContainer(
+                    simulatorID: simulatorID,
+                    bundleIdentifier: bundleIdentifier,
+                    timeout: 30
+                ) {
+                    _ = runHostProcess(
+                        executablePath: "/usr/bin/xcrun",
+                        arguments: ["simctl", "terminate", simulatorID, bundleIdentifier],
+                        timeout: 10
+                    )
+                    return bootstrappedPath
+                }
                 _ = runHostProcess(
                     executablePath: "/usr/bin/xcrun",
                     arguments: ["simctl", "terminate", simulatorID, bundleIdentifier],
@@ -1464,39 +1468,35 @@ final class AndBibleUITests: XCTestCase {
         if usedXCTestBootstrap {
             app.launch()
             XCTAssertTrue(
-                app.wait(for: .runningForeground, timeout: 20),
+                app.wait(for: .runningForeground, timeout: 30),
                 "Expected bootstrap launch to reach the foreground before fixture seeding.",
                 file: file,
                 line: line
             )
+            if let bootstrappedPath = waitForInstalledAppDataContainer(
+                simulatorID: simulatorID,
+                bundleIdentifier: bundleIdentifier,
+                timeout: 45
+            ) {
+                app.terminate()
+                return bootstrappedPath
+            }
             app.terminate()
         }
 
-        if let simulatorID,
-           let bootstrappedPath = resolveInstalledAppDataContainer(
-               simulatorID: simulatorID,
-               bundleIdentifier: bundleIdentifier,
-               timeout: 20,
-               recordFailure: false
-           ) {
+        if let bootstrappedPath = waitForInstalledAppDataContainer(
+            simulatorID: simulatorID,
+            bundleIdentifier: bundleIdentifier,
+            timeout: 45
+        ) {
             return bootstrappedPath
-        }
-
-        let deadline = Date().addingTimeInterval(20)
-        while Date() < deadline {
-            if let bootstrappedPath = findInstalledAppDataContainerFromFilesystem(
-                bundleIdentifier: bundleIdentifier
-            ) {
-                return bootstrappedPath
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
 
         if let simulatorID {
             _ = resolveInstalledAppDataContainer(
                 simulatorID: simulatorID,
                 bundleIdentifier: bundleIdentifier,
-                timeout: 1,
+                timeout: 5,
                 recordFailure: true,
                 file: file,
                 line: line
@@ -1509,6 +1509,47 @@ final class AndBibleUITests: XCTestCase {
             file: file,
             line: line
         )
+        return nil
+    }
+
+    /**
+     Waits for the installed app data container to become visible through either `simctl` or the
+     simulator filesystem scan.
+     *
+     * - Parameters:
+     *   - simulatorID: Optional simulator UDID used for `simctl get_app_container`.
+     *   - bundleIdentifier: Bundle identifier of the app under test.
+     *   - timeout: Maximum time to keep polling both host-side resolution strategies.
+     * - Returns: Absolute simulator data-container path once available, otherwise `nil`.
+     * - Side effects:
+     *   - repeatedly queries `simctl get_app_container` when a simulator UDID is known
+     *   - scans the simulator filesystem for container metadata while installation settles
+     * - Failure modes: This helper does not fail directly.
+     */
+    private func waitForInstalledAppDataContainer(
+        simulatorID: String?,
+        bundleIdentifier: String,
+        timeout: TimeInterval
+    ) -> String? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let simulatorID,
+               let path = resolveInstalledAppDataContainer(
+                   simulatorID: simulatorID,
+                   bundleIdentifier: bundleIdentifier,
+                   timeout: 2,
+                   recordFailure: false
+               ) {
+                return path
+            }
+            if let path = findInstalledAppDataContainerFromFilesystem(
+                bundleIdentifier: bundleIdentifier
+            ) {
+                return path
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        } while Date() < deadline
+
         return nil
     }
 
@@ -1772,6 +1813,12 @@ final class AndBibleUITests: XCTestCase {
             if result.status == 0, !trimmedPath.isEmpty {
                 return trimmedPath
             }
+            if let fallbackPath = resolveInstalledAppDataContainerFromListApps(
+                simulatorID: simulatorID,
+                bundleIdentifier: bundleIdentifier
+            ) {
+                return fallbackPath
+            }
             lastError = result.stderr.isEmpty ? result.stdout : result.stderr
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         } while Date() < deadline
@@ -1784,6 +1831,48 @@ final class AndBibleUITests: XCTestCase {
             )
         }
         return nil
+    }
+
+    /**
+     Falls back to `simctl listapps` when `get_app_container` is temporarily stale.
+     *
+     * CoreSimulator can already know the installed app metadata, including `DataContainer`, even
+     * while `get_app_container ... data` is still returning an empty result during early
+     * installation windows.
+     *
+     * - Parameters:
+     *   - simulatorID: Target simulator UDID.
+     *   - bundleIdentifier: Bundle identifier of the app under test.
+     * - Returns: Absolute data-container path when `listapps` reports one, otherwise `nil`.
+     * - Side effects:
+     *   - runs `xcrun simctl listapps` on the host and parses the OpenStep property-list output
+     * - Failure modes: This helper does not fail directly.
+     */
+    private func resolveInstalledAppDataContainerFromListApps(
+        simulatorID: String,
+        bundleIdentifier: String
+    ) -> String? {
+        let result = runHostProcess(
+            executablePath: "/usr/bin/xcrun",
+            arguments: ["simctl", "listapps", simulatorID, bundleIdentifier],
+            timeout: 10
+        )
+        guard result.status == 0 else {
+            return nil
+        }
+        let escapedIdentifier = NSRegularExpression.escapedPattern(for: bundleIdentifier)
+        let pattern = #"(?s)""# + escapedIdentifier + #""\s*=\s*\{.*?DataContainer\s*=\s*"([^"]+)";"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(
+                  in: result.stdout,
+                  range: NSRange(result.stdout.startIndex..., in: result.stdout)
+              ),
+              let containerRange = Range(match.range(at: 1), in: result.stdout),
+              let url = URL(string: String(result.stdout[containerRange])) else {
+            return nil
+        }
+
+        return url.path
     }
 
     /**
@@ -2773,21 +2862,29 @@ final class AndBibleUITests: XCTestCase {
         in app: XCUIApplication,
         timeout: TimeInterval = 15
     ) -> XCUIElement {
-        tapReaderMoreMenuButton(in: app, timeout: timeout)
-        tapReaderAction(actionIdentifier, in: app, timeout: timeout)
-
         let destination = unresolvedElement(destinationIdentifier, in: app)
         let readinessCandidates = [destinationIdentifier] + readinessIdentifiers
 
-        if waitForAnyElement(readinessCandidates, in: app, timeout: timeout) != nil {
-            if let resolvedDestination = resolvedElement(destinationIdentifier, in: app) {
-                return resolvedDestination
+        for attempt in 1...2 {
+            if resolvedElement("readerOverflowMenu", in: app) == nil {
+                tapReaderMoreMenuButton(in: app, timeout: timeout)
             }
-            if destination.exists || destination.waitForExistence(timeout: 1) {
-                return destination
+            tapReaderAction(actionIdentifier, in: app, timeout: timeout)
+
+            if waitForAnyElement(readinessCandidates, in: app, timeout: timeout) != nil {
+                if let resolvedDestination = resolvedElement(destinationIdentifier, in: app) {
+                    return resolvedDestination
+                }
+                if destination.exists || destination.waitForExistence(timeout: 1) {
+                    return destination
+                }
+                if let readyElement = waitForAnyElement(readinessIdentifiers, in: app, timeout: 1) {
+                    return readyElement
+                }
             }
-            if let readyElement = waitForAnyElement(readinessIdentifiers, in: app, timeout: 1) {
-                return readyElement
+
+            if attempt == 1, resolvedElement("readerOverflowMenu", in: app) == nil {
+                tapReaderMoreMenuButton(in: app, timeout: timeout)
             }
         }
 
@@ -3047,17 +3144,64 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) -> XCUIElement {
         let settingsForm = requireElement("settingsForm", in: app, timeout: timeout, file: file, line: line)
-        let control = settingsForm.buttons[identifier].firstMatch
-
+        let visibleTitle = settingsNavigationTitle(for: identifier)
         let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if control.exists && waitForElementToBecomeHittable(control, timeout: 0.5) {
-                return control
-            }
-            if control.exists && isElementVisible(control, within: settingsForm) {
-                return control
+        func resolvedVisibleControl() -> XCUIElement? {
+            var candidates = [
+                settingsForm.links[identifier].firstMatch,
+                settingsForm.buttons[identifier].firstMatch,
+                settingsForm.cells[identifier].firstMatch,
+                settingsForm.otherElements[identifier].firstMatch,
+                app.links[identifier].firstMatch,
+                app.buttons[identifier].firstMatch,
+                app.cells[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
+            ]
+
+            if let visibleTitle {
+                candidates.insert(contentsOf: [
+                    settingsForm.links[visibleTitle].firstMatch,
+                    settingsForm.buttons[visibleTitle].firstMatch,
+                    settingsForm.cells[visibleTitle].firstMatch,
+                    settingsForm.otherElements[visibleTitle].firstMatch,
+                    settingsForm.cells.containing(.staticText, identifier: visibleTitle).firstMatch,
+                    settingsForm.otherElements.containing(.staticText, identifier: visibleTitle).firstMatch,
+                    settingsForm.staticTexts[visibleTitle].firstMatch,
+                    app.links[visibleTitle].firstMatch,
+                    app.buttons[visibleTitle].firstMatch,
+                    app.cells[visibleTitle].firstMatch,
+                    app.otherElements[visibleTitle].firstMatch,
+                    app.cells.containing(.staticText, identifier: visibleTitle).firstMatch,
+                    app.staticTexts[visibleTitle].firstMatch,
+                ], at: 0)
             }
 
+            if let control = candidates.first(where: { $0.exists && waitForElementToBecomeHittable($0, timeout: 0.5) }) {
+                return control
+            }
+            if let control = candidates.first(where: { $0.exists && isElementVisible($0, within: settingsForm) }) {
+                return control
+            }
+            return nil
+        }
+
+        if visibleTitle != nil {
+            for _ in 0..<3 {
+                if let control = resolvedVisibleControl() {
+                    return control
+                }
+                guard settingsForm.exists, !settingsForm.frame.isEmpty, Date() < deadline else {
+                    break
+                }
+                settingsForm.swipeDown()
+                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            }
+        }
+
+        repeat {
+            if let control = resolvedVisibleControl() {
+                return control
+            }
             guard settingsForm.exists, !settingsForm.frame.isEmpty else {
                 break
             }
@@ -3066,6 +3210,7 @@ final class AndBibleUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
+        let control = unresolvedElement(identifier, in: app)
         if control.exists {
             return control
         }
@@ -3077,6 +3222,40 @@ final class AndBibleUITests: XCTestCase {
             line: line
         )
         return control
+    }
+
+    /**
+     Maps one production Settings row identifier to the English title rendered in UI tests.
+     *
+     * `makeApp()` forces `AppleLanguages=(en)` and `AppleLocale=en_US`, so these labels are stable
+     * across local and CI runs even when SwiftUI does not surface the row identifiers through the
+     * underlying `Form` hierarchy.
+     *
+     * - Parameter identifier: Stable production identifier used by the test helpers.
+     * - Returns: The visible English title for the row, or `nil` when the identifier has no
+     *   title-based fallback.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func settingsNavigationTitle(for identifier: String) -> String? {
+        switch identifier {
+        case "settingsDownloadsLink":
+            "Downloads"
+        case "settingsRepositoriesLink":
+            "Repositories"
+        case "settingsImportExportLink":
+            "Import & Export"
+        case "settingsSyncLink":
+            "iCloud Sync"
+        case "settingsLabelsLink":
+            "Labels"
+        case "settingsTextDisplayLink":
+            "Text Display"
+        case "settingsColorsLink":
+            "Colors"
+        default:
+            nil
+        }
     }
 
     /**
@@ -3245,6 +3424,25 @@ final class AndBibleUITests: XCTestCase {
         case "searchWordModePicker":
             return [
                 app.segmentedControls[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
+            ]
+        case "searchQueryField":
+            return [
+                app.textFields[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
+            ]
+        case
+            "settingsDownloadsLink",
+            "settingsRepositoriesLink",
+            "settingsImportExportLink",
+            "settingsSyncLink",
+            "settingsLabelsLink",
+            "settingsTextDisplayLink",
+            "settingsColorsLink":
+            return [
+                app.links[identifier].firstMatch,
+                app.buttons[identifier].firstMatch,
+                app.cells[identifier].firstMatch,
                 app.otherElements[identifier].firstMatch,
             ]
         case "syncSettingsState":
@@ -3986,9 +4184,11 @@ final class AndBibleUITests: XCTestCase {
             )
             if waitForElementToBecomeHittable(button, timeout: min(2, max(0.5, deadline.timeIntervalSinceNow))) {
                 button.tap()
-                if waitForReaderOverflowMenu(in: app, timeout: min(5, max(1, deadline.timeIntervalSinceNow))) {
-                    return true
-                }
+            } else if button.exists, !button.frame.isEmpty {
+                button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            }
+            if waitForReaderOverflowMenu(in: app, timeout: min(5, max(1, deadline.timeIntervalSinceNow))) {
+                return true
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
@@ -4058,18 +4258,55 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let button = requireReaderActionControl(identifier, in: app, timeout: timeout, file: file, line: line)
-        if waitForElementToBecomeHittable(button, timeout: min(timeout, 2)) {
-            button.tap()
+        let deadline = Date().addingTimeInterval(timeout)
+
+        repeat {
+            let button = requireReaderActionControl(
+                identifier,
+                in: app,
+                timeout: min(3, max(1, deadline.timeIntervalSinceNow)),
+                file: file,
+                line: line
+            )
+            if waitForElementToBecomeHittable(button, timeout: min(1.5, max(0.5, deadline.timeIntervalSinceNow))) {
+                button.tap()
+            } else if let overflowMenu = resolvedElement("readerOverflowMenu", in: app),
+                      isElementVisible(button, within: overflowMenu)
+            {
+                button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            } else {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                continue
+            }
+
+            let settleDeadline = Date().addingTimeInterval(min(2, max(0.5, deadline.timeIntervalSinceNow)))
+            repeat {
+                if resolvedElement("readerOverflowMenu", in: app) == nil {
+                    return
+                }
+                if let refreshedButton = resolvedElement(identifier, in: app), !refreshedButton.exists {
+                    return
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            } while Date() < settleDeadline
+        } while Date() < deadline
+
+        if let overflowMenu = resolvedElement("readerOverflowMenu", in: app) {
+            let button = resolveReaderActionElement(identifier, in: app, overflowMenu: overflowMenu)
+            XCTAssertTrue(
+                button.isHittable || isElementVisible(button, within: overflowMenu),
+                "Expected element '\(identifier)' to become tappable within \(timeout) seconds.",
+                file: file,
+                line: line
+            )
             return
         }
-        if let overflowMenu = resolvedElement("readerOverflowMenu", in: app),
-           isElementVisible(button, within: overflowMenu)
-        {
-            button.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).tap()
-            return
-        }
-        tapElementReliably(button, timeout: timeout, file: file, line: line)
+
+        XCTFail(
+            "Expected the reader overflow menu to remain available while activating '\(identifier)' within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
     }
 
     /**
@@ -4216,18 +4453,17 @@ final class AndBibleUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             if let overflowMenu = resolvedElement("readerOverflowMenu", in: app) {
-                let action = resolveReaderActionElement(identifier, in: app, overflowMenu: overflowMenu)
-                if action.exists, waitForElementToBecomeHittable(action, timeout: 0.5) {
-                    return action
-                }
-                if isElementVisible(action, within: overflowMenu) {
-                    return action
-                }
-                if overflowMenu.exists, !overflowMenu.frame.isEmpty {
-                    if action.exists, !action.frame.isEmpty, action.frame.minY < overflowMenu.frame.minY {
-                        overflowMenu.swipeDown()
-                    } else {
+                for _ in 0..<4 {
+                    let action = resolveReaderActionElement(identifier, in: app, overflowMenu: overflowMenu)
+                    if action.exists, waitForElementToBecomeHittable(action, timeout: 0.5) {
+                        return action
+                    }
+                    if isElementVisible(action, within: overflowMenu) {
+                        return action
+                    }
+                    if overflowMenu.exists, !overflowMenu.frame.isEmpty {
                         overflowMenu.swipeUp()
+                        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
                     }
                 }
             }
@@ -4350,11 +4586,14 @@ final class AndBibleUITests: XCTestCase {
         }
 
         let visibleFrame = container.frame.insetBy(dx: 0, dy: 16)
-        let tapPoint = CGPoint(
-            x: element.frame.minX + min(max(20, element.frame.width * 0.2), max(1, element.frame.width - 1)),
-            y: element.frame.midY
-        )
-        return visibleFrame.contains(tapPoint)
+        let intersection = visibleFrame.intersection(element.frame)
+        guard !intersection.isNull else {
+            return false
+        }
+        let minimumVisibleHeight = min(max(24, element.frame.height * 0.5), element.frame.height)
+        let minimumVisibleWidth = min(max(40, element.frame.width * 0.3), element.frame.width)
+        return intersection.height >= minimumVisibleHeight &&
+            intersection.width >= minimumVisibleWidth
     }
 
     /**
@@ -4697,11 +4936,22 @@ final class AndBibleUITests: XCTestCase {
 
         while Date() < deadline {
             let searchScreen = unresolvedElement("searchScreen", in: app)
+            if let identifiedField = resolvedElement("searchQueryField", in: app),
+               identifiedField.exists,
+               (identifiedField.isHittable || !identifiedField.frame.isEmpty)
+            {
+                return identifiedField
+            }
             let fieldCandidates = [
+                searchScreen.textFields["searchQueryField"].firstMatch,
+                app.textFields["searchQueryField"].firstMatch,
+                searchScreen.otherElements["searchQueryField"].firstMatch,
+                app.otherElements["searchQueryField"].firstMatch,
                 searchScreen.searchFields.firstMatch,
                 app.navigationBars.searchFields.firstMatch,
                 searchScreen.textFields.firstMatch,
                 app.navigationBars.textFields.firstMatch,
+                app.descendants(matching: .any).matching(identifier: "searchQueryField").firstMatch,
             ]
 
             if let field = fieldCandidates.first(where: {
@@ -4718,7 +4968,7 @@ final class AndBibleUITests: XCTestCase {
             file: file,
             line: line
         )
-        return app.navigationBars.searchFields.firstMatch
+        return unresolvedElement("searchQueryField", in: app)
     }
 
     /**
@@ -4832,14 +5082,16 @@ final class AndBibleUITests: XCTestCase {
         line: UInt = #line
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        let settingsForm = app.collectionViews["settingsForm"].firstMatch
 
         repeat {
-            if settingsForm.exists && !settingsForm.frame.isEmpty {
+            if let settingsForm = resolvedElement("settingsForm", in: app),
+               settingsForm.exists,
+               !settingsForm.frame.isEmpty
+            {
                 return true
             }
 
-            if settingsForm.waitForExistence(timeout: 0.2) {
+            if resolvedElement("settingsForm", in: app) != nil {
                 return true
             }
 
@@ -4853,6 +5105,45 @@ final class AndBibleUITests: XCTestCase {
         } while Date() < deadline
 
         return false
+    }
+
+    /**
+     Waits for the exported Settings screen state to contain one deterministic token.
+     *
+     * - Parameters:
+     *   - expectedToken: Token expected inside the semicolon-delimited Settings screen state.
+     *   - app: Running application under test.
+     *   - timeout: Maximum number of seconds to poll before failing.
+     *   - file: Source file used for XCTest failure attribution.
+     *   - line: Source line used for XCTest failure attribution.
+     * - Side effects:
+     *   - repeatedly reads the production `settingsForm` accessibility value
+     * - Failure modes:
+     *   - records an XCTest failure if the requested token never appears before timeout
+     */
+    private func waitForSettingsState(
+        containing expectedToken: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let settingsForm = requireElement("settingsForm", in: app, timeout: timeout, file: file, line: line)
+        let deadline = Date().addingTimeInterval(timeout)
+
+        repeat {
+            if let state = settingsForm.value as? String, state.contains(expectedToken) {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        let finalState = settingsForm.value as? String ?? ""
+        XCTFail(
+            "Expected Settings state to contain '\(expectedToken)' within \(timeout) seconds. Last state: '\(finalState)'.",
+            file: file,
+            line: line
+        )
     }
 
     /**
@@ -4937,6 +5228,16 @@ final class AndBibleUITests: XCTestCase {
             file: file,
             line: line
         )
+        if waitForElementToBecomeHittable(element, timeout: min(2, timeout)) {
+            element.tap()
+            return
+        }
+        if let settingsForm = resolvedElement("settingsForm", in: app),
+           isElementVisible(element, within: settingsForm)
+        {
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            return
+        }
         tapElementReliably(element, timeout: timeout, file: file, line: line)
     }
 
@@ -5426,6 +5727,14 @@ final class AndBibleUITests: XCTestCase {
         }
 
         if !existingText.isEmpty {
+            let app = trackedApp ?? XCUIApplication()
+            if selectAllTextIfAvailable(in: element, app: app) {
+                if !text.isEmpty {
+                    element.typeText(text)
+                }
+                return
+            }
+
             let deleteSequence = String(
                 repeating: XCUIKeyboardKey.delete.rawValue,
                 count: existingText.count
@@ -5467,6 +5776,40 @@ final class AndBibleUITests: XCTestCase {
         }
 
         return rawValue
+    }
+
+    /**
+     Attempts to select the entire current field contents through the iOS edit menu.
+     *
+     * - Parameters:
+     *   - element: Focused text-entry element whose contents should be selected.
+     *   - app: Running application hosting the system edit menu.
+     * - Returns: `true` when "Select All" became available and was tapped.
+     * - Side effects:
+     *   - double-taps the field and, when needed, long-presses it to surface edit actions
+     * - Failure modes: This helper does not fail directly.
+     */
+    private func selectAllTextIfAvailable(
+        in element: XCUIElement,
+        app: XCUIApplication
+    ) -> Bool {
+        let selectAllMenuItem = app.menuItems["Select All"].firstMatch
+
+        func tapSelectAllIfPresent(timeout: TimeInterval) -> Bool {
+            if selectAllMenuItem.waitForExistence(timeout: timeout) {
+                selectAllMenuItem.tap()
+                return true
+            }
+            return false
+        }
+
+        element.doubleTap()
+        if tapSelectAllIfPresent(timeout: 1) {
+            return true
+        }
+
+        element.press(forDuration: 1.0)
+        return tapSelectAllIfPresent(timeout: 1)
     }
 
     /**

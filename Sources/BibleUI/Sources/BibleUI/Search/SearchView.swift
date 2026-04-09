@@ -400,7 +400,9 @@ public struct SearchView: View {
 
     /// Main search UI shown once the view reaches the `.ready` state.
     private var searchContent: some View {
-        let content = VStack(spacing: 0) {
+        VStack(spacing: 0) {
+            searchQueryBar
+
             if showOptions {
                 searchOptionsPanel
             }
@@ -430,21 +432,50 @@ public struct SearchView: View {
             }
             .accessibilityIdentifier("searchResultsList")
         }
-        return Group {
-            if #available(iOS 18.0, *) {
-                content
-                    .searchable(text: $query, prompt: String(localized: "search_bible_text"))
-                    .searchFocused($isSearchFieldFocused)
-                    .onSubmit(of: .search) {
-                        isSearchFieldFocused = false
-                        performSearch()
-                    }
-            } else {
-                content
-                    .searchable(text: $query, prompt: String(localized: "search_bible_text"))
-                    .onSubmit(of: .search) {
-                        performSearch()
-                    }
+    }
+
+    /// Stable app-owned query field used for both user input and UI automation.
+    private var searchQueryBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField(String(localized: "search_bible_text"), text: $query)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .submitLabel(.search)
+                .focused($isSearchFieldFocused)
+                .accessibilityIdentifier("searchQueryField")
+                .onSubmit {
+                    isSearchFieldFocused = false
+                    performSearch()
+                }
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                    clearSearchResults()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "clear"))
+                .accessibilityIdentifier("searchClearQueryButton")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.quaternary)
+        )
+        .padding(.horizontal)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .onAppear {
+            DispatchQueue.main.async {
+                isSearchFieldFocused = true
             }
         }
     }
@@ -581,6 +612,14 @@ public struct SearchView: View {
         case .phrase:
             return "phrase"
         }
+    }
+
+    /// Resets Search result state when the visible query is explicitly cleared.
+    private func clearSearchResults() {
+        results = []
+        multiResults = nil
+        resultSummary = ""
+        isSearching = false
     }
 
     // MARK: - Results Sections

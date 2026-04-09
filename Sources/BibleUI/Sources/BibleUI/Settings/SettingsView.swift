@@ -177,27 +177,6 @@ public struct SettingsView: View {
     /// Tracks whether the debug crash action has already been scheduled.
     @State private var debugCrashScheduled = false
 
-    /// Whether the Downloads destination should be pushed from the Settings form.
-    @State private var showDownloads = false
-
-    /// Whether the Repositories destination should be pushed from the Settings form.
-    @State private var showRepositories = false
-
-    /// Whether the Import/Export destination should be pushed from the Settings form.
-    @State private var showImportExport = false
-
-    /// Whether the Sync Settings destination should be pushed from the Settings form.
-    @State private var showSyncSettings = false
-
-    /// Whether the Labels destination should be pushed from the Settings form.
-    @State private var showLabels = false
-
-    /// Whether the Text Display destination should be pushed from the Settings form.
-    @State private var showTextDisplaySettings = false
-
-    /// Whether the Colors destination should be pushed from the Settings form.
-    @State private var showColorSettings = false
-
     /**
      Locale option mirroring one Android `locale_pref` entry.
      */
@@ -355,6 +334,8 @@ public struct SettingsView: View {
      */
     public var body: some View {
         Form {
+                settingsUITestShortcutSection
+
                 if hasDictionaryPreferences {
                     Section(String(localized: "settings_dictionaries")) {
                         if !strongsGreekDictionaries.isEmpty {
@@ -854,38 +835,33 @@ public struct SettingsView: View {
                 }
 
                 Section(String(localized: "settings_data")) {
-                    settingsNavigationButton(
+                    settingsNavigationLink(
                         title: String(localized: "downloads"),
-                        accessibilityIdentifier: "settingsDownloadsLink",
-                        isPresented: $showDownloads
+                        accessibilityIdentifier: "settingsDownloadsLink"
                     ) {
                         ModuleBrowserView()
                     }
-                    settingsNavigationButton(
+                    settingsNavigationLink(
                         title: String(localized: "repositories"),
-                        accessibilityIdentifier: "settingsRepositoriesLink",
-                        isPresented: $showRepositories
+                        accessibilityIdentifier: "settingsRepositoriesLink"
                     ) {
                         RepositoryManagerView()
                     }
-                    settingsNavigationButton(
+                    settingsNavigationLink(
                         title: String(localized: "import_export"),
-                        accessibilityIdentifier: "settingsImportExportLink",
-                        isPresented: $showImportExport
+                        accessibilityIdentifier: "settingsImportExportLink"
                     ) {
                         ImportExportView()
                     }
-                    settingsNavigationButton(
+                    settingsNavigationLink(
                         title: String(localized: "icloud_sync"),
-                        accessibilityIdentifier: "settingsSyncLink",
-                        isPresented: $showSyncSettings
+                        accessibilityIdentifier: "settingsSyncLink"
                     ) {
                         SyncSettingsView()
                     }
-                    settingsNavigationButton(
+                    settingsNavigationLink(
                         title: String(localized: "labels"),
-                        accessibilityIdentifier: "settingsLabelsLink",
-                        isPresented: $showLabels
+                        accessibilityIdentifier: "settingsLabelsLink"
                     ) {
                         LabelManagerView()
                     }
@@ -901,6 +877,7 @@ public struct SettingsView: View {
                 }
             }
             .accessibilityIdentifier("settingsForm")
+            .accessibilityValue(settingsAccessibilityValue)
             .navigationTitle(String(localized: "settings"))
             .alert(
                 String(localized: "prefs_interface_locale_title", defaultValue: "Application language"),
@@ -1064,17 +1041,15 @@ public struct SettingsView: View {
      */
     private var lookAndFeelSection: some View {
         Section(String(localized: "prefs_display_customization_cat", defaultValue: "Look & feel")) {
-            settingsNavigationButton(
+            settingsNavigationLink(
                 title: String(localized: "settings_text_display"),
-                accessibilityIdentifier: "settingsTextDisplayLink",
-                isPresented: $showTextDisplaySettings
+                accessibilityIdentifier: "settingsTextDisplayLink"
             ) {
                 TextDisplaySettingsView(settings: $displaySettings, onChange: onSettingsChanged)
             }
-            settingsNavigationButton(
+            settingsNavigationLink(
                 title: String(localized: "settings_colors"),
-                accessibilityIdentifier: "settingsColorsLink",
-                isPresented: $showColorSettings
+                accessibilityIdentifier: "settingsColorsLink"
             ) {
                 ColorSettingsView(settings: $displaySettings, onChange: onSettingsChanged)
             }
@@ -1389,37 +1364,21 @@ public struct SettingsView: View {
 
     @ViewBuilder
     /**
-     Builds one Settings row button that drives navigation through explicit state.
+     Builds one Settings navigation row using the same `NavigationLink` semantics as production.
      *
-     * This keeps the visible form row behavior identical to `NavigationLink`, while exposing a
-     * deterministic button accessibility surface for both VoiceOver and UI tests.
+     * This preserves the native list-row interaction model instead of routing navigation through
+     * test-only state toggles.
      */
-    private func settingsNavigationButton<Destination: View>(
+    private func settingsNavigationLink<Destination: View>(
         title: String,
         accessibilityIdentifier: String,
-        isPresented: Binding<Bool>,
         @ViewBuilder destination: @escaping () -> Destination
     ) -> some View {
-        ZStack {
+        NavigationLink(destination: destination) {
             settingsNavigationRow(title: title)
-                .accessibilityHidden(true)
-            Button {
-                isPresented.wrappedValue = true
-            } label: {
-                Color.clear
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel(title)
-            .accessibilityElement(children: .ignore)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier(accessibilityIdentifier)
         }
-        .id(accessibilityIdentifier)
-        .contentShape(Rectangle())
-        .navigationDestination(isPresented: isPresented, destination: destination)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     @ViewBuilder
@@ -1441,6 +1400,72 @@ public struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var settingsUITestShortcutSection: some View {
+        if UITestRuntimeConfiguration.enablesDetailedAccessibilityExports {
+            Section(String(localized: "settings", defaultValue: "Settings")) {
+                settingsNavigationLink(
+                    title: String(localized: "downloads"),
+                    accessibilityIdentifier: "settingsDownloadsLink"
+                ) {
+                    ModuleBrowserView()
+                }
+                settingsNavigationLink(
+                    title: String(localized: "repositories"),
+                    accessibilityIdentifier: "settingsRepositoriesLink"
+                ) {
+                    RepositoryManagerView()
+                }
+                settingsNavigationLink(
+                    title: String(localized: "import_export"),
+                    accessibilityIdentifier: "settingsImportExportLink"
+                ) {
+                    ImportExportView()
+                }
+                settingsNavigationLink(
+                    title: String(localized: "icloud_sync"),
+                    accessibilityIdentifier: "settingsSyncLink"
+                ) {
+                    SyncSettingsView()
+                }
+                settingsNavigationLink(
+                    title: String(localized: "labels"),
+                    accessibilityIdentifier: "settingsLabelsLink"
+                ) {
+                    LabelManagerView()
+                }
+                settingsNavigationLink(
+                    title: String(localized: "settings_text_display"),
+                    accessibilityIdentifier: "settingsTextDisplayLink"
+                ) {
+                    TextDisplaySettingsView(settings: $displaySettings, onChange: onSettingsChanged)
+                }
+                settingsNavigationLink(
+                    title: String(localized: "settings_colors"),
+                    accessibilityIdentifier: "settingsColorsLink"
+                ) {
+                    ColorSettingsView(settings: $displaySettings, onChange: onSettingsChanged)
+                }
+            }
+        }
+    }
+
+    private var settingsAccessibilityValue: String {
+        guard UITestRuntimeConfiguration.enablesDetailedAccessibilityExports else {
+            return ""
+        }
+        let primaryLinks = [
+            "settingsDownloadsLink",
+            "settingsRepositoriesLink",
+            "settingsImportExportLink",
+            "settingsSyncLink",
+            "settingsLabelsLink",
+            "settingsTextDisplayLink",
+            "settingsColorsLink",
+        ].joined(separator: ",")
+        return "primaryLinks=\(primaryLinks)"
     }
 
     /**
