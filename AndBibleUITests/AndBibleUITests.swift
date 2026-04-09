@@ -403,12 +403,24 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        XCTAssertTrue(requireReaderReferenceContaining("Genesis 1", in: app, timeout: 20).exists)
+        let initialReference = requireReaderReferenceValue(in: app, timeout: 20)
+        XCTAssertTrue(
+            initialReference.localizedCaseInsensitiveContains("Genesis 1"),
+            "Expected the seeded bookmark-navigation scenario to start on Genesis 1, but saw '\(initialReference)'."
+        )
 
         _ = openBookmarkList(in: app)
         let bookmarkRow = requireBookmarkRow("Exodus_2_1", in: app, timeout: 10)
         tapElementReliably(bookmarkRow, timeout: 10)
-        XCTAssertTrue(requireReaderReferenceContaining("Exodus 2", in: app, timeout: 20).exists)
+        let updatedReference = waitForReaderReferenceValueToChange(
+            from: initialReference,
+            in: app,
+            timeout: 20
+        )
+        XCTAssertTrue(
+            updatedReference.localizedCaseInsensitiveContains("Exodus 2"),
+            "Expected selecting the seeded bookmark to navigate to Exodus 2, but saw '\(updatedReference)'."
+        )
     }
 
     /**
@@ -430,21 +442,21 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        openBookmarkList(in: app)
+        _ = openBookmarkList(in: app)
         let exodusRow = requireBookmarkRow("Exodus_2_1", in: app, timeout: 10)
-        let matthewRow = requireBookmarkRow("Matthew_3_1", in: app, timeout: 10)
+        _ = requireBookmarkRow("Matthew_3_1", in: app, timeout: 10)
 
         exodusRow.swipeLeft()
         requireElement("bookmarkListDeleteButton::Exodus_2_1", in: app, timeout: 10).tap()
 
-        let deletedPredicate = NSPredicate(format: "exists == false")
-        expectation(for: deletedPredicate, evaluatedWith: exodusRow)
-        waitForExpectations(timeout: 10)
-        XCTAssertTrue(matthewRow.exists, "Expected Matthew bookmark row to remain after deleting Exodus.")
+        waitForBookmarkListState(containing: "count=1", in: app, timeout: 10)
+        waitForBookmarkListState(notContaining: bookmarkListRowStateToken("Exodus_2_1"), in: app, timeout: 10)
+        waitForBookmarkListState(containing: bookmarkListRowStateToken("Matthew_3_1"), in: app, timeout: 10)
 
         reopenBookmarkList(in: app)
-        XCTAssertTrue(matthewRow.waitForExistence(timeout: 10), "Expected Matthew bookmark row to persist after reopening bookmarks.")
-        XCTAssertFalse(exodusRow.exists, "Expected Exodus bookmark row to remain deleted after reopening bookmarks.")
+        waitForBookmarkListState(containing: "count=1", in: app, timeout: 10)
+        waitForBookmarkListState(notContaining: bookmarkListRowStateToken("Exodus_2_1"), in: app, timeout: 10)
+        waitForBookmarkListState(containing: bookmarkListRowStateToken("Matthew_3_1"), in: app, timeout: 10)
     }
 
     /**
@@ -619,11 +631,23 @@ final class AndBibleUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        XCTAssertTrue(requireReaderReferenceContaining("Genesis 1", in: app, timeout: 20).exists)
+        let initialReference = requireReaderReferenceValue(in: app, timeout: 20)
+        XCTAssertTrue(
+            initialReference.localizedCaseInsensitiveContains("Genesis 1"),
+            "Expected the seeded history scenario to start on Genesis 1, but saw '\(initialReference)'."
+        )
 
         XCTAssertTrue(openHistory(in: app).exists)
         tapElementReliably(requireHistoryRow(containing: "Exodus 2", in: app, timeout: 10), timeout: 10)
-        XCTAssertTrue(requireReaderReferenceContaining("Exodus 2", in: app, timeout: 20).exists)
+        let updatedReference = waitForReaderReferenceValueToChange(
+            from: initialReference,
+            in: app,
+            timeout: 20
+        )
+        XCTAssertTrue(
+            updatedReference.localizedCaseInsensitiveContains("Exodus 2"),
+            "Expected selecting the seeded history row to navigate to Exodus 2, but saw '\(updatedReference)'."
+        )
     }
 
     /**
@@ -648,18 +672,9 @@ final class AndBibleUITests: XCTestCase {
         tapElementReliably(requireElement("historyClearButton", in: app, timeout: 10), timeout: 10)
         tapElementReliably(requireElement("historyDoneButton", in: app, timeout: 10), timeout: 10)
         _ = openHistory(in: app)
-        waitForElementExistence(
-            "historyRow::Exod_2_1",
-            in: app,
-            shouldExist: false,
-            timeout: 10
-        )
-        waitForElementExistence(
-            "historyRow::Matt_3_1",
-            in: app,
-            shouldExist: false,
-            timeout: 10
-        )
+        waitForHistoryState(containing: "count=0", in: app, timeout: 10)
+        waitForHistoryState(notContaining: historyRowStateToken("Exod_2_1"), in: app, timeout: 10)
+        waitForHistoryState(notContaining: historyRowStateToken("Matt_3_1"), in: app, timeout: 10)
     }
 
     /**
@@ -680,18 +695,18 @@ final class AndBibleUITests: XCTestCase {
 
         _ = openHistory(in: app)
         let exodusRow = requireHistoryRow(containing: "Exodus 2", in: app, timeout: 10)
-        let matthewRow = requireHistoryRow(containing: "Matthew 3", in: app, timeout: 10)
+        _ = requireHistoryRow(containing: "Matthew 3", in: app, timeout: 10)
         exodusRow.swipeLeft()
         tapElementReliably(requireElement("historyDeleteButton::Exod_2_1", in: app, timeout: 10), timeout: 10)
-        let deletedPredicate = NSPredicate(format: "exists == false")
-        expectation(for: deletedPredicate, evaluatedWith: exodusRow)
-        waitForExpectations(timeout: 10)
-        XCTAssertTrue(matthewRow.exists, "Expected Matthew history row to remain after deleting Exodus.")
+        waitForHistoryState(containing: "count=1", in: app, timeout: 10)
+        waitForHistoryState(notContaining: historyRowStateToken("Exod_2_1"), in: app, timeout: 10)
+        waitForHistoryState(containing: historyRowStateToken("Matt_3_1"), in: app, timeout: 10)
 
         tapElementReliably(requireElement("historyDoneButton", in: app, timeout: 10), timeout: 10)
         _ = openHistory(in: app)
-        XCTAssertTrue(matthewRow.waitForExistence(timeout: 10), "Expected Matthew history row to persist after reopening History.")
-        XCTAssertFalse(exodusRow.exists, "Expected Exodus history row to remain deleted after reopening History.")
+        waitForHistoryState(containing: "count=1", in: app, timeout: 10)
+        waitForHistoryState(notContaining: historyRowStateToken("Exod_2_1"), in: app, timeout: 10)
+        waitForHistoryState(containing: historyRowStateToken("Matt_3_1"), in: app, timeout: 10)
     }
 
     /**
@@ -2759,6 +2774,58 @@ final class AndBibleUITests: XCTestCase {
     }
 
     /**
+     Returns one history-row token as serialized by the History screen accessibility state.
+     *
+     * - Parameter keyToken: Sanitized history key token, such as `Exod_2_1`.
+     * - Returns: History row token wrapped in delimiters for exact containment checks.
+     * - Side effects: none.
+     * - Failure modes: This helper cannot fail.
+     */
+    private func historyRowStateToken(_ keyToken: String) -> String {
+        "|\(keyToken)|"
+    }
+
+    /**
+     Waits for the History screen accessibility state to contain one token.
+     *
+     * - Parameters:
+     *   - token: State fragment expected from the exported History accessibility value.
+     *   - app: Running application whose History screen should reach the requested state.
+     *   - timeout: Maximum number of seconds to wait before failing.
+     * - Side effects:
+     *   - polls the History screen accessibility export until the requested token appears
+     * - Failure modes:
+     *   - records an XCTest failure if the History state never contains the token
+     */
+    private func waitForHistoryState(
+        containing token: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10
+    ) {
+        waitForElementValue("historyScreen", toContain: token, in: app, timeout: timeout)
+    }
+
+    /**
+     Waits for the History screen accessibility state to stop containing one token.
+     *
+     * - Parameters:
+     *   - token: State fragment that should disappear from the exported History value.
+     *   - app: Running application whose History screen should drop the requested token.
+     *   - timeout: Maximum number of seconds to wait before failing.
+     * - Side effects:
+     *   - polls the History screen accessibility export until the requested token disappears
+     * - Failure modes:
+     *   - records an XCTest failure if the History state keeps reporting the token
+     */
+    private func waitForHistoryState(
+        notContaining token: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 10
+    ) {
+        waitForElementValue("historyScreen", toNotContain: token, in: app, timeout: timeout)
+    }
+
+    /**
      Opens History from the reader shell.
      *
      * - Parameter app: Running application whose reader shell should present History.
@@ -3364,22 +3431,38 @@ final class AndBibleUITests: XCTestCase {
                 app.scrollViews[identifier].firstMatch,
                 app.otherElements[identifier].firstMatch,
             ]
-        case "labelManagerNewLabelNameField":
+        case "labelAssignmentCreateNewLabelButton":
             return [
-                app.alerts.descendants(matching: .textField)
-                    .matching(identifier: identifier)
-                    .firstMatch,
+                app.buttons[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
+            ]
+        case "labelManagerNewLabelNameField":
+            let alert = app.alerts.element(boundBy: 0)
+            let sheet = app.sheets.element(boundBy: 0)
+            return [
+                alert.descendants(matching: .textField).matching(identifier: identifier).element(boundBy: 0),
+                sheet.descendants(matching: .textField).matching(identifier: identifier).element(boundBy: 0),
+                alert.descendants(matching: .textField).matching(identifier: "Label name").element(boundBy: 0),
+                sheet.descendants(matching: .textField).matching(identifier: "Label name").element(boundBy: 0),
                 app.textFields[identifier].firstMatch,
-                app.alerts.descendants(matching: .textField)
-                    .matching(identifier: "Label name")
-                    .firstMatch,
                 app.textFields["Label name"].firstMatch,
             ]
-        case "labelManagerCreateButton":
+        case "labelEditNameField":
             return [
-                app.alerts.buttons[identifier].firstMatch,
+                app.textFields[identifier].firstMatch,
+                app.textViews[identifier].firstMatch,
+                app.otherElements[identifier].firstMatch,
+            ]
+        case "labelManagerCreateButton":
+            let alert = app.alerts.element(boundBy: 0)
+            let sheet = app.sheets.element(boundBy: 0)
+            let createLabelPredicate = NSPredicate(format: "label == %@", "Create")
+            return [
+                alert.descendants(matching: .button).matching(identifier: identifier).element(boundBy: 0),
+                sheet.descendants(matching: .button).matching(identifier: identifier).element(boundBy: 0),
+                alert.descendants(matching: .button).matching(createLabelPredicate).element(boundBy: 0),
+                sheet.descendants(matching: .button).matching(createLabelPredicate).element(boundBy: 0),
                 app.buttons[identifier].firstMatch,
-                app.alerts.buttons["Create"].firstMatch,
                 app.buttons["Create"].firstMatch,
             ]
         case "aboutAppTitle":
@@ -3494,9 +3577,6 @@ final class AndBibleUITests: XCTestCase {
         in app: XCUIApplication
     ) -> XCUIElement? {
         let candidates = elementCandidates(for: identifier, in: app)
-        if let visible = candidates.first(where: { $0.exists && !$0.frame.isEmpty }) {
-            return visible
-        }
         return candidates.first(where: { $0.exists })
     }
 
@@ -3705,25 +3785,35 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> XCUIElement {
-        let element = readerReferenceElement(containing: fragment, in: app)
-        if element.identifier == "bookChooserButton" {
-            let predicate = NSPredicate(format: "value CONTAINS[c] %@", fragment)
-            expectation(for: predicate, evaluatedWith: element)
-            waitForExpectations(timeout: timeout)
+        let referenceButton = app.buttons["bookChooserButton"].firstMatch
+        if referenceButton.exists || referenceButton.waitForExistence(timeout: min(timeout, 1)) {
+            let deadline = Date().addingTimeInterval(timeout)
+            repeat {
+                if let value = referenceButton.value as? String,
+                   value.localizedCaseInsensitiveContains(fragment)
+                {
+                    return referenceButton
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            } while Date() < deadline
+
+            let finalValue = referenceButton.value as? String ?? ""
             XCTAssertTrue(
-                predicate.evaluate(with: element),
-                "Expected the reader reference to contain '\(fragment)' within \(timeout) seconds.",
+                finalValue.localizedCaseInsensitiveContains(fragment),
+                "Expected the reader reference to contain '\(fragment)' within \(timeout) seconds, but saw '\(finalValue)'.",
                 file: file,
                 line: line
             )
-        } else {
-            XCTAssertTrue(
-                element.waitForExistence(timeout: timeout),
-                "Expected a visible reader reference containing '\(fragment)' within \(timeout) seconds.",
-                file: file,
-                line: line
-            )
+            return referenceButton
         }
+
+        let element = readerReferenceElement(containing: fragment, in: app)
+        XCTAssertTrue(
+            element.waitForExistence(timeout: timeout),
+            "Expected a visible reader reference containing '\(fragment)' within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
         return element
     }
 
@@ -3748,28 +3838,37 @@ final class AndBibleUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let element = readerReferenceElement(containing: fragment, in: app)
-        if element.identifier == "bookChooserButton" {
-            let predicate = NSPredicate(format: "NOT (value CONTAINS[c] %@)", fragment)
-            expectation(for: predicate, evaluatedWith: element)
-            waitForExpectations(timeout: timeout)
-            XCTAssertTrue(
-                predicate.evaluate(with: element),
-                "Expected the reader reference to stop containing '\(fragment)' within \(timeout) seconds.",
-                file: file,
-                line: line
-            )
-        } else {
-            let predicate = NSPredicate(format: "exists == false")
-            expectation(for: predicate, evaluatedWith: element)
-            waitForExpectations(timeout: timeout)
+        let referenceButton = app.buttons["bookChooserButton"].firstMatch
+        if referenceButton.exists || referenceButton.waitForExistence(timeout: min(timeout, 1)) {
+            let deadline = Date().addingTimeInterval(timeout)
+            repeat {
+                let value = referenceButton.value as? String ?? ""
+                if !value.localizedCaseInsensitiveContains(fragment) {
+                    return
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            } while Date() < deadline
+
+            let finalValue = referenceButton.value as? String ?? ""
             XCTAssertFalse(
-                element.exists,
-                "Expected reader reference containing '\(fragment)' to disappear within \(timeout) seconds.",
+                finalValue.localizedCaseInsensitiveContains(fragment),
+                "Expected the reader reference to stop containing '\(fragment)' within \(timeout) seconds, but saw '\(finalValue)'.",
                 file: file,
                 line: line
             )
+            return
         }
+
+        let element = readerReferenceElement(containing: fragment, in: app)
+        let predicate = NSPredicate(format: "exists == false")
+        expectation(for: predicate, evaluatedWith: element)
+        waitForExpectations(timeout: timeout)
+        XCTAssertFalse(
+            element.exists,
+            "Expected reader reference containing '\(fragment)' to disappear within \(timeout) seconds.",
+            file: file,
+            line: line
+        )
     }
 
     /**
@@ -5720,26 +5819,15 @@ final class AndBibleUITests: XCTestCase {
      *     instead of first deleting existing content
      */
     private func replaceText(in element: XCUIElement, with text: String) {
-        focusTextEntryElement(element, timeout: 10)
         let existingText = currentTextEntryValue(in: element)
         if existingText == text {
             return
         }
 
-        if !existingText.isEmpty {
-            let app = trackedApp ?? XCUIApplication()
-            if selectAllTextIfAvailable(in: element, app: app) {
-                if !text.isEmpty {
-                    element.typeText(text)
-                }
-                return
-            }
-
-            let deleteSequence = String(
-                repeating: XCUIKeyboardKey.delete.rawValue,
-                count: existingText.count
-            )
-            element.typeText(deleteSequence)
+        let app = trackedApp ?? XCUIApplication()
+        if !clearTextEntryElement(element, app: app) {
+            XCTFail("Expected text input '\(element.identifier)' to clear before typing replacement text.")
+            return
         }
 
         if !text.isEmpty {
@@ -5762,7 +5850,7 @@ final class AndBibleUITests: XCTestCase {
         }
 
         let placeholderCandidates = Set(
-            [element.label, element.identifier]
+            [element.label, element.identifier, element.placeholderValue ?? ""]
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
         )
@@ -5803,13 +5891,13 @@ final class AndBibleUITests: XCTestCase {
             return false
         }
 
-        element.doubleTap()
+        element.press(forDuration: 1.0)
         if tapSelectAllIfPresent(timeout: 1) {
             return true
         }
 
-        element.press(forDuration: 1.0)
-        return tapSelectAllIfPresent(timeout: 1)
+        element.tap()
+        return tapSelectAllIfPresent(timeout: 0.5)
     }
 
     /**
@@ -5829,6 +5917,7 @@ final class AndBibleUITests: XCTestCase {
      */
     private func focusTextEntryElement(
         _ element: XCUIElement,
+        preferTrailingEdge: Bool = false,
         timeout: TimeInterval = 10,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -5842,19 +5931,79 @@ final class AndBibleUITests: XCTestCase {
 
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
-            if !element.frame.isEmpty {
-                element.tap()
+            if element.exists && waitForElementToBecomeHittable(element, timeout: 0.5) {
+                if preferTrailingEdge, !element.frame.isEmpty {
+                    element.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+                } else {
+                    element.tap()
+                }
                 return
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         } while Date() < deadline
 
         XCTAssertTrue(
-            !element.frame.isEmpty,
-            "Expected text input '\(element.identifier)' to expose a non-empty frame within \(timeout) seconds.",
+            waitForElementToBecomeHittable(element, timeout: 0),
+            "Expected text input '\(element.identifier)' to become hittable within \(timeout) seconds.",
             file: file,
             line: line
         )
+    }
+
+    /**
+     Clears one text-entry control and verifies that the editable contents are empty afterward.
+     *
+     * - Parameters:
+     *   - element: Text field or search field whose contents should be removed.
+     *   - app: Running application hosting the keyboard/edit menu.
+     * - Returns: `true` when the helper confirms the field is empty.
+     * - Side effects:
+     *   - focuses the field, taps the standard clear control when available, otherwise deletes the
+     *     visible contents from the trailing edge and finally falls back to the edit menu
+     * - Failure modes: This helper does not fail directly.
+     */
+    private func clearTextEntryElement(
+        _ element: XCUIElement,
+        app: XCUIApplication
+    ) -> Bool {
+        let existingText = currentTextEntryValue(in: element)
+        if existingText.isEmpty {
+            focusTextEntryElement(element, timeout: 10)
+            return true
+        }
+
+        focusTextEntryElement(element, preferTrailingEdge: true, timeout: 10)
+
+        let clearButton = element.buttons["Clear text"].firstMatch
+        if waitForElementToBecomeHittable(clearButton, timeout: 0.5) {
+            clearButton.tap()
+            if currentTextEntryValue(in: element).isEmpty {
+                return true
+            }
+        }
+
+        var remainingText = currentTextEntryValue(in: element)
+        for _ in 0..<2 where !remainingText.isEmpty {
+            let deleteSequence = String(
+                repeating: XCUIKeyboardKey.delete.rawValue,
+                count: remainingText.count
+            )
+            element.typeText(deleteSequence)
+            remainingText = currentTextEntryValue(in: element)
+            if remainingText.isEmpty {
+                return true
+            }
+        }
+
+        if selectAllTextIfAvailable(in: element, app: app) {
+            let selectionLength = max(currentTextEntryValue(in: element).count, 1)
+            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: selectionLength))
+            if currentTextEntryValue(in: element).isEmpty {
+                return true
+            }
+        }
+
+        return currentTextEntryValue(in: element).isEmpty
     }
 
     /**
