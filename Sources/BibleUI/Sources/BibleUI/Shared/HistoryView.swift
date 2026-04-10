@@ -75,9 +75,6 @@ public struct HistoryView: View {
                     .accessibilityIdentifier("historyEmptyState")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("historyScreen")
-                .accessibilityValue(historyAccessibilityState(for: historySnapshot))
             } else {
                 List {
                     ForEach(Array(historySnapshot.enumerated()), id: \.element.id) { index, item in
@@ -112,10 +109,10 @@ public struct HistoryView: View {
                         }
                     }
                 }
-                .accessibilityIdentifier("historyScreen")
-                .accessibilityValue(historyAccessibilityState(for: historySnapshot))
             }
         }
+        .accessibilityIdentifier("historyScreen")
+        .accessibilityValue(historyAccessibilityValue)
         .navigationTitle(String(localized: "history"))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -157,21 +154,6 @@ public struct HistoryView: View {
     }
 
     /**
-     Resolves the deterministic accessibility identifier for one persisted history row.
-     *
-     * - Parameter item: History row whose durable key should back the identifier.
-     * - Returns: Accessibility identifier stable across row reordering for the same history key.
-     * - Side effects: none.
-     * - Failure modes: This helper cannot fail.
-     */
-    private func historyAccessibilityState(for items: [HistoryItem]) -> String {
-        let visibleRows = items
-            .map { sanitizedHistoryKey(for: $0) }
-            .joined(separator: ",")
-        return "count=\(items.count);rows=\(visibleRows)"
-    }
-
-    /**
      * Resolves the deterministic accessibility identifier for one persisted history row.
      *
      * - Parameter item: History row whose durable key should back the identifier.
@@ -193,6 +175,19 @@ public struct HistoryView: View {
      */
     private func historyDeleteButtonIdentifier(for item: HistoryItem) -> String {
         "historyDeleteButton::\(sanitizedHistoryKey(for: item))"
+    }
+
+    /// Stable History screen state exported for UI automation.
+    private var historyAccessibilityValue: String {
+        let baseState = "count=\(history.count)"
+        guard UITestRuntimeConfiguration.enablesDetailedAccessibilityExports else {
+            return baseState
+        }
+
+        let rowTokens = history.prefix(UITestRuntimeConfiguration.detailedAccessibilityRowTokenLimit).map {
+            "|\(sanitizedHistoryKey(for: $0))|"
+        }.joined(separator: ",")
+        return "\(baseState);rows=\(rowTokens)"
     }
 
     /**

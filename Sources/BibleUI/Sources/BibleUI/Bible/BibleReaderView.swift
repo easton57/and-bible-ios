@@ -730,9 +730,11 @@ public struct BibleReaderView: View {
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button(String(localized: "done")) { activeReaderSheet = nil }
+                                    .accessibilityIdentifier("aboutDoneButton")
                             }
                         }
                 }
+                .accessibilityIdentifier("aboutSheetScreen")
             }
         }
         .sheet(isPresented: $showTextDisplaySettings) {
@@ -2414,12 +2416,16 @@ public struct BibleReaderView: View {
             Button(action: action) {
                 readerOverflowButtonLabel(title: title, assetName: assetName)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .accessibilityIdentifier(identifier)
         } else {
             Button(action: action) {
                 readerOverflowButtonLabel(title: title, assetName: assetName)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
         }
     }
@@ -2450,6 +2456,7 @@ public struct BibleReaderView: View {
                     .foregroundStyle(Color.blue)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
         .contentShape(Rectangle())
