@@ -310,6 +310,15 @@ final class AndBibleTests: XCTestCase {
         XCTAssertEqual(keyName, "06440")
     }
 
+    func testDictionaryEntryKeyExtractsEntryFreeAttributeWithFlexibleWhitespace() {
+        let rawEntry = #"<entryFree type="x" n = "430"><orth>אֱלֹהִים</orth></entryFree>"#
+
+        XCTAssertEqual(
+            BibleReaderController.dictionaryEntryKey(actualKey: "", rawEntry: rawEntry),
+            "430"
+        )
+    }
+
     func testLinkifyRawDictionaryXMLLinksStructuredAndPlainStrongsReferences() {
         let rawEntry = """
         <entryFree n="6440"><def>From 6437; see HEBREW for 05774 and <ref target="StrongsHebrew/02421">2421</ref>.</def></entryFree>
@@ -427,6 +436,15 @@ final class AndBibleTests: XCTestCase {
         XCTAssertFalse(BibleReaderController.isSupportedStrongsDictionaryModuleName("BDBGlosses_Strongs"))
         XCTAssertTrue(BibleReaderController.isSupportedStrongsDictionaryModuleName("StrongsHebrew"))
         XCTAssertTrue(BibleReaderController.isSupportedStrongsDictionaryModuleName("InvStrongsRealHebrew"))
+    }
+
+    func testRenderedContentStateDefaultsToNeutralToken() {
+        let controller = BibleReaderController(bridge: BibleBridge())
+
+        XCTAssertEqual(
+            controller.renderedContentState,
+            BibleReaderController.emptyRenderedContentState
+        )
     }
 
     #if os(iOS)

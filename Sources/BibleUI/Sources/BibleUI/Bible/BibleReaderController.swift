@@ -108,7 +108,8 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
     private(set) var currentEpubTitle: String?
 
     /// Stable summary of the last content payload emitted to the reader WebView.
-    private(set) var renderedContentState: String = "category=bible;module=KJV;book=Genesis;chapter=1;key=Gen.1"
+    static let emptyRenderedContentState = "category=none;module=none;book=none;chapter=none;key=none"
+    private(set) var renderedContentState: String = BibleReaderController.emptyRenderedContentState
 
     /// Infinite scroll: tracks the range of chapters/books currently loaded in the WebView.
     private var minLoadedChapter: Int = 0
@@ -3378,7 +3379,10 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
             return String(rawEntry[range]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        let entryPattern = try? NSRegularExpression(pattern: #"<entryFree\b[^>]*\bn="([^"]+)""#, options: [])
+        let entryPattern = try? NSRegularExpression(
+            pattern: #"<entryFree\b[^>]*\bn\s*=\s*"([^"]+)""#,
+            options: []
+        )
         if let regex = entryPattern,
            let match = regex.firstMatch(in: rawEntry, range: NSRange(rawEntry.startIndex..., in: rawEntry)),
            let range = Range(match.range(at: 1), in: rawEntry) {
@@ -3573,7 +3577,7 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
         if !selectedNames.isEmpty {
             for name in selectedNames where seen.insert(name).inserted {
                 if let mod = mgr.module(named: name),
-                   Self.isSupportedStrongsDictionaryModuleName(mod.info.name),
+                   StrongsDictionaryPolicy.isSupportedDictionaryModuleName(mod.info.name),
                    (mod.info.category == .dictionary || mod.info.category == .glossary),
                    mod.info.features.contains(feature) {
                     result.append(mod)
@@ -3588,7 +3592,7 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
         // 2. Runtime default: dictionary/glossary modules with matching feature
         for info in allModules where
             (info.category == .dictionary || info.category == .glossary) &&
-                Self.isSupportedStrongsDictionaryModuleName(info.name) &&
+                StrongsDictionaryPolicy.isSupportedDictionaryModuleName(info.name) &&
                 info.features.contains(feature) {
             if seen.insert(info.name).inserted, let mod = mgr.module(named: info.name) {
                 result.append(mod)
@@ -3620,7 +3624,7 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
      hides, which would otherwise produce confusing tab labels and materially different entry content.
      */
     static func isSupportedStrongsDictionaryModuleName(_ name: String) -> Bool {
-        !["BDBGlosses_Strongs"].contains(name)
+        StrongsDictionaryPolicy.isSupportedDictionaryModuleName(name)
     }
 
     /// Find modules that can decode morphology (Robinson, Packard, etc.).

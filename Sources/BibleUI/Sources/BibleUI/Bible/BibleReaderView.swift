@@ -410,7 +410,7 @@ public struct BibleReaderView: View {
     private var readerRenderedContentStateValue: String {
         let windowToken = windowManager.activeWindow.map { "windowOrder=\($0.orderNumber)" } ?? "windowOrder=none"
         let contentToken = focusedController?.renderedContentState
-            ?? "category=none;module=none;book=none;chapter=none;key=none"
+            ?? BibleReaderController.emptyRenderedContentState
         return "\(windowToken);\(contentToken)"
     }
 
