@@ -93,6 +93,10 @@ final class AndBibleTests: XCTestCase {
         }
     }
 
+    func testTextDisplayAppDefaultsStartWithStrongsDisabled() {
+        XCTAssertEqual(TextDisplaySettings.appDefaults.strongsMode, 0)
+    }
+
     func testCSVSetEncodingAndDecodingRoundTrip() {
         let encoded = AppPreferenceRegistry.encodeCSVSet(["  KJV  ", "", "ESV", "KJV", "  "])
         XCTAssertEqual(encoded, "ESV,KJV,KJV")
@@ -426,6 +430,21 @@ final class AndBibleTests: XCTestCase {
     }
 
     #if os(iOS)
+    func testBuildStrongsMultiDocJSONReturnsInstallFallbackWhenNoStrongsDictionaryIsInstalled() throws {
+        let bridge = BibleBridge()
+        let modulePath = try makeTemporaryBundledSwordPath()
+        let manager = try XCTUnwrap(SwordManager(modulePath: modulePath))
+        let controller = BibleReaderController(bridge: bridge, swordManagerOverride: manager)
+
+        let multiDocJSON = try XCTUnwrap(
+            controller.buildStrongsMultiDocJSON(strongs: ["H00430"], robinson: []),
+            "Expected Android-style missing-document fallback when no Strong's dictionary is installed"
+        )
+
+        XCTAssertTrue(multiDocJSON.contains("No dictionary module installed"))
+        XCTAssertTrue(multiDocJSON.contains("download://?initials=StrongsHebrew"))
+    }
+
     @MainActor
     func testLoadCurrentContentEmitsBookIntroAndChapterMarkerForSecondCorinthiansOne() throws {
         let bridge = BibleBridge()

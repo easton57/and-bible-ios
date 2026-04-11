@@ -2915,6 +2915,10 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
             }
         }
 
+        if fragments.isEmpty, let firstStrongs = strongs.first {
+            fragments.append(missingStrongsDictionaryFragment(for: firstStrongs))
+        }
+
         if fragments.isEmpty {
             logger.info("handleStrongsLink: no definitions found")
             return nil
@@ -2924,6 +2928,48 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
             fragments: fragments,
             contentType: "strongs",
             stateJSON: stateJSON
+        )
+    }
+
+    /**
+     Builds the Android-style missing-document fallback shown when Strong's display is available
+     but no matching Strong's dictionary module is installed.
+
+     Android falls back to a synthetic dictionary document with a download link instead of leaving
+     the user with an enabled Strong's UI and no actionable destination.
+     */
+    private func missingStrongsDictionaryFragment(
+        for strongsNumber: String
+    ) -> (xml: String, key: String, keyName: String, bookInitials: String, bookAbbreviation: String, features: String) {
+        let isHebrew = Self.isHebrewStrongsNumber(strongsNumber)
+        let moduleName = isHebrew ? "StrongsHebrew" : "StrongsGreek"
+        let message = escapeXML(
+            Bundle.main.localizedString(
+                forKey: "no_dictionary_installed",
+                value: "No dictionary module installed. Download Strong's Hebrew/Greek from Downloads.",
+                table: nil
+            )
+        )
+        let downloadsLabel = escapeXML(
+            Bundle.main.localizedString(
+                forKey: "downloads",
+                value: "Downloads",
+                table: nil
+            )
+        )
+        let xml = """
+        <div>
+        <title type="x-gen">\(message)</title>
+        <p><a href="download://?initials=\(moduleName)">\(downloadsLabel)</a></p>
+        </div>
+        """
+        return (
+            xml: xml,
+            key: "\(moduleName)--missing",
+            keyName: moduleName,
+            bookInitials: moduleName,
+            bookAbbreviation: moduleName,
+            features: "{}"
         )
     }
 
@@ -3169,13 +3215,7 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
         let sanitizedBase = stripped.isEmpty ? numberOnly : stripped
 
         let categoryPrefix: String
-        if original.uppercased().hasPrefix("H") {
-            categoryPrefix = "H"
-        } else if original.uppercased().hasPrefix("G") {
-            categoryPrefix = "G"
-        } else {
-            categoryPrefix = (Int(sanitizedBase) ?? 0) > 5624 ? "H" : "G"
-        }
+        categoryPrefix = isHebrewStrongsNumber(original) ? "H" : "G"
 
         var keys: [String] = []
 
@@ -3200,6 +3240,16 @@ public final class BibleReaderController: NSObject, BibleBridgeDelegate {
         appendUnique(sanitizedBase)
 
         return keys
+    }
+
+    /// Mirrors Android's heuristic for inferring Hebrew-vs-Greek when the prefix is omitted.
+    static func isHebrewStrongsNumber(_ strongsNumber: String) -> Bool {
+        let normalized = strongsNumber.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if normalized.hasPrefix("H") { return true }
+        if normalized.hasPrefix("G") { return false }
+
+        let digits = String(normalized.drop(while: { $0.isLetter || $0 == "0" }))
+        return (Int(digits) ?? 0) > 5624
     }
 
     /**

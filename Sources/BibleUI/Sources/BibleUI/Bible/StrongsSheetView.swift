@@ -334,6 +334,22 @@ final class StrongsSheetDelegate: NSObject, BibleBridgeDelegate {
             handleFindAllLink(link)
             return
         }
+        // Android-style missing-document fallbacks route to Downloads.
+        if link.hasPrefix("download://") {
+            logger.info("StrongsSheet: handling as downloads link")
+            if let windowScene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).first,
+               let rootVC = windowScene.windows.first?.rootViewController {
+                var topVC = rootVC
+                while let presented = topVC.presentedViewController {
+                    topVC = presented
+                }
+                topVC.dismiss(animated: true) { [weak controller] in
+                    controller?.bridgeDidRequestOpenDownloads(bridge)
+                }
+            }
+            return
+        }
         // External links
         logger.info("StrongsSheet: handling as external URL")
         if let url = URL(string: link) {
