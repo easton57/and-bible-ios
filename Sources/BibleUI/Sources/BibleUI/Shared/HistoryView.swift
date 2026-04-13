@@ -63,17 +63,21 @@ public struct HistoryView: View {
      Builds the empty state or filtered history list with destructive toolbar actions.
      */
     public var body: some View {
+        let historySnapshot = history
         Group {
-            if history.isEmpty {
-                ContentUnavailableView(
-                    String(localized: "history_no_history"),
-                    systemImage: "clock",
-                    description: Text(String(localized: "history_no_history_description"))
-                )
-                .accessibilityIdentifier("historyEmptyState")
+            if historySnapshot.isEmpty {
+                VStack {
+                    ContentUnavailableView(
+                        String(localized: "history_no_history"),
+                        systemImage: "clock",
+                        description: Text(String(localized: "history_no_history_description"))
+                    )
+                    .accessibilityIdentifier("historyEmptyState")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(Array(history.enumerated()), id: \.element.id) { index, item in
+                    ForEach(historySnapshot, id: \.id) { item in
                         Button {
                             navigateTo(item)
                         } label: {
@@ -97,7 +101,7 @@ public struct HistoryView: View {
                         .accessibilityIdentifier(historyRowIdentifier(for: item))
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                deleteItem(at: index)
+                                deleteItem(item)
                             } label: {
                                 SwiftUI.Label(String(localized: "delete"), systemImage: "trash")
                             }
@@ -118,7 +122,7 @@ public struct HistoryView: View {
                 Button(String(localized: "done")) { dismiss() }
                     .accessibilityIdentifier("historyDoneButton")
             }
-            if !history.isEmpty {
+            if !historySnapshot.isEmpty {
                 ToolbarItem(placement: .destructiveAction) {
                     Button(String(localized: "clear"), role: .destructive) {
                         clearHistory()
@@ -150,7 +154,7 @@ public struct HistoryView: View {
     }
 
     /**
-     Resolves the deterministic accessibility identifier for one persisted history row.
+     * Resolves the deterministic accessibility identifier for one persisted history row.
      *
      * - Parameter item: History row whose durable key should back the identifier.
      * - Returns: Accessibility identifier stable across row reordering for the same history key.
@@ -203,20 +207,18 @@ public struct HistoryView: View {
     }
 
     /**
-     Deletes one visible history row by index from the filtered active-window history list.
+     Deletes one visible history row by model identity from the rendered history snapshot.
      *
-     * - Parameter index: Position of the row in the current `history` snapshot.
+     * - Parameter item: Persisted history row captured by the rendered swipe action.
      * - Side effects:
      *   - deletes the referenced `HistoryItem` from SwiftData
      *   - saves the mutated history state back to persistence
      * - Failure modes:
-     *   - returns without mutation when the index is outside the current filtered history bounds
      *   - silently discards save failures because row deletion is a user-driven destructive action
      *     with no dedicated retry surface in this view
      */
-    private func deleteItem(at index: Int) {
-        guard history.indices.contains(index) else { return }
-        modelContext.delete(history[index])
+    private func deleteItem(_ item: HistoryItem) {
+        modelContext.delete(item)
         try? modelContext.save()
     }
 
@@ -242,7 +244,8 @@ public struct HistoryView: View {
      Deletes every currently visible history row for the active window scope.
      */
     private func clearHistory() {
-        for item in history {
+        let visibleHistory = history
+        for item in visibleHistory {
             modelContext.delete(item)
         }
         try? modelContext.save()
