@@ -1551,7 +1551,7 @@ public struct BibleReaderView: View {
      */
     private var documentHeader: some View {
         let controller = focusedController
-        return VStack(spacing: 0) {
+        return AnyView(VStack(spacing: 0) {
             HStack {
                 if controller?.showingMyNotes == true {
                     // My Notes mode: show back button
@@ -1696,7 +1696,7 @@ public struct BibleReaderView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
             .background(.bar)
-        }
+        })
     }
 
     /**
