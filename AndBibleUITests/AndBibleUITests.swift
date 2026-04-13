@@ -5271,13 +5271,14 @@ final class AndBibleUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
 
         repeat {
-            let button = requireReaderActionControl(
+            guard let button = tryResolveReaderActionControl(
                 identifier,
                 in: app,
-                timeout: min(3, max(1, deadline.timeIntervalSinceNow)),
-                file: file,
-                line: line
-            )
+                timeout: min(3, max(1, deadline.timeIntervalSinceNow))
+            ) else {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                continue
+            }
             if waitForElementToBecomeHittable(button, timeout: min(1.5, max(0.5, deadline.timeIntervalSinceNow))) {
                 button.tap()
             } else if let overflowMenu = resolvedElement("readerOverflowMenu", in: app),
@@ -5301,6 +5302,13 @@ final class AndBibleUITests: XCTestCase {
             } while Date() < settleDeadline
         } while Date() < deadline
 
+        let button = requireReaderActionControl(
+            identifier,
+            in: app,
+            timeout: min(5, timeout),
+            file: file,
+            line: line
+        )
         if let actionSurface = ensureReaderActionSurface(
             for: identifier,
             in: app,
@@ -5308,7 +5316,6 @@ final class AndBibleUITests: XCTestCase {
             file: file,
             line: line
         ) {
-            let button = resolveReaderActionElement(identifier, in: app, actionSurface: actionSurface)
             XCTAssertTrue(
                 button.isHittable || isElementVisible(button, within: actionSurface),
                 "Expected element '\(identifier)' to become tappable within \(timeout) seconds.",

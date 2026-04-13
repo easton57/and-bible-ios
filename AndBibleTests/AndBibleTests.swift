@@ -8,7 +8,6 @@ import SQLite3
 @testable import BibleView
 #if os(iOS)
 import UIKit
-import WebKit
 import struct SwiftUI.Color
 #endif
 
@@ -16,26 +15,14 @@ private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self
 
 final class AndBibleTests: XCTestCase {
     #if os(iOS)
-    private final class RecordingWebView: WKWebView {
+    @MainActor
+    private func makeRecordingBridge() -> (BibleBridge, () -> [String]) {
+        let bridge = BibleBridge()
         var evaluatedScripts: [String] = []
-
-        init() {
-            super.init(frame: .zero, configuration: WKWebViewConfiguration())
+        bridge.javaScriptEvaluationObserver = { script in
+            evaluatedScripts.append(script)
         }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        @MainActor
-        override func evaluateJavaScript(
-            _ javaScriptString: String,
-            completionHandler: ((Any?, Error?) -> Void)? = nil
-        ) {
-            evaluatedScripts.append(javaScriptString)
-            completionHandler?(nil, nil)
-        }
+        return (bridge, { evaluatedScripts })
     }
     #endif
 
@@ -484,9 +471,7 @@ final class AndBibleTests: XCTestCase {
 
     @MainActor
     func testLoadCurrentContentEmitsBookIntroAndChapterMarkerForSecondCorinthiansOne() throws {
-        let bridge = BibleBridge()
-        let webView = RecordingWebView()
-        bridge.webView = webView
+        let (bridge, recordedScripts) = makeRecordingBridge()
         let modulePath = try makeTemporaryBundledSwordPath()
         let manager = try XCTUnwrap(SwordManager(modulePath: modulePath))
 
@@ -500,7 +485,7 @@ final class AndBibleTests: XCTestCase {
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
 
         let addDocumentsScript = try XCTUnwrap(
-            webView.evaluatedScripts.first(where: { $0.contains("emit('add_documents'") })
+            recordedScripts().first(where: { $0.contains("emit('add_documents'") })
         )
         let hasSecondCorinthiansChapterMarker = addDocumentsScript.range(
             of: #"osisID=\\"2Cor\.1\\""#,
@@ -519,9 +504,7 @@ final class AndBibleTests: XCTestCase {
 
     @MainActor
     func testLoadCurrentContentEmitsRenderableChapterMarkerForSecondCorinthiansTwo() throws {
-        let bridge = BibleBridge()
-        let webView = RecordingWebView()
-        bridge.webView = webView
+        let (bridge, recordedScripts) = makeRecordingBridge()
         let modulePath = try makeTemporaryBundledSwordPath()
         let manager = try XCTUnwrap(SwordManager(modulePath: modulePath))
 
@@ -535,7 +518,7 @@ final class AndBibleTests: XCTestCase {
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
 
         let addDocumentsScript = try XCTUnwrap(
-            webView.evaluatedScripts.first(where: { $0.contains("emit('add_documents'") })
+            recordedScripts().first(where: { $0.contains("emit('add_documents'") })
         )
         let hasSecondCorinthiansChapterMarker = addDocumentsScript.range(
             of: #"osisID=\\"2Cor\.2\\""#,
@@ -553,9 +536,7 @@ final class AndBibleTests: XCTestCase {
     }
     @MainActor
     func testLoadCurrentContentDoesNotHighlightRestoredReadingPosition() throws {
-        let bridge = BibleBridge()
-        let webView = RecordingWebView()
-        bridge.webView = webView
+        let (bridge, recordedScripts) = makeRecordingBridge()
         let modulePath = try makeTemporaryBundledSwordPath()
         let manager = try XCTUnwrap(SwordManager(modulePath: modulePath))
 
@@ -574,7 +555,7 @@ final class AndBibleTests: XCTestCase {
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
 
         let addDocumentsScript = try XCTUnwrap(
-            webView.evaluatedScripts.first(where: { $0.contains("emit('add_documents'") })
+            recordedScripts().first(where: { $0.contains("emit('add_documents'") })
         )
 
         XCTAssertTrue(
@@ -585,9 +566,7 @@ final class AndBibleTests: XCTestCase {
 
     @MainActor
     func testLoadCurrentContentHighlightsExplicitVerseNavigationTarget() throws {
-        let bridge = BibleBridge()
-        let webView = RecordingWebView()
-        bridge.webView = webView
+        let (bridge, recordedScripts) = makeRecordingBridge()
         let modulePath = try makeTemporaryBundledSwordPath()
         let manager = try XCTUnwrap(SwordManager(modulePath: modulePath))
 
@@ -598,7 +577,7 @@ final class AndBibleTests: XCTestCase {
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
 
         let addDocumentsScript = try XCTUnwrap(
-            webView.evaluatedScripts.first(where: { $0.contains("emit('add_documents'") })
+            recordedScripts().first(where: { $0.contains("emit('add_documents'") })
         )
 
         XCTAssertTrue(

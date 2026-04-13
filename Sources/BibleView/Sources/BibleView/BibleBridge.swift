@@ -180,6 +180,9 @@ public final class BibleBridge: NSObject, WKScriptMessageHandler {
     /// Reference to the web view for sending responses.
     public weak var webView: WKWebView?
 
+    /// Test-only observer used to record emitted JavaScript without constructing a live WKWebView.
+    var javaScriptEvaluationObserver: ((String) -> Void)?
+
     /// Whether the ambiguous selection modal should be size-limited.
     public var limitAmbiguousModalSize: Bool = false
 
@@ -601,6 +604,10 @@ public final class BibleBridge: NSObject, WKScriptMessageHandler {
 
     private func evaluateJavaScript(_ js: String) {
         let execute = { [weak self] in
+            if let observer = self?.javaScriptEvaluationObserver {
+                observer(js)
+                return
+            }
             guard let webView = self?.webView else {
                 NSLog("BRIDGE-JS: webView is nil! Cannot evaluate: %@", String(js.prefix(200)))
                 return
